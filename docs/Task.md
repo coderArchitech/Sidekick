@@ -59,7 +59,7 @@ All Phase 0 code and automated tests are done and green on Linux, Windows and ma
 | T-017 | `ingest` crate: parse, chunk, embed | 🟡 In progress: testing | Waiting on dependency: image files need a vision model (T-025/T-026); Gemini, Voyage and Ollama embeddings come with T-026. Everything else done |
 | T-018 | `retrieval` crate: hybrid search and context packs | 🟡 In progress: testing | Waiting on dependency: the latest screenshot joins the pack with T-025. Everything else done; 20k-chunk search 8 ms in release |
 | T-019 | Library feature: documents in a session | 🟡 In progress: testing | Waiting on dependency: Playwright drag-and-drop spec comes with the UI suite (T-032); native picker/drop check on Windows/macOS |
-| T-020 | Orchestrator: question detection and modes | ⬜ To do | |
+| T-020 | Orchestrator: question detection and modes | ✅ Done | Rules meet the targets on a never-tuned set (95% / 100%); real-meeting check in T-039 |
 | T-021 | Orchestrator: prompts, Skills, two-tier answers | ⬜ To do | |
 | T-022 | Live Answers tab | ⬜ To do | |
 | T-023 | Chat tab | ⬜ To do | |
@@ -381,11 +381,14 @@ All Phase 0 code and automated tests are done and green on Linux, Windows and ma
 **Scope:** Rules for interrogatives and implicit asks; name and nickname matching (fuzzy, tolerant of STT spelling); optional small-model classifier; Auto vs Directed-only mode with header button and hotkey; manual asks in both modes; early detection on interim results for directed questions.
 
 **Tests**
-- [ ] Unit: labelled fixture set of 200+ utterances; precision ≥ 85%, recall ≥ 80% (PRD success metrics).
-- [ ] Unit: name matching with misspellings and nicknames; no false trigger on similar words.
-- [ ] Unit: Directed-only mode ignores undirected questions; manual asks always answered.
-- [ ] Unit: debounce waits 600 ms after segment end and merges split questions.
-- [ ] Component: Auto button and hotkey toggle mode and persist the session setting.
+- [x] Unit: labelled set of 200 utterances: precision 100%, recall 98%. This set was used to write the rules, so it's optimistic.
+- [x] Unit: held-out round 1 (40 lines) scored 69.6% / 80% on the first rules; its mistakes led to general fixes (trust STT punctuation, narrower request patterns, "is there…"), so it's now tuning data (100% / 100%).
+- [x] Unit: held-out round 2 (40 lines, written after the fixes, never tuned on): precision 95.2%, recall 100%.
+- [x] Unit: name matching with misspellings (edit distance scaled to name length) and nicknames, possessives, multi-word names; no false trigger on similar words.
+- [x] Unit: Directed-only answers only directed questions; Auto answers all. Manual asks (Chat) arrive with T-023 and are always answered.
+- [x] Unit: 600 ms debounce; split questions merged; the user speaking or another speaker ends a turn; question at the end of a longer turn found; the user's own questions ignored.
+- [x] Component: Auto button and hotkey toggle the mode and persist the session setting; detection wired to live transcript events.
+- [ ] Real-meeting precision/recall on recorded fixtures (T-039). A small-model classifier stays optional unless that falls short.
 
 ### T-021 Orchestrator: prompts, Skills, two-tier answers
 

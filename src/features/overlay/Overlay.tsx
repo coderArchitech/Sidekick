@@ -1,8 +1,9 @@
 import { useEffect, useState } from "react";
 import { Library } from "@/features/library";
-import { SessionBar } from "@/features/session";
+import { SessionBar, useSessionStore } from "@/features/session";
 import { TranscriptView } from "@/features/transcript";
 import { commands, type AppInfo } from "@/ipc";
+import { useQuestionDetection } from "@/orchestrator";
 import { ProtectionShield } from "./ProtectionShield";
 import { useHotkeyActions } from "./useHotkeyActions";
 import { MAX_OPACITY, MIN_OPACITY, TABS, useOverlayStore, type Tab } from "./store";
@@ -19,6 +20,7 @@ export function Overlay() {
   const { tab, opacity, setTab, setOpacity } = useOverlayStore();
   const [info, setInfo] = useState<AppInfo | null>(null);
   useHotkeyActions();
+  useQuestionDetection(useSessionStore((s) => s.session));
 
   useEffect(() => {
     void commands.appInfo().then((result) => {

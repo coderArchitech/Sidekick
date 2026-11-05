@@ -127,3 +127,27 @@ describe("mock start without consent", () => {
     expect(started.status === "error" && started.error.code).toBe("CONSENT_REQUIRED");
   });
 });
+
+describe("Auto-answer toggle", () => {
+  beforeEach(() => {
+    resetMocks();
+    useSessionStore.setState({ session: null, warnings: [], error: null, busy: false });
+  });
+
+  it("shows the session's setting and toggles it", async () => {
+    const user = userEvent.setup();
+    render(<SessionBar />);
+    await createSession(user);
+    const auto = screen.getByRole("button", { name: "Auto" });
+    expect(auto).toHaveAttribute("aria-pressed", "true"); // default on
+    await user.click(auto);
+    await waitFor(() =>
+      expect(screen.getByRole("button", { name: "Auto" })).toHaveAttribute("aria-pressed", "false"),
+    );
+    const s = useSessionStore.getState().session;
+    const stored = await mockCommands.listSessions(null, null);
+    expect(
+      stored.status === "ok" && stored.data.items.find((x) => x.id === s?.id)?.autoAnswer,
+    ).toBe(false);
+  });
+});

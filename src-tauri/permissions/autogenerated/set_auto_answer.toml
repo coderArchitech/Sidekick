@@ -1,0 +1,11 @@
+# Automatically generated - DO NOT EDIT!
+
+[[permission]]
+identifier = "allow-set-auto-answer"
+description = "Enables the set_auto_answer command without any pre-configured scope."
+commands.allow = ["set_auto_answer"]
+
+[[permission]]
+identifier = "deny-set-auto-answer"
+description = "Denies the set_auto_answer command without any pre-configured scope."
+commands.deny = ["set_auto_answer"]

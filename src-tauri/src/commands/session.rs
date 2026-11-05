@@ -287,3 +287,17 @@ pub fn add_bookmark(
 ) -> SidekickResult<repo::Bookmark> {
     repo::add_bookmark(&state.db(), &session_id, at_ms, label.as_deref())
 }
+
+/// Auto-answer on/off for the session (PRD QA-3: header button and hotkey).
+#[tauri::command]
+#[specta::specta]
+pub fn set_auto_answer(
+    app: AppHandle,
+    state: State<'_, AppState>,
+    session_id: String,
+    on: bool,
+) -> SidekickResult<Session> {
+    let session = repo::set_auto_answer(&state.db(), &session_id, on)?;
+    changed(&app, &session);
+    Ok(session)
+}

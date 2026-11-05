@@ -468,6 +468,11 @@ export const mockCommands: Commands = {
     sessions.delete(sessionId);
     return Promise.resolve({ status: "ok", data: null });
   },
+  setAutoAnswer: (sessionId, on) => {
+    const s = sessions.get(sessionId);
+    if (!s) return Promise.resolve(err("INTERNAL", "That session no longer exists."));
+    return Promise.resolve(save({ ...s, autoAnswer: on }));
+  },
   getTranscript: (sessionId) =>
     Promise.resolve({
       status: "ok",

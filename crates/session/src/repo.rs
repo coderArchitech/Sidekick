@@ -341,3 +341,14 @@ pub fn list_bookmarks(db: &Database, session_id: &str) -> SidekickResult<Vec<Boo
     rows.collect::<Result<_, _>>()
         .map_err(|e| db_err("reading bookmarks", &e))
 }
+
+/// Turns Auto-answer on or off for one session (PRD QA-3).
+pub fn set_auto_answer(db: &Database, session_id: &str, on: bool) -> SidekickResult<Session> {
+    db.conn()
+        .execute(
+            "UPDATE sessions SET auto_answer = ?2 WHERE id = ?1",
+            params![session_id, on],
+        )
+        .map_err(|e| db_err("updating a session", &e))?;
+    get(db, session_id)
+}

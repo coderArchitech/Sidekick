@@ -23,8 +23,8 @@ fn permissions() -> HashMap<String, Vec<String>> {
 }
 
 /// Commands only the Settings window may call.
+// The overlay may read settings (profile names for detection) but not change them.
 const SETTINGS_ONLY: &[&str] = &[
-    "allow-get-settings",
     "allow-update-settings",
     "allow-list-providers",
     "allow-set-api-key",

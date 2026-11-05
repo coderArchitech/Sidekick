@@ -62,3 +62,19 @@ describe("global shortcut actions", () => {
     expect(useSessionStore.getState().session?.status).toBe("live");
   });
 });
+
+describe("auto-answer shortcut", () => {
+  beforeEach(() => {
+    resetMocks();
+    useSessionStore.setState({ session: null, warnings: [], error: null, busy: false });
+  });
+
+  it("toggles Auto-answer for the session", async () => {
+    await liveSession();
+    render(<Harness />);
+    await tick();
+    mockSessionBus.emit("hotkey", { action: "auto_answer" });
+    await tick();
+    expect(useSessionStore.getState().session?.autoAnswer).toBe(false);
+  });
+});

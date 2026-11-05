@@ -27,6 +27,7 @@ const COMMANDS: &[&str] = &[
     "get_transcript",
     "rename_speaker",
     "add_bookmark",
+    "set_auto_answer",
     "ingest_document",
     "ingest_url",
     "list_documents",

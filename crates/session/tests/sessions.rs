@@ -458,3 +458,20 @@ async fn profile_names_reach_every_stt_stream_as_keyterms() {
         ]
     );
 }
+
+#[test]
+fn auto_answer_is_per_session() {
+    let db = db();
+    let a = repo::create(&db, &new("A")).unwrap();
+    let b = repo::create(&db, &new("B")).unwrap();
+    assert!(
+        !repo::set_auto_answer(&db, &a.id, false)
+            .unwrap()
+            .auto_answer
+    );
+    assert!(
+        repo::get(&db, &b.id).unwrap().auto_answer,
+        "other sessions unchanged"
+    );
+    assert!(repo::set_auto_answer(&db, &a.id, true).unwrap().auto_answer);
+}

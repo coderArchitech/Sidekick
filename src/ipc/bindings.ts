@@ -235,6 +235,17 @@ export const commands = {
     }
   },
   /**
+   * Auto-answer on/off for the session (PRD QA-3: header button and hotkey).
+   */
+  async setAutoAnswer(sessionId: string, on: boolean): Promise<Result<Session, SidekickError>> {
+    try {
+      return { status: "ok", data: await TAURI_INVOKE("set_auto_answer", { sessionId, on }) };
+    } catch (e) {
+      if (e instanceof Error) throw e;
+      else return { status: "error", error: e as any };
+    }
+  },
+  /**
    * Queues a file for parsing and embedding.
    */
   async ingestDocument(sessionId: string, path: string): Promise<Result<null, SidekickError>> {

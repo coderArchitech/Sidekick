@@ -5,8 +5,8 @@ import { sessionEvents, type Action } from "@/ipc";
 
 /**
  * Runs overlay actions for global shortcuts (PRD UI-6). Show/hide is handled in
- * Rust. Ask, Screenshot, Auto-answer and Switch Skill hook in when their
- * features land (T-023, T-025, T-020, T-028).
+ * Rust. Ask, Screenshot and Switch Skill hook in when their features land
+ * (T-023, T-025, T-028).
  */
 export function useHotkeyActions() {
   useEffect(() => {
@@ -31,6 +31,9 @@ export async function handle(action: Action): Promise<void> {
       break;
     case "bookmark":
       await bookmarkNow(store.session);
+      break;
+    case "auto_answer":
+      await store.toggleAuto();
       break;
     default:
       break;
