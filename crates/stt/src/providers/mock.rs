@@ -49,6 +49,10 @@ impl SttProvider for MockSttProvider {
                 () = cancel.cancelled() => break,
                 f = frames.recv() => match f {
                     Some(f) if f.speech => {
+                        // A jump in time (e.g. a pause) ends the utterance, like silence does.
+                        if burst.is_some_and(|(_, end)| f.start_ms > end) {
+                            flush(&mut burst, &mut count);
+                        }
                         let end = f.start_ms + u64::from(FRAME_MS);
                         if burst.is_none() {
                             sink.partial(Partial { kind: config.kind, text: "Mock".into() });

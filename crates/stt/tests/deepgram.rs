@@ -440,3 +440,37 @@ async fn mock_provider_turns_speech_bursts_into_segments() {
         ]
     );
 }
+
+#[tokio::test]
+async fn mock_provider_splits_on_a_time_gap() {
+    let sink = Arc::new(Sink::default());
+    let (tx, rx) = tokio::sync::mpsc::channel(100);
+    let s: Arc<dyn SttSink> = sink.clone();
+    let task = tokio::spawn(async move {
+        MockSttProvider
+            .run(
+                SttConfig::new(StreamKind::Mic),
+                None,
+                rx,
+                s,
+                CancellationToken::new(),
+            )
+            .await
+    });
+    // Frames 0, 1 then 10, 11: no silent frame, but 400 ms missing (a pause).
+    for i in [0u64, 1, 10, 11] {
+        let mut f = frame(i, true);
+        f.kind = StreamKind::Mic;
+        tx.send(f).await.unwrap();
+    }
+    drop(tx);
+    task.await.unwrap().unwrap();
+    let spans: Vec<(u64, u64)> = sink
+        .segments
+        .lock()
+        .unwrap()
+        .iter()
+        .map(|s| (s.start_ms, s.end_ms))
+        .collect();
+    assert_eq!(spans, [(0, 100), (500, 600)]);
+}

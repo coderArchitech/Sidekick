@@ -11,9 +11,11 @@ use tauri::{AppHandle, State};
 use crate::events::TauriAnswerSink;
 use crate::state::AppState;
 
+// Async so it runs on Tauri's Tokio runtime: the gateway spawns the stream as a
+// Tokio task, which panics on the main thread where sync commands run.
 #[tauri::command]
 #[specta::specta]
-pub fn llm_stream(
+pub async fn llm_stream(
     app: AppHandle,
     state: State<'_, AppState>,
     request_id: String,

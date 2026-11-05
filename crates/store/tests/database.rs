@@ -35,7 +35,7 @@ fn seed_session(db: &Database, id: &str) {
              INSERT INTO questions (id, session_id, source, text, created_at) VALUES ('{id}-q', '{id}', 'chat', 'Rate limit?', 1);
              INSERT INTO answers (id, question_id, body_md, sources_json, provider, model, latency_ms, created_at)
                VALUES ('{id}-ans', '{id}-q', '600/min', '[]', 'mock', 'm', 10, 1);
-             INSERT INTO consent_log (id, session_id, option, confirmed_at) VALUES ('{id}-c', '{id}', 'me_only', 1);"
+             INSERT INTO consent_log (id, session_id, session_title, option, confirmed_at) VALUES ('{id}-c', '{id}', 'Acme QBR', 'me_only', 1);"
         ))
         .unwrap();
 }
@@ -107,7 +107,7 @@ fn file_on_disk_is_encrypted() {
 }
 
 #[test]
-fn deleting_a_session_cascades_to_every_child_table() {
+fn deleting_a_session_cascades_to_every_child_table_except_consent() {
     let db = Database::open_in_memory(&key('a')).unwrap();
     seed_session(&db, "s1");
     seed_session(&db, "s2");
@@ -124,10 +124,11 @@ fn deleting_a_session_cascades_to_every_child_table() {
         "bookmarks",
         "questions",
         "answers",
-        "consent_log",
     ] {
         assert_eq!(count(&db, table), 1, "{table} should only hold s2's row");
     }
+    // The consent log outlives its session (tech doc 4.4, migration 0002).
+    assert_eq!(count(&db, "consent_log"), 2);
 }
 
 #[test]
@@ -212,4 +213,41 @@ fn settings_round_trip() {
     );
     assert_eq!(settings::get(&db, "missing").unwrap(), None);
     assert_eq!(settings::all(&db).unwrap().len(), 2);
+}
+
+#[test]
+fn upgrading_from_0001_keeps_consent_rows_with_their_title() {
+    // Simulates an existing user: create the v1 schema directly, add data, then open (runs 0002).
+    let dir = tempfile::tempdir().unwrap();
+    let path = dir.path().join(DB_FILE_NAME);
+    {
+        let conn = rusqlite::Connection::open(&path).unwrap();
+        conn.pragma_update(None, "key", format!("x'{}'", "a".repeat(64)))
+            .unwrap();
+        conn.execute_batch(include_str!("../migrations/0001_init.sql"))
+            .unwrap();
+        conn.pragma_update(None, "user_version", 1).unwrap();
+        conn.execute_batch(
+            "INSERT INTO sessions (id, title, status, stt_provider, llm_provider, llm_model, created_at)
+               VALUES ('s1', 'Old meeting', 'ended', 'deepgram', 'anthropic', 'm', 1);
+             INSERT INTO consent_log (id, session_id, option, confirmed_at) VALUES ('c1', 's1', 'participants_agreed', 5);",
+        )
+        .unwrap();
+    }
+    let db = Database::open(&path, &key('a')).unwrap();
+    assert_eq!(db.schema_version().unwrap(), LATEST_VERSION);
+    assert_eq!(db.backups().len(), 1, "backed up before migrating");
+    let title: String = db
+        .conn()
+        .query_row(
+            "SELECT session_title FROM consent_log WHERE id = 'c1'",
+            [],
+            |r| r.get(0),
+        )
+        .unwrap();
+    assert_eq!(title, "Old meeting");
+    db.conn()
+        .execute("DELETE FROM sessions WHERE id = 's1'", [])
+        .unwrap();
+    assert_eq!(count(&db, "consent_log"), 1);
 }

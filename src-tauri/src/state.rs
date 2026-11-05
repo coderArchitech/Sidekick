@@ -14,6 +14,10 @@ pub struct AppState {
     db: Mutex<Database>,
     pub gateway: Gateway,
     pub diagnostics: Arc<Recorder>,
+    pub keys: Arc<dyn KeyStore>,
+    /// The one live (or paused) session, if any: its id and runner.
+    pub live: tokio::sync::Mutex<Option<(String, sidekick_session::LiveSession)>>,
+    pub mock: bool,
 }
 
 impl AppState {
@@ -53,6 +57,9 @@ impl AppState {
             db: Mutex::new(db),
             gateway,
             diagnostics,
+            keys,
+            live: tokio::sync::Mutex::new(None),
+            mock,
         })
     }
 

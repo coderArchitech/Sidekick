@@ -63,7 +63,7 @@ The problem it solves: in context-heavy meetings, people can't recall details fr
 
 | Field | Value |
 | --- | --- |
-| Version | 1.3 (draft) |
+| Version | 1.4 (draft) |
 | Owner | @nitesh |
 | Status | Draft, in development (Phase 0) |
 | Review cadence | At every minor release, and whenever an ADR is added |
@@ -76,6 +76,7 @@ The problem it solves: in context-heavy meetings, people can't recall details fr
 | 1.1 | Nov 5, 2026 | Repo scaffolded. Added ADR-011 (Cargo workspace, one crate per module) and ADR-012 (frontend feature boundaries); updated 3.2, 3.5, 6, 7.1, 9.1, 14; added 7.8 module boundaries; diagrams redrawn in Mermaid; proposed changes listed in 14.6 |
 | 1.2 | Nov 5, 2026 | Added the implementation task list ([Task.md](Task.md)) and linked it from 1.6 and 14.1 |
 | 1.3 | Nov 5, 2026 | Applied P1–P5 (14.6): `EmbeddingProvider` and ADR-013; `web_search` command; per-question concurrency; FTS sync triggers; name vocabulary P0 |
+| 1.4 | Nov 5, 2026 | T-013: `session` crate (consent merged into it), migration 0002 (consent log outlives sessions), session commands and events; SQL ownership rule in 7.8 |
 
 ### 1.6 Related documents
 
@@ -210,8 +211,8 @@ Each module below is its own crate at `crates/<module>/`, named `sidekick-<modul
 | `gateway` | Provider catalog (all kinds, for Settings); `LlmProvider` adapters (Anthropic, mock; OpenAI, Gemini, Ollama in T-026); the only place keys are attached; streaming via an `AnswerSink` the shell implements; retries with backoff and `Retry-After`; cancellation; key checks before saving. `SearchProvider` and `EmbeddingProvider` arrive with T-046 and T-017 | Started (LLM done) |
 | `secrets` | `KeyStore` trait with `KeychainStore` (OS keychain, service `sidekick`) and `MemoryStore` (tests, mock mode); keys as `SecretString`; `KeyStatus` exposes only the last 4 characters; account names restricted to `[a-z0-9-]` | Done |
 | `skills` | Load, validate, import and export Skill files | Not started |
-| `session` | Session lifecycle: create, start, pause, stop, delete | Not started |
-| `consent` | Enforce consent confirmation before capturing others; write consent log | Not started |
+| `session` | Session lifecycle (draft → live ⇄ paused → ended) and consent rules as pure functions; SQL for `sessions`, `consent_log` and `transcript_segments`; `LiveSession` runs one audio capture + one STT run per allowed stream, falling back to the mic with a warning if system audio is unavailable | Started (T-013) |
+| `consent` | Merged into `session`: consent is part of the session lifecycle (`streams_for(consent)` decides which streams may start) | Merged |
 | `usage` | Count STT minutes and LLM tokens per provider; estimate cost | Not started |
 | `diagnostics` | `Recorder`: per-stage latency samples (last 15 min, max 1,000) with nearest-rank p50/p95 and health against the 10.1/13.1 targets; the gateway records LLM first-token time; the frontend reports question→cue/answer via `record_latency`. Health checks and log export arrive with T-031 | Started (latency done) |
 | `core` | `SidekickError` and error codes (5.4); IDs and provider traits as they are needed | Started |
@@ -498,12 +499,16 @@ CREATE TABLE skills (
   updated_at INTEGER NOT NULL
 );
 
+-- Replaced by migration 0002: the consent log has no foreign key, so it
+-- outlives a deleted session (section 4.4), and keeps a copy of the title.
 CREATE TABLE consent_log (
-  id TEXT PRIMARY KEY,
-  session_id TEXT NOT NULL REFERENCES sessions(id) ON DELETE CASCADE,
-  option TEXT NOT NULL CHECK (option IN ('participants_agreed','me_only')),
-  confirmed_at INTEGER NOT NULL
+  id            TEXT PRIMARY KEY,
+  session_id    TEXT NOT NULL,
+  session_title TEXT NOT NULL DEFAULT '',
+  option        TEXT NOT NULL CHECK (option IN ('participants_agreed','me_only')),
+  confirmed_at  INTEGER NOT NULL
 );
+CREATE INDEX idx_consent_session ON consent_log(session_id);
 
 CREATE TABLE usage (
   id INTEGER PRIMARY KEY,
@@ -578,11 +583,11 @@ Commands are request/response calls from the frontend to Rust (`invoke`). All re
 | --- | --- | --- | --- |
 | `create_session` | `title, skill_id?` | `Session` | Create a draft session |
 | `confirm_consent` | `session_id, option` | `()` | Record consent choice; required before `start_session` |
-| `start_session` | `session_id` | `SessionState` | Start audio capture and STT |
-| `pause_session` / `resume_session` | `session_id` | `SessionState` | Pause or resume listening |
-| `end_session` | `session_id` | `SessionSummary` | Stop capture; trigger summary |
-| `delete_session` | `session_id` | `()` | Delete all session data |
-| `list_sessions` | `cursor?, limit` | `Page<SessionMeta>` | Session history, newest first |
+| `start_session` | `session_id` | `SessionStarted` (`session`, `warnings`) | Start audio capture and STT for the streams the consent allows; `CONSENT_REQUIRED` without consent; one live session at a time. With `SIDEKICK_AUDIO_FIXTURE`, the file plays as a single stream |
+| `pause_session` / `resume_session` | `session_id` | `Session` | Pause or resume listening (paused audio is dropped, never sent) |
+| `end_session` | `session_id` | `Session` | Stop capture and let STT flush; the summary arrives with T-024 |
+| `delete_session` | `session_id` | `()` | Delete all session data (the consent record is kept, 4.4) |
+| `list_sessions` | `cursor?, limit?` | `SessionPage` (`items`, `nextCursor`) | Session history, newest first |
 | `ingest_document` | `session_id or pack_id, file_path` | `DocumentId` | Queue a document for parsing and embedding |
 | `delete_document` | `document_id` | `()` | Remove document and its chunks |
 | `capture_screenshot` | `mode: region / window / screen` | `Screenshot` | Capture and store a screenshot |
@@ -611,7 +616,7 @@ Commands are request/response calls from the frontend to Rust (`invoke`). All re
 
 ### 5.2 Events
 
-Events are pushed from Rust to the frontend. Payloads are typed and versioned with the app. Tauri event names can't contain dots, so the wire names use a dash (`answer-token`); the table keeps the dotted names for readability. In TypeScript, features subscribe through `answerEvents` from `@/ipc`, which also works with the browser mocks. Status: `answer.token`, `answer.done` and `answer.error` are implemented.
+Events are pushed from Rust to the frontend. Payloads are typed and versioned with the app. Tauri event names can't contain dots, so the wire names use a dash (`answer-token`); the table keeps the dotted names for readability. In TypeScript, features subscribe through `answerEvents` from `@/ipc`, which also works with the browser mocks. Status: `answer.*`, `session.state` (`session-changed`, payload `{ session }`), `transcript.partial`, `transcript.segment` (already saved, with its row `id`) and `stt.status` (`stt-status-changed`) are implemented. Features subscribe through `answerEvents` and `sessionEvents` from `@/ipc`.
 
 | Event | Payload | When |
 | --- | --- | --- |
@@ -1011,6 +1016,7 @@ These rules keep each part replaceable on its own. The compiler (Rust) and ESLin
 | `sidekick-core` depends on no other Sidekick crate and not on Tauri | *Enforced* by its `Cargo.toml` |
 | Domain crates depend on `sidekick-core` and only the other crates they genuinely need; no cycles | *Enforced* by Cargo (cycles don't compile) |
 | Domain crates never depend on `tauri`. If a crate must emit events or touch windows, the shell passes it a trait or callback | Code review; `cargo tree -p sidekick-<name> -i tauri` should be empty |
+| `store` owns the schema and migrations; each domain crate owns the SQL for its own tables (through `Database::conn()`), e.g. `session::repo` for `sessions`, `consent_log`, `transcript_segments` | Code review |
 | `src-tauri` has no business logic: commands validate, call a crate, map the result | Code review |
 | Shared dependency versions live in `[workspace.dependencies]`; crates use `dep.workspace = true` | Code review |
 | Provider adapters live inside their crate (`crates/stt/src/providers/deepgram.rs`), behind the trait from `sidekick-core` | Code review |

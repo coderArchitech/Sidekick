@@ -52,7 +52,7 @@ All Phase 0 code and automated tests are done and green on Linux, Windows and ma
 
 | ID | Task | Status | Notes |
 | --- | --- | --- | --- |
-| T-013 | Sessions and consent | ⬜ To do | |
+| T-013 | Sessions and consent | 🟡 In progress: testing | Automated tests pass; real-app run and E2E (T-033) pending |
 | T-014 | Live transcript tab | ⬜ To do | |
 | T-015 | `hotkeys` crate: global shortcuts | ⬜ To do | 🖥️ |
 | T-016 | Profile: name and nicknames | ⬜ To do | |
@@ -284,13 +284,17 @@ All Phase 0 code and automated tests are done and green on Linux, Windows and ma
 **Scope:** `session` and `consent` crates; lifecycle draft → live → paused → ended; consent dialog with "Participants agreed" and "Transcribe me only"; me-only mode starts only the mic stream; consent log kept 1 year.
 
 **Tests**
-- [ ] Unit: allowed and rejected lifecycle transitions.
-- [ ] Unit: `start_session` without consent returns `CONSENT_REQUIRED`.
-- [ ] Unit: me-only consent starts mic capture only; system audio never starts.
-- [ ] Integration: consent log row written with date and option; survives session deletion rules (1 year).
-- [ ] Integration: `list_sessions` pagination (cursor, limit default 50, max 200).
-- [ ] Component: consent dialog blocks Start until an option is chosen.
-- [ ] E2E: create session → consent → start with fixture audio → transcript appears → end.
+- [x] Unit: allowed and rejected lifecycle transitions; wire values round-trip.
+- [x] Unit: starting without consent returns `CONSENT_REQUIRED`.
+- [x] Integration: me-only consent starts mic capture only; system audio never starts. Participants-agreed starts both.
+- [x] Integration: system audio unavailable → continues with the mic and a warning; no mic → start fails cleanly.
+- [x] Integration: consent log row written with option and time; latest choice wins; only before start; survives session deletion (migration 0002, tested from a real v1 database).
+- [x] Integration: `list_sessions` pagination (cursor, default 50, max 200, bad cursor rejected).
+- [x] Integration: lifecycle timestamps (first start kept, end recorded); segments saved and deleted with the session.
+- [x] Integration: pause drops audio and splits the transcript; stop flushes STT.
+- [x] Component: session bar creates, starts, pauses, resumes and ends; consent dialog needs a choice, Cancel/Escape start nothing, focus starts on the first option; errors shown; axe passes.
+- [ ] Manual: real app with `SIDEKICK_MOCK_PROVIDERS=1` and `SIDEKICK_AUDIO_FIXTURE`: start a session, see it go live, end it (transcript UI is T-014).
+- [ ] E2E: create session → consent → start with fixture audio → transcript appears → end (needs the WebdriverIO harness, T-033).
 
 ### T-014 Live transcript tab
 

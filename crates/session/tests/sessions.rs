@@ -1,0 +1,349 @@
+//! Integration tests for sessions and consent (Task T-013).
+
+#![allow(
+    clippy::unwrap_used,
+    clippy::cast_possible_truncation,
+    clippy::cast_precision_loss
+)]
+
+use std::path::Path;
+use std::sync::{Arc, Mutex};
+use std::time::Duration;
+
+use sidekick_audio::{CaptureHandle, FrameSender, Pacing, StreamKind};
+use sidekick_core::{ErrorCode, SidekickError, SidekickResult};
+use sidekick_secrets::SecretString;
+use sidekick_session::repo::{self, NewSession};
+use sidekick_session::{
+    AudioFactory, ConsentOption, FixtureAudio, LiveSession, SessionStatus, SttPlan, streams_for,
+};
+use sidekick_store::Database;
+use sidekick_stt::{MockSttProvider, Partial, Segment, SttSink, SttStatus};
+
+fn db() -> Database {
+    Database::open_in_memory(&SecretString::from("b".repeat(64))).unwrap()
+}
+
+fn new(title: &str) -> NewSession<'_> {
+    NewSession {
+        title,
+        stt_provider: "deepgram",
+        llm_provider: "anthropic",
+        llm_model: "claude-opus-5-5",
+        auto_answer: true,
+    }
+}
+
+#[test]
+fn create_get_and_validate_titles() {
+    let db = db();
+    let s = repo::create(&db, &new("  Acme QBR  ")).unwrap();
+    assert_eq!(
+        (s.title.as_str(), s.status, s.consent, s.auto_answer),
+        ("Acme QBR", SessionStatus::Draft, None, true)
+    );
+    assert_eq!(repo::get(&db, &s.id).unwrap(), s);
+    assert!(repo::create(&db, &new("   ")).is_err());
+    assert!(repo::create(&db, &new(&"x".repeat(201))).is_err());
+}
+
+#[test]
+fn lifecycle_timestamps() {
+    let db = db();
+    let s = repo::create(&db, &new("Standup")).unwrap();
+    let live = repo::set_status(&db, &s.id, SessionStatus::Live).unwrap();
+    let started = live.started_at.unwrap();
+    repo::set_status(&db, &s.id, SessionStatus::Paused).unwrap();
+    let resumed = repo::set_status(&db, &s.id, SessionStatus::Live).unwrap();
+    assert_eq!(resumed.started_at, Some(started), "first start is kept");
+    let ended = repo::set_status(&db, &s.id, SessionStatus::Ended).unwrap();
+    assert!(ended.ended_at.is_some());
+}
+
+#[test]
+fn consent_is_recorded_before_start_and_survives_deletion() {
+    let db = db();
+    let s = repo::create(&db, &new("Client call")).unwrap();
+    let s = repo::record_consent(&db, &s.id, ConsentOption::MeOnly).unwrap();
+    assert_eq!(s.consent, Some(ConsentOption::MeOnly));
+    // Changing your mind before starting: the latest choice wins.
+    let s = repo::record_consent(&db, &s.id, ConsentOption::ParticipantsAgreed).unwrap();
+    assert_eq!(s.consent, Some(ConsentOption::ParticipantsAgreed));
+
+    repo::set_status(&db, &s.id, SessionStatus::Live).unwrap();
+    assert!(
+        repo::record_consent(&db, &s.id, ConsentOption::MeOnly).is_err(),
+        "only before starting"
+    );
+
+    repo::delete(&db, &s.id).unwrap();
+    assert!(repo::get(&db, &s.id).is_err());
+    let log = repo::consent_log(&db, &s.id).unwrap();
+    assert_eq!(
+        log.iter().map(|(o, _)| *o).collect::<Vec<_>>(),
+        [ConsentOption::MeOnly, ConsentOption::ParticipantsAgreed]
+    );
+}
+
+#[test]
+fn start_without_consent_is_refused() {
+    assert_eq!(
+        streams_for(None).unwrap_err().code,
+        ErrorCode::ConsentRequired
+    );
+}
+
+#[test]
+fn lists_newest_first_with_pagination() {
+    let db = db();
+    for i in 0..5 {
+        repo::create(&db, &new(&format!("Meeting {i}"))).unwrap();
+        std::thread::sleep(Duration::from_millis(2));
+    }
+    let page1 = repo::list(&db, None, Some(2)).unwrap();
+    assert_eq!(
+        page1
+            .items
+            .iter()
+            .map(|s| s.title.as_str())
+            .collect::<Vec<_>>(),
+        ["Meeting 4", "Meeting 3"]
+    );
+    let page2 = repo::list(&db, page1.next_cursor.as_deref(), Some(2)).unwrap();
+    assert_eq!(
+        page2
+            .items
+            .iter()
+            .map(|s| s.title.as_str())
+            .collect::<Vec<_>>(),
+        ["Meeting 2", "Meeting 1"]
+    );
+    let page3 = repo::list(&db, page2.next_cursor.as_deref(), Some(2)).unwrap();
+    assert_eq!(page3.items.len(), 1);
+    assert_eq!(page3.next_cursor, None);
+    assert_eq!(
+        repo::list(&db, None, None).unwrap().items.len(),
+        5,
+        "default limit 50"
+    );
+    assert_eq!(
+        repo::list(&db, None, Some(10_000)).unwrap().items.len(),
+        5,
+        "limit capped at 200"
+    );
+    assert!(repo::list(&db, Some("garbage"), None).is_err());
+}
+
+#[test]
+fn segments_are_stored_and_deleted_with_the_session() {
+    let db = db();
+    let s = repo::create(&db, &new("Review")).unwrap();
+    let seg = Segment {
+        speaker_label: "speaker_1".into(),
+        is_user: false,
+        text: "Priya, rate limit?".into(),
+        start_ms: 100,
+        end_ms: 900,
+        confidence: Some(0.9),
+    };
+    repo::insert_segment(&db, &s.id, &seg).unwrap();
+    let count = |db: &Database| {
+        db.conn()
+            .query_row("SELECT count(*) FROM transcript_segments", [], |r| {
+                r.get::<_, i64>(0)
+            })
+            .unwrap()
+    };
+    assert_eq!(count(&db), 1);
+    repo::delete(&db, &s.id).unwrap();
+    assert_eq!(count(&db), 0);
+}
+
+// ---- Runner -------------------------------------------------------------------
+
+#[derive(Default)]
+struct Sink {
+    segments: Mutex<Vec<Segment>>,
+}
+
+impl SttSink for Sink {
+    fn partial(&self, _: Partial) {}
+    fn segment(&self, s: Segment) {
+        self.segments.lock().unwrap().push(s);
+    }
+    fn status(&self, _: StreamKind, _: SttStatus) {}
+}
+
+fn write_wav(path: &Path, pattern: &[(bool, f32)]) {
+    let spec = hound::WavSpec {
+        channels: 1,
+        sample_rate: 16_000,
+        bits_per_sample: 16,
+        sample_format: hound::SampleFormat::Int,
+    };
+    let mut w = hound::WavWriter::create(path, spec).unwrap();
+    let mut t = 0usize;
+    for &(voice, secs) in pattern {
+        for _ in 0..(16_000.0 * secs) as usize {
+            let v = if voice {
+                (0.4 * (2.0 * std::f32::consts::PI * 300.0 * t as f32 / 16_000.0).sin() * 32_767.0)
+                    as i16
+            } else {
+                0
+            };
+            w.write_sample(v).unwrap();
+            t += 1;
+        }
+    }
+    w.finalize().unwrap();
+}
+
+fn plan() -> SttPlan {
+    SttPlan {
+        provider: Arc::new(MockSttProvider),
+        key: None,
+        language: "en".into(),
+        keyterms: vec![],
+    }
+}
+
+/// Records which streams were started; system audio can be made to fail.
+struct Recording {
+    inner: FixtureAudio,
+    system_fails: bool,
+    started: Mutex<Vec<StreamKind>>,
+}
+
+impl AudioFactory for Recording {
+    fn start(&self, kind: StreamKind, tx: FrameSender) -> SidekickResult<CaptureHandle> {
+        if kind == StreamKind::System && self.system_fails {
+            return Err(SidekickError::new(
+                ErrorCode::PermissionDenied,
+                "System audio needs macOS 14.6.",
+            ));
+        }
+        self.started.lock().unwrap().push(kind);
+        self.inner.start(kind, tx)
+    }
+}
+
+fn recording(dir: &Path, system_fails: bool) -> Recording {
+    let wav = dir.join("meeting.wav");
+    write_wav(
+        &wav,
+        &[(true, 0.5), (false, 0.6), (true, 0.5), (false, 0.6)],
+    );
+    Recording {
+        inner: FixtureAudio {
+            path: wav,
+            pacing: Pacing::Fast,
+        },
+        system_fails,
+        started: Mutex::default(),
+    }
+}
+
+#[tokio::test]
+async fn me_only_starts_the_microphone_only() {
+    let dir = tempfile::tempdir().unwrap();
+    let audio = recording(dir.path(), false);
+    let sink = Arc::new(Sink::default());
+    let kinds = streams_for(Some(ConsentOption::MeOnly)).unwrap();
+    let live = LiveSession::start(&kinds, &audio, &plan(), sink.clone()).unwrap();
+    assert_eq!(live.kinds(), [StreamKind::Mic]);
+    tokio::time::sleep(Duration::from_millis(300)).await; // Let the fixture play.
+    live.stop().await;
+    assert_eq!(
+        *audio.started.lock().unwrap(),
+        [StreamKind::Mic],
+        "system audio never started"
+    );
+    let segs = sink.segments.lock().unwrap();
+    assert_eq!(segs.len(), 2, "two speech bursts in the fixture");
+    assert!(segs.iter().all(|s| s.speaker_label == "me" && s.is_user));
+}
+
+#[tokio::test]
+async fn participants_agreed_starts_both_streams() {
+    let dir = tempfile::tempdir().unwrap();
+    let audio = recording(dir.path(), false);
+    let sink = Arc::new(Sink::default());
+    let kinds = streams_for(Some(ConsentOption::ParticipantsAgreed)).unwrap();
+    let live = LiveSession::start(&kinds, &audio, &plan(), sink.clone()).unwrap();
+    assert_eq!(live.kinds(), [StreamKind::Mic, StreamKind::System]);
+    assert!(live.warnings.is_empty());
+    tokio::time::sleep(Duration::from_millis(300)).await; // Let the fixture play.
+    live.stop().await;
+    let labels: Vec<String> = sink
+        .segments
+        .lock()
+        .unwrap()
+        .iter()
+        .map(|s| s.speaker_label.clone())
+        .collect();
+    assert!(
+        labels.contains(&"me".to_owned()) && labels.contains(&"speaker_1".to_owned()),
+        "{labels:?}"
+    );
+}
+
+#[tokio::test]
+async fn missing_system_audio_falls_back_to_the_microphone_with_a_warning() {
+    let dir = tempfile::tempdir().unwrap();
+    let audio = recording(dir.path(), true);
+    let kinds = streams_for(Some(ConsentOption::ParticipantsAgreed)).unwrap();
+    let live = LiveSession::start(&kinds, &audio, &plan(), Arc::new(Sink::default())).unwrap();
+    assert_eq!(live.kinds(), [StreamKind::Mic]);
+    assert_eq!(live.warnings.len(), 1);
+    assert!(live.warnings[0].contains("Only your microphone"));
+    live.stop().await;
+}
+
+struct Failing;
+impl AudioFactory for Failing {
+    fn start(&self, _: StreamKind, _: FrameSender) -> SidekickResult<CaptureHandle> {
+        Err(SidekickError::new(
+            ErrorCode::PermissionDenied,
+            "No microphone found.",
+        ))
+    }
+}
+
+#[tokio::test]
+async fn missing_microphone_fails_the_start() {
+    let err = LiveSession::start(
+        &[StreamKind::Mic],
+        &Failing,
+        &plan(),
+        Arc::new(Sink::default()),
+    )
+    .err()
+    .unwrap();
+    assert_eq!(err.code, ErrorCode::PermissionDenied);
+}
+
+#[tokio::test]
+async fn pause_and_resume_reach_the_capture() {
+    let dir = tempfile::tempdir().unwrap();
+    let wav = dir.path().join("long.wav");
+    write_wav(&wav, &[(true, 3.0)]);
+    let audio = FixtureAudio {
+        path: wav,
+        pacing: Pacing::RealTime,
+    };
+    let sink = Arc::new(Sink::default());
+    let live = LiveSession::start(&[StreamKind::Mic], &audio, &plan(), sink.clone()).unwrap();
+    tokio::time::sleep(Duration::from_millis(300)).await;
+    live.pause();
+    tokio::time::sleep(Duration::from_millis(600)).await;
+    live.resume();
+    tokio::time::sleep(Duration::from_millis(300)).await;
+    live.stop().await;
+    // The pause splits the speech into two bursts: frames are dropped, then resume.
+    let segs = sink.segments.lock().unwrap();
+    assert!(segs.len() >= 2, "{segs:?}");
+    assert!(
+        segs[1].start_ms > segs[0].end_ms + 100,
+        "gap where the pause was: {segs:?}"
+    );
+}

@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { SessionBar } from "@/features/session";
 import { commands, type AppInfo } from "@/ipc";
 import { ProtectionShield } from "./ProtectionShield";
 import { MAX_OPACITY, MIN_OPACITY, TABS, useOverlayStore, type Tab } from "./store";
@@ -53,6 +54,8 @@ export function Overlay() {
           />
         </label>
       </header>
+
+      <SessionBar />
 
       <div role="tablist" aria-label="Sidekick views" className="flex border-b border-slate-700">
         {TABS.map((id) => (
