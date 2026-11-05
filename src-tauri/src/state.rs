@@ -4,6 +4,7 @@ use std::path::PathBuf;
 use std::sync::{Arc, Mutex, MutexGuard, PoisonError};
 
 use sidekick_core::{SidekickError, SidekickResult};
+use sidekick_diagnostics::Recorder;
 use sidekick_gateway::Gateway;
 use sidekick_secrets::{KeyStore, KeychainStore, MemoryStore};
 use sidekick_store::{DB_FILE_NAME, Database, database_key};
@@ -12,6 +13,7 @@ use sidekick_store::{DB_FILE_NAME, Database, database_key};
 pub struct AppState {
     db: Mutex<Database>,
     pub gateway: Gateway,
+    pub diagnostics: Arc<Recorder>,
 }
 
 impl AppState {
@@ -38,7 +40,9 @@ impl AppState {
             .map_err(|_| SidekickError::internal("Couldn't create the app data folder."))?;
         let key = database_key(keys.as_ref())?;
         let db = Database::open(&data_dir.join(DB_FILE_NAME), &key)?;
-        let mut gateway = Gateway::new(Arc::clone(&keys), mock);
+        let diagnostics = Arc::new(Recorder::default());
+        let mut gateway =
+            Gateway::new(Arc::clone(&keys), mock).with_recorder(Arc::clone(&diagnostics));
         if !mock {
             gateway = gateway.with_verifier(
                 "deepgram",
@@ -48,6 +52,7 @@ impl AppState {
         Ok(Self {
             db: Mutex::new(db),
             gateway,
+            diagnostics,
         })
     }
 

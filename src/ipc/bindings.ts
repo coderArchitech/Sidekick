@@ -108,6 +108,18 @@ export const commands = {
   async cancelStream(requestId: string): Promise<boolean> {
     return await TAURI_INVOKE("cancel_stream", { requestId });
   },
+  /**
+   * Settings window: the Diagnostics panel.
+   */
+  async getDiagnostics(): Promise<Diagnostics> {
+    return await TAURI_INVOKE("get_diagnostics");
+  },
+  /**
+   * Overlay: the orchestrator reports stages it measures (question → cue/answer).
+   */
+  async recordLatency(stage: Stage, ms: number): Promise<void> {
+    await TAURI_INVOKE("record_latency", { stage, ms });
+  },
 };
 
 /** user-defined events **/
@@ -137,6 +149,12 @@ export type AppInfo = { name: string; version: string; os: string };
  * One turn of the conversation. Text only for now; images arrive with screenshots (T-025).
  */
 export type ChatMessage = { role: Role; content: string };
+export type Diagnostics = {
+  appVersion: string;
+  os: string;
+  protection: ProtectionStatus;
+  stages: StageStats[];
+};
 /**
  * How hard the model should think. Lower is faster and cheaper.
  */
@@ -298,6 +316,42 @@ export type SettingsPatch = {
  * `message` is user-facing and must never contain API keys or meeting content.
  */
 export type SidekickError = { code: ErrorCode; message: string; retryable: boolean };
+/**
+ * Measured stages. Targets come from tech doc 10.1 and 13.1.
+ */
+export type Stage =
+  /**
+   * End of speech to final segment received.
+   */
+  | "transcript_lag"
+  /**
+   * Question end to first cue token.
+   */
+  | "question_to_cue"
+  /**
+   * Question end to first full-answer token.
+   */
+  | "question_to_answer"
+  /**
+   * Request sent to first token, per LLM call.
+   */
+  | "llm_first_token"
+  /**
+   * Context retrieval for one question.
+   */
+  | "retrieval";
+export type StageStats = {
+  stage: Stage;
+  count: number;
+  p50Ms: number | null;
+  p95Ms: number | null;
+  targetP50Ms: number;
+  targetP95Ms: number;
+  /**
+   * `None` until there are samples.
+   */
+  healthy: boolean | null;
+};
 /**
  * Token counts reported by the provider.
  */

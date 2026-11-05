@@ -1,0 +1,11 @@
+# Automatically generated - DO NOT EDIT!
+
+[[permission]]
+identifier = "allow-record-latency"
+description = "Enables the record_latency command without any pre-configured scope."
+commands.allow = ["record_latency"]
+
+[[permission]]
+identifier = "deny-record-latency"
+description = "Denies the record_latency command without any pre-configured scope."
+commands.deny = ["record_latency"]

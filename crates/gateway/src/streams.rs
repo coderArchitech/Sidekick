@@ -10,6 +10,8 @@ use sidekick_core::{ErrorCode, SidekickError};
 use sidekick_secrets::SecretString;
 use tokio_util::sync::CancellationToken;
 
+use sidekick_diagnostics::{Recorder, Stage};
+
 use crate::retry::{RetryPolicy, with_retries};
 
 /// Where stream output goes. The app shell implements this with Tauri events,
@@ -23,9 +25,19 @@ pub trait AnswerSink: Send + Sync {
 #[derive(Default)]
 pub struct StreamManager {
     active: Arc<Mutex<HashMap<String, CancellationToken>>>,
+    recorder: Option<Arc<Recorder>>,
 }
 
 impl StreamManager {
+    /// Records time-to-first-token for each stream (tech doc 10.1).
+    #[must_use]
+    pub fn with_recorder(recorder: Arc<Recorder>) -> Self {
+        Self {
+            active: Arc::default(),
+            recorder: Some(recorder),
+        }
+    }
+
     /// Starts streaming in the background. Exactly one terminal call
     /// (`done` or `error`) is made on the sink per request.
     pub fn start(
@@ -47,6 +59,7 @@ impl StreamManager {
             old.cancel(); // Reusing an id replaces the old stream.
         }
         let active = Arc::clone(&self.active);
+        let recorder = self.recorder.clone();
         tokio::spawn(async move {
             let started = std::time::Instant::now();
             let run = async {
@@ -60,6 +73,9 @@ impl StreamManager {
                         StreamEvent::Delta(delta) => {
                             if first_token {
                                 first_token = false;
+                                if let Some(r) = &recorder {
+                                    r.record(Stage::LlmFirstToken, started.elapsed());
+                                }
                                 tracing::info!(target: "gateway", request_id, first_token_ms = started.elapsed().as_millis() as u64, "first token");
                             }
                             sink.token(&request_id, &delta);

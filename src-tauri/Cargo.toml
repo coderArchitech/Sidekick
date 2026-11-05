@@ -22,6 +22,7 @@ sidekick-gateway = { workspace = true, features = ["specta"] }
 tokio.workspace = true
 sidekick-stt.workspace = true
 sidekick-window = { workspace = true, features = ["specta"] }
+sidekick-diagnostics = { workspace = true, features = ["specta"] }
 tauri = { version = "2", features = ["macos-private-api"] }
 serde.workspace = true
 serde_json.workspace = true

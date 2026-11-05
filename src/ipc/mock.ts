@@ -1,6 +1,8 @@
 import { createMockAnswerBus } from "./answerEvents";
 import type {
   commands as tauriCommands,
+  Stage,
+  StageStats,
   KeyStatus,
   ProtectionStatus,
   ProviderEntry,
@@ -45,6 +47,37 @@ let settings: Settings = structuredClone(DEFAULT_SETTINGS);
 const savedKeys = new Map<string, string>();
 const activeStreams = new Map<string, { cancelled: boolean }>();
 export const mockAnswerBus = createMockAnswerBus();
+const STAGE_TARGETS: Record<Stage, [number, number]> = {
+  transcript_lag: [1000, 1500],
+  question_to_cue: [2000, 3000],
+  question_to_answer: [2500, 4000],
+  llm_first_token: [900, 2000],
+  retrieval: [100, 250],
+};
+const latencySamples = new Map<Stage, number[]>();
+
+function stageStats(): StageStats[] {
+  return (Object.keys(STAGE_TARGETS) as Stage[]).map((stage) => {
+    const values = [...(latencySamples.get(stage) ?? [])].sort((a, b) => a - b);
+    const pick = (pct: number) =>
+      values.length
+        ? (values[Math.max(1, Math.ceil((pct * values.length) / 100)) - 1] ?? null)
+        : null;
+    const [t50, t95] = STAGE_TARGETS[stage];
+    const p50 = pick(50);
+    const p95 = pick(95);
+    return {
+      stage,
+      count: values.length,
+      p50Ms: p50,
+      p95Ms: p95,
+      targetP50Ms: t50,
+      targetP95Ms: t95,
+      healthy: p50 === null || p95 === null ? null : p50 <= t50 && p95 <= t95,
+    };
+  });
+}
+
 /** Protection status the mock reports; tests may replace it. */
 export const mockProtection: { status: ProtectionStatus } = {
   status: { state: "unavailable", reason: "Running in a browser: no screen-share protection." },
@@ -83,6 +116,7 @@ export function resetMocks(): void {
   settings = structuredClone(DEFAULT_SETTINGS);
   savedKeys.clear();
   activeStreams.clear();
+  latencySamples.clear();
   mockWindowCalls.openSettings = 0;
   mockWindowCalls.hide = 0;
   mockProtection.status = {
@@ -193,6 +227,17 @@ export const mockCommands: Commands = {
       });
     })();
     return Promise.resolve({ status: "ok", data: null });
+  },
+  getDiagnostics: () =>
+    Promise.resolve({
+      appVersion: "0.0.0-mock",
+      os: "web",
+      protection: structuredClone(mockProtection.status),
+      stages: stageStats(),
+    }),
+  recordLatency: (stage, ms) => {
+    latencySamples.set(stage, [...(latencySamples.get(stage) ?? []), ms]);
+    return Promise.resolve();
   },
   cancelStream: (requestId) => {
     const handle = activeStreams.get(requestId);

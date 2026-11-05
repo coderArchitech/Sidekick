@@ -23,6 +23,8 @@ pub fn builder() -> Builder<tauri::Wry> {
             commands::keys::list_models,
             commands::llm::llm_stream,
             commands::llm::cancel_stream,
+            commands::diagnostics::get_diagnostics,
+            commands::diagnostics::record_latency,
         ])
         .events(collect_events![
             events::AnswerToken,

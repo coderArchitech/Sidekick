@@ -44,7 +44,7 @@ The working task list for building Sidekick end to end, derived from the [techni
 | T-009 | `audio` crate: microphone and system audio capture | 🟡 In progress: testing | 🖥️ Automated tests pass; needs device checks on Windows and macOS 14.6+ (ADR-014) |
 | T-010 | `stt` crate: Deepgram streaming | 🟡 In progress: testing | Automated tests pass; live latency check with a real key pending |
 | T-011 | `window` crate: capture exclusion and protection status | 🟡 In progress: testing | 🖥️ Exclusion and shield done; manual checklist on Windows/macOS pending; screen-share detection for auto-hide still open |
-| T-012 | `diagnostics` crate: latency metrics and baselines | ⬜ To do | |
+| T-012 | `diagnostics` crate: latency metrics and baselines | 🟡 In progress: testing | Metrics and panel done; baselines need the reference laptops |
 
 ### Phase 1: MVP (all P0 requirements)
 
@@ -265,10 +265,12 @@ The working task list for building Sidekick end to end, derived from the [techni
 **Scope:** Record per-stage timings (end of speech, segment, detection, retrieval, first token); p50/p95 over a rolling window; `get_diagnostics` command; Diagnostics panel in Settings.
 
 **Tests**
-- [ ] Unit: percentile calculation on known samples.
-- [ ] Unit: rolling window drops old samples.
-- [ ] Component: Diagnostics panel shows values and healthy/unhealthy state.
-- [ ] Manual: Phase 0 baselines recorded in TECHNICAL.md 13.2.
+- [x] Unit: nearest-rank percentile calculation on known samples.
+- [x] Unit: rolling window drops samples older than 15 minutes; at most 1,000 kept.
+- [x] Unit: health against targets; no verdict without samples.
+- [x] Integration: the gateway records LLM time-to-first-token.
+- [x] Component: Diagnostics panel shows every stage, p50/p95, Healthy / Slow / No data, and refreshes.
+- [ ] Manual: Phase 0 baselines recorded in TECHNICAL.md 13.2 on the reference Windows and macOS laptops (needs T-013 for end-to-end numbers).
 
 ## Phase 1 details
 

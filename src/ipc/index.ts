@@ -15,6 +15,7 @@ export type {
   AnswerToken,
   AppInfo,
   ChatMessage,
+  Diagnostics,
   Effort,
   ErrorCode,
   FinishReason,
@@ -32,6 +33,8 @@ export type {
   Settings,
   SettingsPatch,
   SidekickError,
+  Stage,
+  StageStats,
   Usage,
 } from "./bindings";
 

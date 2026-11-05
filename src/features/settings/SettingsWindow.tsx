@@ -6,6 +6,7 @@ import {
   type Settings,
   type SettingsPatch,
 } from "@/ipc";
+import { DiagnosticsPanel } from "./DiagnosticsPanel";
 import { ProviderSection } from "./ProviderSection";
 
 const RETENTION_LABELS: Record<Retention, string> = {
@@ -123,6 +124,7 @@ export function SettingsWindow() {
                 ))}
               </select>
             </section>
+            <DiagnosticsPanel />
           </>
         )}
       </div>

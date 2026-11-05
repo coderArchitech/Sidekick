@@ -14,6 +14,8 @@ const COMMANDS: &[&str] = &[
     "list_models",
     "llm_stream",
     "cancel_stream",
+    "get_diagnostics",
+    "record_latency",
 ];
 
 fn main() {

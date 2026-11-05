@@ -1,0 +1,20 @@
+[package]
+name = "sidekick-diagnostics"
+description = "Local latency metrics (p50/p95 per pipeline stage over a rolling window) for the Diagnostics panel. Never sent anywhere."
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+publish.workspace = true
+
+[features]
+specta = ["dep:specta"]
+
+[dependencies]
+serde.workspace = true
+specta = { workspace = true, optional = true }
+
+[dev-dependencies]
+serde_json.workspace = true
+
+[lints]
+workspace = true

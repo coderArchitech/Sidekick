@@ -93,6 +93,13 @@ impl Gateway {
         self
     }
 
+    /// Records LLM time-to-first-token in `recorder`.
+    #[must_use]
+    pub fn with_recorder(mut self, recorder: Arc<sidekick_diagnostics::Recorder>) -> Self {
+        self.streams = StreamManager::with_recorder(recorder);
+        self
+    }
+
     #[must_use]
     pub fn with_retry_policy(mut self, policy: RetryPolicy) -> Self {
         self.policy = policy;

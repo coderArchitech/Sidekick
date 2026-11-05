@@ -12,6 +12,7 @@ specta = ["dep:specta", "sidekick-core/specta"]
 [dependencies]
 sidekick-core.workspace = true
 sidekick-secrets.workspace = true
+sidekick-diagnostics.workspace = true
 async-trait.workspace = true
 futures.workspace = true
 reqwest.workspace = true

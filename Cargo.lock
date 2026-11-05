@@ -3659,6 +3659,7 @@ dependencies = [
  "serde",
  "serde_json",
  "sidekick-core",
+ "sidekick-diagnostics",
  "sidekick-gateway",
  "sidekick-secrets",
  "sidekick-settings",
@@ -3702,6 +3703,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "sidekick-diagnostics"
+version = "0.1.0"
+dependencies = [
+ "serde",
+ "serde_json",
+ "specta",
+]
+
+[[package]]
 name = "sidekick-gateway"
 version = "0.1.0"
 dependencies = [
@@ -3712,6 +3722,7 @@ dependencies = [
  "serde",
  "serde_json",
  "sidekick-core",
+ "sidekick-diagnostics",
  "sidekick-secrets",
  "specta",
  "tokio",

@@ -213,7 +213,7 @@ Each module below is its own crate at `crates/<module>/`, named `sidekick-<modul
 | `session` | Session lifecycle: create, start, pause, stop, delete | Not started |
 | `consent` | Enforce consent confirmation before capturing others; write consent log | Not started |
 | `usage` | Count STT minutes and LLM tokens per provider; estimate cost | Not started |
-| `diagnostics` | Latency metrics, health checks, log export | Not started |
+| `diagnostics` | `Recorder`: per-stage latency samples (last 15 min, max 1,000) with nearest-rank p50/p95 and health against the 10.1/13.1 targets; the gateway records LLM first-token time; the frontend reports question→cue/answer via `record_latency`. Health checks and log export arrive with T-031 | Started (latency done) |
 | `core` | `SidekickError` and error codes (5.4); IDs and provider traits as they are needed | Started |
 
 **Frontend** (`src/`, see [ADR-012](adr/0012-frontend-feature-modules-with-public-index.md))
@@ -605,7 +605,8 @@ Commands are request/response calls from the frontend to Rust (`invoke`). All re
 | `set_overlay` | `opacity?, click_through?, compact?` | `OverlayState` | Overlay appearance |
 | `get_capture_protection` | none | `ProtectionStatus` (`state`: protected / not_guaranteed / unavailable / disabled, plus a one-sentence `reason`) | Whether capture exclusion is active; shown as the shield in the overlay header |
 | `get_usage` | `range` | `UsageSummary` | Minutes, tokens and estimated cost |
-| `get_diagnostics` / `export_logs` | none / `file_path` | `Diagnostics` / `()` | Health and latency; log bundle |
+| `get_diagnostics` / `export_logs` | none / `file_path` | `Diagnostics` / `()` | App version, OS, protection status and per-stage latency stats; log bundle (T-031) |
+| `record_latency` | `stage, ms` | `()` | Overlay reports a measured stage (e.g. question → cue) |
 | `export_backup` / `restore_backup` | `file_path, passphrase` | `()` | Backup and restore |
 
 ### 5.2 Events

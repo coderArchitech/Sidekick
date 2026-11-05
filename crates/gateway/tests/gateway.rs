@@ -350,6 +350,22 @@ async fn cancel_stops_tokens_and_reports_cancelled() {
 }
 
 #[tokio::test]
+async fn records_time_to_first_token() {
+    let recorder = Arc::new(sidekick_diagnostics::Recorder::default());
+    let gw = Gateway::new(Arc::new(MemoryStore::default()), true).with_recorder(recorder.clone());
+    let sink = Arc::new(Collect::default());
+    gw.start_stream("q7".into(), "anthropic", request("any"), sink.clone())
+        .unwrap();
+    sink.wait().await;
+    let stats = recorder.snapshot();
+    let first = stats
+        .iter()
+        .find(|s| s.stage == sidekick_diagnostics::Stage::LlmFirstToken)
+        .unwrap();
+    assert_eq!(first.count, 1);
+}
+
+#[tokio::test]
 async fn mock_mode_answers_without_keys() {
     let gw = Gateway::new(Arc::new(MemoryStore::default()), true);
     let sink = Arc::new(Collect::default());
