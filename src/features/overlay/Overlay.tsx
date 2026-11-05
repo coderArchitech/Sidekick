@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { commands, type AppInfo } from "@/ipc";
+import { ProtectionShield } from "./ProtectionShield";
 import { MAX_OPACITY, MIN_OPACITY, TABS, useOverlayStore, type Tab } from "./store";
 
 const TAB_LABELS: Record<Tab, string> = {
@@ -31,6 +32,7 @@ export function Overlay() {
       >
         <span className="font-semibold">Sidekick</span>
         <span className="text-xs text-slate-400">{info ? `v${info.version}` : ""}</span>
+        <ProtectionShield />
         <button
           type="button"
           className="rounded px-1.5 py-0.5 text-xs text-slate-300 hover:bg-slate-700"

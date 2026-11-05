@@ -43,7 +43,7 @@ The working task list for building Sidekick end to end, derived from the [techni
 | T-008 | Settings window: providers and API keys | 🟡 In progress: testing | Passes locally; waiting for CI and a check in the real app on Windows/macOS |
 | T-009 | `audio` crate: microphone and system audio capture | 🟡 In progress: testing | 🖥️ Automated tests pass; needs device checks on Windows and macOS 14.6+ (ADR-014) |
 | T-010 | `stt` crate: Deepgram streaming | 🟡 In progress: testing | Automated tests pass; live latency check with a real key pending |
-| T-011 | `window` crate: capture exclusion and protection status | ⬜ To do | 🖥️ Highest technical risk |
+| T-011 | `window` crate: capture exclusion and protection status | 🟡 In progress: testing | 🖥️ Exclusion and shield done; manual checklist on Windows/macOS pending; screen-share detection for auto-hide still open |
 | T-012 | `diagnostics` crate: latency metrics and baselines | ⬜ To do | |
 
 ### Phase 1: MVP (all P0 requirements)
@@ -251,10 +251,13 @@ The working task list for building Sidekick end to end, derived from the [techni
 **Scope:** Windows `SetWindowDisplayAffinity(WDA_EXCLUDEFROMCAPTURE)`; macOS window sharing type none; status check per OS version; auto-hide fallback when screen sharing is detected and exclusion isn't guaranteed; `SIDEKICK_DISABLE_EXCLUSION`.
 
 **Tests**
-- [ ] Unit: status logic returns protected / not guaranteed / unavailable per OS and version.
-- [ ] Unit: fallback hides the overlay when sharing starts and status isn't protected; restores after.
-- [ ] Unit: `SIDEKICK_DISABLE_EXCLUSION=1` turns exclusion off and status says so.
-- [ ] Manual (Windows 10, 11; macOS 14, 15, latest): overlay not visible to others when sharing full screen and a window in Teams, Zoom, Meet, Webex, Slack huddles; results recorded in a table in TECHNICAL.md 8.5.
+- [x] Unit: status logic returns protected / not guaranteed / unavailable per OS and version (Windows build 19041, macOS 15), with a reason for each.
+- [x] Unit: auto-hide rule applies only while sharing, with auto-hide on, and protection not guaranteed.
+- [x] Unit: disabled flag and failure to apply produce `disabled` / `unavailable`.
+- [x] Component: shield shows each state with colour, label and tooltip reason.
+- [x] Manual: real app on Linux applies protection at startup and shows the red shield.
+- [ ] Screen-share detection to drive auto-hide: no reliable cross-platform OS signal; design needed (manual hide hotkey in T-015 covers it until then).
+- [ ] Manual (Windows 10, 11; macOS 14, 15, latest): overlay not visible to others when sharing full screen and a window in Teams, Zoom, Meet, Webex, Slack huddles; results recorded in a table in TECHNICAL.md 8.5; adjust the status rules to match.
 
 ### T-012 `diagnostics` crate: latency metrics and baselines
 

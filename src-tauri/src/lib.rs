@@ -10,6 +10,7 @@ mod commands;
 mod events;
 mod ipc;
 mod logging;
+mod protection;
 mod state;
 
 #[cfg(test)]
@@ -33,6 +34,7 @@ pub fn run() {
                 Box::new(e) as Box<dyn std::error::Error>
             })?;
             app.manage(state);
+            app.manage(protection::apply(app.handle()));
             Ok(())
         })
         .run(tauri::generate_context!())

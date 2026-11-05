@@ -25,6 +25,12 @@ export const commands = {
       else return { status: "error", error: e as any };
     }
   },
+  /**
+   * Whether the overlay is hidden from screen sharing (PRD UI-4a).
+   */
+  async getCaptureProtection(): Promise<ProtectionStatus> {
+    return await TAURI_INVOKE("get_capture_protection");
+  },
   async getSettings(): Promise<Result<Settings, SidekickError>> {
     try {
       return { status: "ok", data: await TAURI_INVOKE("get_settings") };
@@ -200,6 +206,30 @@ export type LlmRequest = {
  * A model the user can pick.
  */
 export type ModelInfo = { id: string; displayName: string };
+export type ProtectionState =
+  /**
+   * The OS hides the overlay from screen sharing and recordings (green shield).
+   */
+  | "protected"
+  /**
+   * Exclusion is on, but some capture methods may still see the overlay (amber).
+   */
+  | "not_guaranteed"
+  /**
+   * This OS can't hide the overlay (red).
+   */
+  | "unavailable"
+  /**
+   * Turned off with `SIDEKICK_DISABLE_EXCLUSION=1` (grey).
+   */
+  | "disabled";
+export type ProtectionStatus = {
+  state: ProtectionState;
+  /**
+   * One sentence for the shield tooltip and Diagnostics.
+   */
+  reason: string;
+};
 /**
  * The active provider and model for one kind of service.
  */

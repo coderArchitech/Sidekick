@@ -201,7 +201,7 @@ Each module below is its own crate at `crates/<module>/`, named `sidekick-<modul
 | `audio` | Microphone and system audio as separate 16 kHz mono streams of 50 ms frames via cpal (WASAPI loopback on Windows, Core Audio tap on macOS 14.6+); windowed-sinc resampler; energy VAD flag per frame; pause/resume/stop; WAV `FixtureSource` for tests and `SIDEKICK_AUDIO_FIXTURE`; never writes audio (ADR-014) | Done (manual device checks pending) |
 | `stt` | `SttProvider` (one `run` per audio stream), Deepgram Nova-3 WebSocket adapter (interim + final results, diarization for system audio, `keyterm` boosts, keep-alives, silence not sent with a `Timeline` mapping provider time back to meeting time, reconnect with backoff and replay of unfinalised and buffered audio, up to 10 s), `DeepgramVerifier` for key checks, mock provider; speaker labels `me` / `speaker_N` | Done (live latency check pending) |
 | `capture` | Region, window and full-screen screenshots; downscale and encode | Not started |
-| `window` | Overlay window: transparency, always-on-top, click-through, capture exclusion and its status check | Not started |
+| `window` | Capture-exclusion status rules per OS and version (Windows build 19041+ protected; macOS 13–14 protected, 15+ not guaranteed because ScreenCaptureKit can bypass it; Linux unavailable) and the auto-hide rule. Pure logic: the shell applies `set_content_protected(true)` to every window at startup. Transparency, click-through and screen-share detection still to come (T-029) | Started (status done; manual checklist pending) |
 | `hotkeys` | Register and dispatch global shortcuts | Not started |
 | `ingest` | Parse documents, split into chunks, request embeddings, write to store | Not started |
 | `store` | SQLCipher database (raw 256-bit key from `secrets`), WAL, foreign keys; migrations with pre-migration backups; sqlite-vec registered for every connection; `settings` (raw JSON) and `vectors` (per-model `chunk_vectors`) modules; repository modules added per feature | Done |
@@ -603,7 +603,7 @@ Commands are request/response calls from the frontend to Rust (`invoke`). All re
 | `list_skills` / `save_skill` / `delete_skill` | `skill?` | `Skill[]` / `Skill` / `()` | Manage Skills |
 | `import_skill` / `export_skill` | `file_path` / `skill_id, file_path` | `Skill` / `()` | Share Skills as files |
 | `set_overlay` | `opacity?, click_through?, compact?` | `OverlayState` | Overlay appearance |
-| `get_capture_protection` | none | `ProtectionStatus` | Whether capture exclusion is active |
+| `get_capture_protection` | none | `ProtectionStatus` (`state`: protected / not_guaranteed / unavailable / disabled, plus a one-sentence `reason`) | Whether capture exclusion is active; shown as the shield in the overlay header |
 | `get_usage` | `range` | `UsageSummary` | Minutes, tokens and estimated cost |
 | `get_diagnostics` / `export_logs` | none / `file_path` | `Diagnostics` / `()` | Health and latency; log bundle |
 | `export_backup` / `restore_backup` | `file_path, passphrase` | `()` | Backup and restore |

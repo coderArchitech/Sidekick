@@ -4,6 +4,7 @@
 const COMMANDS: &[&str] = &[
     "app_info",
     "open_settings",
+    "get_capture_protection",
     "get_settings",
     "update_settings",
     "list_providers",

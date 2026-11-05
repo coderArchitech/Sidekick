@@ -1,0 +1,21 @@
+[package]
+name = "sidekick-window"
+description = "Decides whether the overlay is hidden from screen sharing on this OS (capture exclusion status) and when the auto-hide fallback applies. Pure logic; the app shell applies it to the Tauri window."
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+publish.workspace = true
+
+[features]
+specta = ["dep:specta"]
+
+[dependencies]
+serde.workspace = true
+os_info.workspace = true
+specta = { workspace = true, optional = true }
+
+[dev-dependencies]
+serde_json.workspace = true
+
+[lints]
+workspace = true

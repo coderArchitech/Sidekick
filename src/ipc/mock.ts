@@ -2,6 +2,7 @@ import { createMockAnswerBus } from "./answerEvents";
 import type {
   commands as tauriCommands,
   KeyStatus,
+  ProtectionStatus,
   ProviderEntry,
   ProviderKind,
   Settings,
@@ -44,6 +45,10 @@ let settings: Settings = structuredClone(DEFAULT_SETTINGS);
 const savedKeys = new Map<string, string>();
 const activeStreams = new Map<string, { cancelled: boolean }>();
 export const mockAnswerBus = createMockAnswerBus();
+/** Protection status the mock reports; tests may replace it. */
+export const mockProtection: { status: ProtectionStatus } = {
+  status: { state: "unavailable", reason: "Running in a browser: no screen-share protection." },
+};
 /** Counts window actions so tests can assert them. */
 export const mockWindowCalls = { openSettings: 0, hide: 0 };
 
@@ -80,6 +85,10 @@ export function resetMocks(): void {
   activeStreams.clear();
   mockWindowCalls.openSettings = 0;
   mockWindowCalls.hide = 0;
+  mockProtection.status = {
+    state: "unavailable",
+    reason: "Running in a browser: no screen-share protection.",
+  };
 }
 
 /**
@@ -97,6 +106,7 @@ export const mockCommands: Commands = {
     mockWindowCalls.openSettings += 1;
     return Promise.resolve({ status: "ok", data: null });
   },
+  getCaptureProtection: () => Promise.resolve(structuredClone(mockProtection.status)),
   getSettings: () => Promise.resolve({ status: "ok", data: structuredClone(settings) }),
   updateSettings: (patch) => {
     settings = applyPatch(settings, patch);
