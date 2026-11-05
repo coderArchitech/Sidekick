@@ -61,7 +61,7 @@ All Phase 0 code and automated tests are done and green on Linux, Windows and ma
 | T-019 | Library feature: documents in a session | 🟡 In progress: testing | Waiting on dependency: Playwright drag-and-drop spec comes with the UI suite (T-032); native picker/drop check on Windows/macOS |
 | T-020 | Orchestrator: question detection and modes | ✅ Done | Rules meet the targets on a never-tuned set (95% / 100%); real-meeting check in T-039 |
 | T-021 | Orchestrator: prompts, Skills, two-tier answers | 🟡 In progress: testing | Waiting on dependency: prompts accept a Skill; picking the active Skill comes with T-028. Live-model quality check in T-039 |
-| T-022 | Live Answers tab | ⬜ To do | |
+| T-022 | Live Answers tab | ✅ Done | Follow-up chips not in scope; Playwright pass in T-032 |
 | T-023 | Chat tab | ⬜ To do | |
 | T-024 | Rolling notes | ⬜ To do | |
 | T-025 | `capture` crate: screenshots and answer from screen | ⬜ To do | 🖥️ |
@@ -413,11 +413,11 @@ All Phase 0 code and automated tests are done and green on Linux, Windows and ma
 **Scope:** Cue line, expandable full answer, sources list, code blocks with Shiki highlighting and copy, thumbs up/down (`rate_answer`), sanitised Markdown with no raw HTML.
 
 **Tests**
-- [ ] Component: cue shows first, expands to full answer, then sources.
-- [ ] Component: copy button copies code only when clicked (UI-4c).
-- [ ] Component: raw HTML and script in Markdown are not rendered.
-- [ ] Component: rating calls `rate_answer` with the right value.
-- [ ] UI: streamed tokens render progressively with mocked events.
+- [x] Component: cue shows first, expands to full answer, then sources.
+- [x] Component: copy button copies code only when clicked (UI-4c).
+- [x] Component: raw HTML and script in Markdown are not rendered.
+- [x] Component: rating calls `rate_answer` with the right value.
+- [x] UI: streamed tokens render progressively with mocked events.
 
 ### T-023 Chat tab
 
