@@ -1,0 +1,22 @@
+[package]
+name = "sidekick-core"
+description = "Shared types for every Sidekick crate: errors, IDs and provider traits. Depends on nothing Sidekick-specific."
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+publish.workspace = true
+
+[features]
+# Derives specta::Type so the app shell can export these types to TypeScript.
+specta = ["dep:specta"]
+
+[dependencies]
+serde.workspace = true
+thiserror.workspace = true
+specta = { workspace = true, optional = true }
+
+[dev-dependencies]
+serde_json.workspace = true
+
+[lints]
+workspace = true

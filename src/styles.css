@@ -1,0 +1,11 @@
+@import "tailwindcss";
+
+/* The overlay window is transparent; the panel draws its own background so
+   its opacity can be controlled (PRD UI-1). */
+html,
+body,
+#root {
+  height: 100%;
+  margin: 0;
+  background: transparent;
+}

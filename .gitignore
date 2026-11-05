@@ -1,0 +1,9 @@
+node_modules
+dist
+target
+coverage
+test-results
+src-tauri/gen/schemas
+.env.local
+*.log
+.DS_Store
