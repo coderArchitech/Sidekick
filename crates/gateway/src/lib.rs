@@ -70,6 +70,18 @@ impl Gateway {
                 "anthropic",
                 Arc::new(providers::anthropic::AnthropicProvider::default()),
             );
+            llms.insert(
+                "openai",
+                Arc::new(providers::openai_chat::OpenAiProvider::default()),
+            );
+            llms.insert(
+                "gemini",
+                Arc::new(providers::gemini::GeminiProvider::default()),
+            );
+            llms.insert(
+                "ollama",
+                Arc::new(providers::ollama::OllamaProvider::default()),
+            );
         }
         Self {
             llms,

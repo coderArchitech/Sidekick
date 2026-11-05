@@ -7,7 +7,6 @@
 //!   that support it, so a declined request is retried on another model in the
 //!   same call. A final `refusal` stop reason is surfaced as `FinishReason::Refusal`.
 
-use futures::StreamExt;
 use serde_json::{Value, json};
 use sidekick_core::llm::{
     Effort, FinishReason, LlmProvider, LlmRequest, ModelInfo, Role, StreamEvent, TokenStream, Usage,
@@ -16,7 +15,7 @@ use sidekick_core::{ErrorCode, SidekickError, SidekickResult};
 use sidekick_secrets::{ExposeSecret, SecretString};
 
 use super::http::{status_error, transport_error};
-use crate::sse::SseParser;
+use super::pump::{Framing, Handler, pump};
 
 pub const API_VERSION: &str = "2026-10-21";
 pub const DEFAULT_BASE_URL: &str = "https://api.anthropic.com";
@@ -122,6 +121,16 @@ pub struct StreamState {
     finish: Option<FinishReason>,
     /// Indexes of content blocks that are text (others, like thinking, are skipped).
     text_blocks: Vec<u64>,
+}
+
+impl Handler for StreamState {
+    fn on_message(
+        &mut self,
+        event: Option<&str>,
+        data: &str,
+    ) -> SidekickResult<Option<StreamEvent>> {
+        self.on_event(event, data)
+    }
 }
 
 impl StreamState {
@@ -275,42 +284,7 @@ impl LlmProvider for AnthropicProvider {
             .map_err(|e| transport_error(NAME, &e))?;
         let resp = check_status(resp).await?;
 
-        let mut bytes = resp.bytes_stream();
-        let stream = async_stream(move |tx| async move {
-            let mut parser = SseParser::default();
-            let mut state = StreamState::default();
-            while let Some(chunk) = bytes.next().await {
-                let chunk = match chunk {
-                    Ok(c) => c,
-                    Err(e) => {
-                        let _ = tx.send(Err(transport_error(NAME, &e))).await;
-                        return;
-                    }
-                };
-                for ev in parser.push(&String::from_utf8_lossy(&chunk)) {
-                    match state.on_event(ev.event.as_deref(), &ev.data) {
-                        Ok(Some(out)) => {
-                            let done = matches!(out, StreamEvent::Done { .. });
-                            if tx.send(Ok(out)).await.is_err() || done {
-                                return;
-                            }
-                        }
-                        Ok(None) => {}
-                        Err(e) => {
-                            let _ = tx.send(Err(e)).await;
-                            return;
-                        }
-                    }
-                }
-            }
-            let _ = tx
-                .send(Err(SidekickError::new(
-                    ErrorCode::ProviderUnavailable,
-                    "The answer stream ended early.",
-                )))
-                .await;
-        });
-        Ok(stream)
+        Ok(pump(resp, NAME, Framing::Sse, StreamState::default()))
     }
 }
 

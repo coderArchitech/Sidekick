@@ -65,7 +65,7 @@ All Phase 0 code and automated tests are done and green on Linux, Windows and ma
 | T-023 | Chat tab | ✅ Done | Voice input to Chat later; Playwright pass in T-032 |
 | T-024 | Rolling notes | ✅ Done | Summary written by the overlay after End; quality checked in T-039 |
 | T-025 | `capture` crate: screenshots and answer from screen | 🟡 In progress: testing | 🖥️ Code and automated tests done. Waiting on: real capture on Windows/macOS during a live call (doesn't notify the meeting app), macOS Screen Recording prompt |
-| T-026 | More LLM providers: OpenAI, Gemini, Ollama | ⬜ To do | |
+| T-026 | More LLM providers: OpenAI, Gemini, Ollama | ✅ Done | Default model names may need refreshing as providers release new ones; live-key check in T-039 |
 | T-027 | More STT providers: AssemblyAI, Soniox, local Whisper | ⬜ To do | |
 | T-028 | `skills` crate and Skill builder | ⬜ To do | |
 | T-029 | Overlay controls and private display | ⬜ To do | 🖥️ |
@@ -462,9 +462,9 @@ All Phase 0 code and automated tests are done and green on Linux, Windows and ma
 **Scope:** Adapters following TECHNICAL.md 7.5, including vision and `list_models`; Ollama without a key on localhost.
 
 **Tests**
-- [ ] Unit (each provider): request building, stream parsing, error mapping from recorded fixtures.
-- [ ] Integration (wiremock, each provider): happy path, 401, 429, 500.
-- [ ] Unit: Ollama unreachable maps to `PROVIDER_UNAVAILABLE` with a helpful message.
+- [x] Unit (each provider): request building, stream parsing, error mapping from recorded fixtures.
+- [x] Integration (wiremock, each provider): happy path, 401, 429, 500.
+- [x] Unit: Ollama unreachable maps to `PROVIDER_UNAVAILABLE` with a helpful message.
 
 ### T-027 More STT providers: AssemblyAI, Soniox, local Whisper
 

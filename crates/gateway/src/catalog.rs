@@ -93,7 +93,7 @@ pub const PROVIDERS: &[ProviderInfo] = &[
         Llm,
         "OpenAI",
         true,
-        false,
+        true,
         "https://platform.openai.com/docs",
     ),
     p(
@@ -101,7 +101,7 @@ pub const PROVIDERS: &[ProviderInfo] = &[
         Llm,
         "Google Gemini",
         true,
-        false,
+        true,
         "https://ai.google.dev/gemini-api/docs",
     ),
     p(
@@ -109,7 +109,7 @@ pub const PROVIDERS: &[ProviderInfo] = &[
         Llm,
         "Ollama (local)",
         false,
-        false,
+        true,
         "https://ollama.com",
     ),
     p(
