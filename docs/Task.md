@@ -31,6 +31,8 @@ The working task list for building Sidekick end to end, derived from the [techni
 
 ### Phase 0: Foundation and risk retirement
 
+All Phase 0 code and automated tests are done and green on Linux, Windows and macOS. T-008 to T-012 stay at "testing" until the hardware checks in [phase-0-manual-checks.md](phase-0-manual-checks.md) are done on real Windows and macOS machines.
+
 | ID | Task | Status | Notes |
 | --- | --- | --- | --- |
 | T-001 | Project scaffold | ✅ Done | Branch `chore/scaffold` |
