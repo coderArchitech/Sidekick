@@ -6,6 +6,7 @@
   "permissions": [
     "core:default",
     "allow-app-info",
+    "allow-open-settings",
     "allow-llm-stream",
     "allow-cancel-stream",
     "core:window:allow-start-dragging",

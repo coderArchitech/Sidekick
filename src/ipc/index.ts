@@ -5,7 +5,8 @@
  */
 import type { AnswerEvents } from "./answerEvents";
 import { commands as tauriCommands, events as tauriEvents } from "./bindings";
-import { mockAnswerBus, mockCommands } from "./mock";
+import { getCurrentWindow } from "@tauri-apps/api/window";
+import { mockAnswerBus, mockCommands, mockWindowCalls } from "./mock";
 
 export type { AnswerEvents, Unlisten } from "./answerEvents";
 export type {
@@ -43,3 +44,19 @@ const tauriAnswerEvents: AnswerEvents = {
 };
 
 export const answerEvents: AnswerEvents = isTauri ? tauriAnswerEvents : mockAnswerBus.events;
+
+/** Which window this page is rendering, from the `?window=` query (tech doc 3.7). */
+export type WindowKind = "overlay" | "settings";
+
+export function currentWindow(search: string = window.location.search): WindowKind {
+  return new URLSearchParams(search).get("window") === "settings" ? "settings" : "overlay";
+}
+
+/** Hides the current window (the Settings window closes this way, so it opens fast next time). */
+export async function hideCurrentWindow(): Promise<void> {
+  if (isTauri) {
+    await getCurrentWindow().hide();
+  } else {
+    mockWindowCalls.hide += 1;
+  }
+}

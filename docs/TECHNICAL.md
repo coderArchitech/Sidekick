@@ -226,10 +226,10 @@ Each module below is its own crate at `crates/<module>/`, named `sidekick-<modul
 | `transcript` | Live transcript with speaker names and bookmarks |
 | `notes` | Rolling notes, decisions, action items |
 | `library` | Session documents and screenshot strip |
-| `settings` | Provider dropdowns, key fields, test connection, preferences |
+| `settings` | Settings window: provider and model dropdowns per kind (STT, LLM, embeddings, web search), masked key field with show/hide, paste, Save and test, Test connection, Remove; Auto-answer and retention. Opened with `open_settings`; Close hides the window |
 | `skills` | Skill builder, templates, import/export |
 | `orchestrator` | Question detection, prompt building, Skill application, notes job, two-tier model routing |
-| `ipc` | Typed wrappers for every command and event (generated, see section 5.6) |
+| `ipc` | Generated `bindings.ts` (section 5.6), browser mocks (`mock.ts`) that mirror every command, `answerEvents` for answer streams, and window helpers (`currentWindow`, `hideCurrentWindow`). The only module that imports Tauri |
 
 ### 3.3 Key workflow: answering a question
 
@@ -596,6 +596,7 @@ Commands are request/response calls from the frontend to Rust (`invoke`). All re
 | `test_api_key` | `provider` | `KeyStatus` | Re-test a stored key |
 | `delete_api_key` | `provider` | `()` | Remove a key from the keychain |
 | `list_models` | `provider` | `ModelInfo[]` | Models for the model dropdown |
+| `open_settings` | none | `()` | Show and focus the Settings window (overlay only) |
 | `get_settings` / `update_settings` | `patch?` | `Settings` | Read or change preferences. A patch replaces only the sections it names; unknown fields are rejected; `search: null` disables web search |
 | `list_skills` / `save_skill` / `delete_skill` | `skill?` | `Skill[]` / `Skill` / `()` | Manage Skills |
 | `import_skill` / `export_skill` | `file_path` / `skill_id, file_path` | `Skill` / `()` | Share Skills as files |

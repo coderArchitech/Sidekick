@@ -3,6 +3,7 @@
 
 const COMMANDS: &[&str] = &[
     "app_info",
+    "open_settings",
     "get_settings",
     "update_settings",
     "list_providers",

@@ -31,6 +31,13 @@ export function Overlay() {
       >
         <span className="font-semibold">Sidekick</span>
         <span className="text-xs text-slate-400">{info ? `v${info.version}` : ""}</span>
+        <button
+          type="button"
+          className="rounded px-1.5 py-0.5 text-xs text-slate-300 hover:bg-slate-700"
+          onClick={() => void commands.openSettings()}
+        >
+          Settings
+        </button>
         <label className="flex items-center gap-1 text-xs text-slate-400">
           Opacity
           <input

@@ -40,7 +40,7 @@ The working task list for building Sidekick end to end, derived from the [techni
 | T-005 | `store` crate: encrypted database and migrations | 🟡 In progress: testing | Passes locally; waiting for Windows/macOS CI |
 | T-006 | Settings storage and commands | 🟡 In progress: testing | Passes locally; waiting for Windows/macOS CI |
 | T-007 | `gateway` crate: LLM provider trait, mock and Anthropic | 🟡 In progress: testing | Passes locally; waiting for Windows/macOS CI |
-| T-008 | Settings window: providers and API keys | ⬜ To do | |
+| T-008 | Settings window: providers and API keys | 🟡 In progress: testing | Passes locally; waiting for CI and a check in the real app on Windows/macOS |
 | T-009 | `audio` crate: microphone and system audio capture | ⬜ To do | 🖥️ |
 | T-010 | `stt` crate: Deepgram streaming | ⬜ To do | |
 | T-011 | `window` crate: capture exclusion and protection status | ⬜ To do | 🖥️ Highest technical risk |
@@ -201,12 +201,15 @@ The working task list for building Sidekick end to end, derived from the [techni
 **Scope:** Second Tauri window; `settings` feature with Speech-to-text, LLM and Web search sections; provider and model dropdowns; masked key field with show/hide and paste; Test connection; Remove key; last 4 characters after save.
 
 **Tests**
-- [ ] Component: dropdowns list providers from `list_providers`; model dropdown follows provider.
-- [ ] Component: key field masked by default, show/hide toggles, paste works.
-- [ ] Component: Test connection shows success, `KEY_INVALID` and network errors distinctly.
-- [ ] Component: after save only last 4 characters show; Remove key clears status.
-- [ ] Component: switching active provider needs no re-entry when a key is saved.
-- [ ] Accessibility (axe): no violations; full keyboard operation.
+- [x] Component: one section per kind with defaults selected; dropdowns list providers from `list_providers`; model dropdown appears once a key is saved and the choice persists.
+- [x] Component: key field masked by default, show/hide toggles (`aria-pressed`), paste from clipboard works.
+- [x] Component: Save and test / Test connection show success; `KEY_INVALID` and network errors have distinct text (by error code).
+- [x] Component: after save the input is cleared and only the last 4 characters show; Remove key returns to the input.
+- [x] Component: switching active provider needs no re-entry when a key is saved; web search turns on and off; general settings save.
+- [x] Component: Close hides the window; the overlay's Settings button opens it; the app routes by `?window=`.
+- [x] Accessibility (axe): no violations (colour contrast checked manually).
+- [x] Manual: page checked in a real browser with mocks (screenshot in the PR).
+- [ ] Manual: Settings window opens from the overlay in the real app on Windows and macOS; keys reach the keychain.
 
 ### T-009 `audio` crate: microphone and system audio capture 🖥️
 

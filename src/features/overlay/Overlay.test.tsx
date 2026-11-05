@@ -2,6 +2,7 @@ import { render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it } from "vitest";
 import { Overlay } from "./Overlay";
+import { mockWindowCalls, resetMocks } from "@/ipc/mock";
 import { useOverlayStore } from "./store";
 
 describe("Overlay", () => {
@@ -26,6 +27,16 @@ describe("Overlay", () => {
   it("shows the app version from the Rust core (mocked)", async () => {
     render(<Overlay />);
     expect(await screen.findByText("v0.0.0-mock")).toBeInTheDocument();
+  });
+});
+
+describe("Overlay settings button", () => {
+  beforeEach(resetMocks);
+
+  it("opens the Settings window", async () => {
+    render(<Overlay />);
+    await userEvent.click(screen.getByRole("button", { name: "Settings" }));
+    expect(mockWindowCalls.openSettings).toBe(1);
   });
 });
 

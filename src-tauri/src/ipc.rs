@@ -12,6 +12,7 @@ pub fn builder() -> Builder<tauri::Wry> {
     Builder::<tauri::Wry>::new()
         .commands(collect_commands![
             commands::app::app_info,
+            commands::app::open_settings,
             commands::settings::get_settings,
             commands::settings::update_settings,
             commands::keys::list_providers,

@@ -14,6 +14,17 @@ export const commands = {
       else return { status: "error", error: e as any };
     }
   },
+  /**
+   * Shows and focuses the Settings window (created hidden at startup).
+   */
+  async openSettings(): Promise<Result<null, SidekickError>> {
+    try {
+      return { status: "ok", data: await TAURI_INVOKE("open_settings") };
+    } catch (e) {
+      if (e instanceof Error) throw e;
+      else return { status: "error", error: e as any };
+    }
+  },
   async getSettings(): Promise<Result<Settings, SidekickError>> {
     try {
       return { status: "ok", data: await TAURI_INVOKE("get_settings") };

@@ -5,6 +5,7 @@
   "windows": ["settings"],
   "permissions": [
     "core:default",
+    "core:window:allow-hide",
     "allow-app-info",
     "allow-get-settings",
     "allow-update-settings",

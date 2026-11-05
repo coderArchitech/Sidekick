@@ -44,6 +44,8 @@ let settings: Settings = structuredClone(DEFAULT_SETTINGS);
 const savedKeys = new Map<string, string>();
 const activeStreams = new Map<string, { cancelled: boolean }>();
 export const mockAnswerBus = createMockAnswerBus();
+/** Counts window actions so tests can assert them. */
+export const mockWindowCalls = { openSettings: 0, hide: 0 };
 
 /** Applies a patch the way the Rust side does: absent fields are unchanged. */
 export function applyPatch(current: Settings, patch: SettingsPatch): Settings {
@@ -76,6 +78,8 @@ export function resetMocks(): void {
   settings = structuredClone(DEFAULT_SETTINGS);
   savedKeys.clear();
   activeStreams.clear();
+  mockWindowCalls.openSettings = 0;
+  mockWindowCalls.hide = 0;
 }
 
 /**
@@ -89,6 +93,10 @@ export const mockCommands: Commands = {
       status: "ok",
       data: { name: "Sidekick", version: "0.0.0-mock", os: "web" },
     }),
+  openSettings: () => {
+    mockWindowCalls.openSettings += 1;
+    return Promise.resolve({ status: "ok", data: null });
+  },
   getSettings: () => Promise.resolve({ status: "ok", data: structuredClone(settings) }),
   updateSettings: (patch) => {
     settings = applyPatch(settings, patch);
