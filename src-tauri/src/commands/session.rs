@@ -301,3 +301,24 @@ pub fn set_auto_answer(
     changed(&app, &session);
     Ok(session)
 }
+
+/// Saves a finished answer with its question (tech doc 5.1 `save_answer`).
+#[tauri::command]
+#[specta::specta]
+pub fn save_answer(
+    state: State<'_, AppState>,
+    answer: sidekick_session::answers::NewAnswer,
+) -> SidekickResult<String> {
+    sidekick_session::answers::save(&mut state.db(), &answer)
+}
+
+/// Thumbs up (1) / down (-1) / clear (0).
+#[tauri::command]
+#[specta::specta]
+pub fn rate_answer(
+    state: State<'_, AppState>,
+    answer_id: String,
+    rating: i8,
+) -> SidekickResult<()> {
+    sidekick_session::answers::rate(&state.db(), &answer_id, rating)
+}

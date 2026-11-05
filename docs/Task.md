@@ -60,7 +60,7 @@ All Phase 0 code and automated tests are done and green on Linux, Windows and ma
 | T-018 | `retrieval` crate: hybrid search and context packs | 🟡 In progress: testing | Waiting on dependency: the latest screenshot joins the pack with T-025. Everything else done; 20k-chunk search 8 ms in release |
 | T-019 | Library feature: documents in a session | 🟡 In progress: testing | Waiting on dependency: Playwright drag-and-drop spec comes with the UI suite (T-032); native picker/drop check on Windows/macOS |
 | T-020 | Orchestrator: question detection and modes | ✅ Done | Rules meet the targets on a never-tuned set (95% / 100%); real-meeting check in T-039 |
-| T-021 | Orchestrator: prompts, Skills, two-tier answers | ⬜ To do | |
+| T-021 | Orchestrator: prompts, Skills, two-tier answers | 🟡 In progress: testing | Waiting on dependency: prompts accept a Skill; picking the active Skill comes with T-028. Live-model quality check in T-039 |
 | T-022 | Live Answers tab | ⬜ To do | |
 | T-023 | Chat tab | ⬜ To do | |
 | T-024 | Rolling notes | ⬜ To do | |
@@ -396,12 +396,16 @@ All Phase 0 code and automated tests are done and green on Linux, Windows and ma
 **Scope:** Prompt builder wrapping retrieved content as untrusted data; active Skill instructions; fast cue model and main model in parallel; citation format; "not found in your docs" fallback; at most 2 questions in flight, newest cancels oldest.
 
 **Tests**
-- [ ] Unit: prompt snapshot tests per answer type (detected, chat, screenshot).
-- [ ] Unit: retrieved text is fenced as untrusted data; injection strings in fixtures don't change instructions.
-- [ ] Unit: citations parsed into `sources_json` (doc page, transcript time, URL).
-- [ ] Unit: empty retrieval produces the not-found answer, never a guess.
-- [ ] Unit: third concurrent question cancels the oldest; cancelled streams emit no further tokens.
-- [ ] Unit: LLM failure leaves transcript and notes running (NFR-5).
+- [x] Unit: prompt structure for cue and full variants: rules in the stable system prompt (cache-friendly), numbered transcript-then-document context, Skill section, chat history. Screenshot prompts come with T-025.
+- [x] Unit: retrieved text is fenced inside `<context>` and declared as data; an injection string stays inside the fence and never reaches the system prompt.
+- [x] Unit: citations `[n]` parsed (first-use order, lists like `[2, 3]`, unknown numbers ignored) into `sources_json` entries (doc page or chunk, transcript time).
+- [x] Unit: empty retrieval answers "Not found in your documents or the meeting so far." without calling a model.
+- [x] Unit: cue (fast model, low effort, 80 tokens) and full answer (main model, medium effort) stream in parallel; latency recorded per stage; answer saved with tokens and model.
+- [x] Unit: a third concurrent question cancels the oldest's streams; its late tokens are ignored; manual cancel works.
+- [x] Unit: a stream that fails shows on that answer only and the router keeps working (NFR-5); a failed cue doesn't sink the full answer; refusals show a neutral note.
+- [x] Integration (mocks): transcript line → detection → router → saved answer.
+- [ ] Active Skill selection: with T-028.
+- [ ] Answer quality with live models: T-039.
 
 ### T-022 Live Answers tab
 

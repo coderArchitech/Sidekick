@@ -11,4 +11,5 @@ export {
   mockProtection,
   mockWindowCalls,
   resetMocks,
+  savedAnswers,
 } from "./mock";

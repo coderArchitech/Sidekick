@@ -25,6 +25,8 @@
     "allow-rename-speaker",
     "allow-add-bookmark",
     "allow-set-auto-answer",
+    "allow-save-answer",
+    "allow-rate-answer",
     "allow-ingest-document",
     "allow-ingest-url",
     "allow-list-documents",

@@ -28,6 +28,8 @@ const COMMANDS: &[&str] = &[
     "rename_speaker",
     "add_bookmark",
     "set_auto_answer",
+    "save_answer",
+    "rate_answer",
     "ingest_document",
     "ingest_url",
     "list_documents",

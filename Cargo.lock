@@ -4221,6 +4221,7 @@ dependencies = [
  "hound",
  "rusqlite",
  "serde",
+ "serde_json",
  "sidekick-audio",
  "sidekick-core",
  "sidekick-secrets",

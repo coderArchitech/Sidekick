@@ -246,6 +246,28 @@ export const commands = {
     }
   },
   /**
+   * Saves a finished answer with its question (tech doc 5.1 `save_answer`).
+   */
+  async saveAnswer(answer: NewAnswer): Promise<Result<string, SidekickError>> {
+    try {
+      return { status: "ok", data: await TAURI_INVOKE("save_answer", { answer }) };
+    } catch (e) {
+      if (e instanceof Error) throw e;
+      else return { status: "error", error: e as any };
+    }
+  },
+  /**
+   * Thumbs up (1) / down (-1) / clear (0).
+   */
+  async rateAnswer(answerId: string, rating: number): Promise<Result<null, SidekickError>> {
+    try {
+      return { status: "ok", data: await TAURI_INVOKE("rate_answer", { answerId, rating }) };
+    } catch (e) {
+      if (e instanceof Error) throw e;
+      else return { status: "error", error: e as any };
+    }
+  },
+  /**
    * Queues a file for parsing and embedding.
    */
   async ingestDocument(sessionId: string, path: string): Promise<Result<null, SidekickError>> {
@@ -498,6 +520,27 @@ export type LlmRequest = {
  */
 export type ModelInfo = { id: string; displayName: string };
 /**
+ * A finished answer to save.
+ */
+export type NewAnswer = {
+  sessionId: string;
+  question: string;
+  source: QuestionSource;
+  directed: boolean;
+  /**
+   * The transcript segment the question came from, if detected.
+   */
+  segmentId: number | null;
+  cue: string | null;
+  bodyMd: string;
+  sources: Source[];
+  provider: string;
+  model: string;
+  latencyMs: number;
+  inputTokens: number | null;
+  outputTokens: number | null;
+};
+/**
  * Who the user is, for directed questions and STT boosts (PRD QA-2, LIS-5a).
  */
 export type Profile = { name: string; nicknames: string[] };
@@ -550,6 +593,10 @@ export type ProviderEntry = {
   docsUrl: string;
 } & { key: KeyStatus };
 export type ProviderKind = "stt" | "llm" | "embed" | "search";
+/**
+ * Where a question came from (`questions.source`).
+ */
+export type QuestionSource = "detected" | "chat" | "screenshot";
 /**
  * How long session data is kept after a session ends (tech doc 4.4).
  */
@@ -641,6 +688,20 @@ export type SettingsPatch = {
  * `message` is user-facing and must never contain API keys or meeting content.
  */
 export type SidekickError = { code: ErrorCode; message: string; retryable: boolean };
+/**
+ * One citation (`answers.sources_json`, tech doc 4.3).
+ */
+export type Source = {
+  /**
+   * `doc`, `transcript`, `url` or `screenshot`.
+   */
+  type: string;
+  /**
+   * e.g. `<document id>#p14`, `t:754000`, a URL.
+   */
+  ref: string;
+  label: string;
+};
 /**
  * Measured stages. Targets come from tech doc 10.1 and 13.1.
  */

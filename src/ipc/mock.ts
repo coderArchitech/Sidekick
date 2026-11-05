@@ -5,6 +5,7 @@ import type {
   Bookmark,
   ConsentOption,
   DocumentInfo,
+  NewAnswer,
   Session,
   TranscriptLine,
   SidekickError,
@@ -72,6 +73,8 @@ const sessions = new Map<string, Session>();
 const transcripts = new Map<string, TranscriptLine[]>();
 const bookmarks = new Map<string, Bookmark[]>();
 const documents = new Map<string, DocumentInfo[]>();
+/** Answers saved through `saveAnswer`, for assertions. */
+export const savedAnswers: { id: string; answer: NewAnswer; rating: number | null }[] = [];
 
 /** Simulates ingest like the Rust pipeline: queued → parsing → embedding → ready (or failed). */
 function mockIngest(sessionId: string, name: string, sizeBytes: number) {
@@ -257,6 +260,7 @@ export function resetMocks(): void {
   sessions.clear();
   transcripts.clear();
   documents.clear();
+  savedAnswers.length = 0;
   mockFiles.picked = [];
   bookmarks.clear();
   nextLineId = 1;
@@ -472,6 +476,17 @@ export const mockCommands: Commands = {
     const s = sessions.get(sessionId);
     if (!s) return Promise.resolve(err("INTERNAL", "That session no longer exists."));
     return Promise.resolve(save({ ...s, autoAnswer: on }));
+  },
+  saveAnswer: (answer) => {
+    const id = `mock-answer-${nextLineId++}`;
+    savedAnswers.push({ id, answer: structuredClone(answer), rating: null });
+    return Promise.resolve({ status: "ok", data: id });
+  },
+  rateAnswer: (answerId, rating) => {
+    const a = savedAnswers.find((x) => x.id === answerId);
+    if (!a) return Promise.resolve(err("INTERNAL", "That answer no longer exists."));
+    a.rating = rating === 0 ? null : rating;
+    return Promise.resolve({ status: "ok", data: null });
   },
   getTranscript: (sessionId) =>
     Promise.resolve({

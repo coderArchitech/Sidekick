@@ -229,7 +229,7 @@ Each module below is its own crate at `crates/<module>/`, named `sidekick-<modul
 | `library` | Collapsible Documents panel under the session bar: add files (native picker via `tauri-plugin-dialog`, or drop onto the window), add links, live indexing progress, failure reason with Retry, remove. Screenshot strip arrives with T-043 |
 | `settings` | Settings window: provider and model dropdowns per kind (STT, LLM, embeddings, web search), masked key field with show/hide, paste, Save and test, Test connection, Remove; Auto-answer and retention. Opened with `open_settings`; Close hides the window |
 | `skills` | Skill builder, templates, import/export |
-| `orchestrator` | Question detection (rules: question marks, question words, implicit asks, chit-chat filter, trusts STT punctuation; fuzzy name/nickname matching), `QuestionDetector` (600 ms debounce, merges a speaker's split question, ignores the user's own speech), Auto vs directed-only routing; prompt building and model routing arrive with T-021 |
+| `orchestrator` | Question detection (rules + fuzzy name matching, 600 ms debounce, Auto vs directed-only) and answering: `AnswerRouter` builds cue and full prompts (stable system rules; context fenced as untrusted data; numbered sources), streams both in parallel (cue on the fast model at low effort), keeps at most 2 questions in flight, answers "not found" without a model call when there's no context, records latency, saves answers with cited sources. UI updates batched every 50 ms |
 | `ipc` | Generated `bindings.ts` (section 5.6), browser mocks (`mock.ts`) that mirror every command, `answerEvents` for answer streams, and window helpers (`currentWindow`, `hideCurrentWindow`). The only module that imports Tauri |
 
 ### 3.3 Key workflow: answering a question
@@ -605,8 +605,8 @@ Commands are request/response calls from the frontend to Rust (`invoke`). All re
 | `llm_stream` | `request_id, provider?, model?, messages, tools?` | `()` (tokens arrive as events) | Start a streaming LLM call |
 | `cancel_stream` | `request_id` | `()` | Abort an in-flight LLM call |
 | `web_search` | `request_id, query, max_results?` | `SearchResult[]` | Run a web search for a model tool call; the orchestrator sends results back to the model |
-| `save_answer` | `Answer` | `AnswerId` | Persist a completed answer |
-| `rate_answer` | `answer_id, rating` | `()` | Thumbs up/down |
+| `save_answer` | `NewAnswer` (session, question, source, directed, segment, cue, body, sources, provider, model, latency, tokens) | `String` (answer id) | Persist a question and its answer in one transaction |
+| `rate_answer` | `answer_id, rating` (1, -1, or 0 to clear) | `()` | Thumbs up/down |
 | `save_notes` | `session_id, content_md, version` | `NotesVersion` | Update rolling notes (optimistic version check) |
 | `list_providers` | `kind: stt / llm / embed / search` | `ProviderInfo[]` | Dropdown options, with key status |
 | `set_api_key` | `provider, key` | `KeyStatus` | Test and store a key (key never returned) |

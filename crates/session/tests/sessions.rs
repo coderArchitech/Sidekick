@@ -475,3 +475,49 @@ fn auto_answer_is_per_session() {
     );
     assert!(repo::set_auto_answer(&db, &a.id, true).unwrap().auto_answer);
 }
+
+#[test]
+fn answers_are_saved_with_sources_and_rated() {
+    use sidekick_session::answers::{self, NewAnswer, QuestionSource, Source};
+    let mut db = db();
+    let s = repo::create(&db, &new("Q&A")).unwrap();
+    let a = NewAnswer {
+        session_id: s.id.clone(),
+        question: "What's the rate limit?".into(),
+        source: QuestionSource::Detected,
+        directed: true,
+        segment_id: None,
+        cue: Some("600 requests/min".into()),
+        body_md: "The Pro tier allows 600 requests per minute [1].".into(),
+        sources: vec![Source {
+            kind: "doc".into(),
+            reference: "d1#p14".into(),
+            label: "Spec v2, p.14".into(),
+        }],
+        provider: "anthropic".into(),
+        model: "claude-opus-5-5".into(),
+        latency_ms: 1840,
+        input_tokens: Some(3120),
+        output_tokens: Some(142),
+    };
+    let id = answers::save(&mut db, &a).unwrap();
+    let (json, directed): (String, bool) = db
+        .conn()
+        .query_row("SELECT a.sources_json, q.directed FROM answers a JOIN questions q ON q.id = a.question_id WHERE a.id = ?1", [&id], |r| Ok((r.get(0)?, r.get(1)?)))
+        .unwrap();
+    assert_eq!(
+        json, r#"[{"type":"doc","ref":"d1#p14","label":"Spec v2, p.14"}]"#,
+        "tech doc 4.3 format"
+    );
+    assert!(directed);
+    answers::rate(&db, &id, 1).unwrap();
+    answers::rate(&db, &id, 0).unwrap();
+    assert!(answers::rate(&db, &id, 2).is_err());
+    assert!(answers::rate(&db, "missing", 1).is_err());
+    repo::delete(&db, &s.id).unwrap();
+    let left: i64 = db
+        .conn()
+        .query_row("SELECT count(*) FROM answers", [], |r| r.get(0))
+        .unwrap();
+    assert_eq!(left, 0, "answers go with the session");
+}

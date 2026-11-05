@@ -5,6 +5,7 @@
 //!   The store crate owns the schema; each domain crate owns the SQL for its tables.
 //! - [`runner`]: a live session: one audio capture plus one STT run per stream.
 
+pub mod answers;
 pub mod model;
 pub mod repo;
 pub mod runner;
