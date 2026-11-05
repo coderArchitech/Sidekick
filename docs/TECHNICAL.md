@@ -63,7 +63,7 @@ The problem it solves: in context-heavy meetings, people can't recall details fr
 
 | Field | Value |
 | --- | --- |
-| Version | 1.1 (draft) |
+| Version | 1.2 (draft) |
 | Owner | @nitesh |
 | Status | Draft, in development (Phase 0) |
 | Review cadence | At every minor release, and whenever an ADR is added |
@@ -74,11 +74,13 @@ The problem it solves: in context-heavy meetings, people can't recall details fr
 | --- | --- | --- |
 | 1.0 | Nov 5, 2026 | First full draft |
 | 1.1 | Nov 5, 2026 | Repo scaffolded. Added ADR-011 (Cargo workspace, one crate per module) and ADR-012 (frontend feature boundaries); updated 3.2, 3.5, 6, 7.1, 9.1, 14; added 7.8 module boundaries; diagrams redrawn in Mermaid; proposed changes listed in 14.6 |
+| 1.2 | Nov 5, 2026 | Added the implementation task list ([Task.md](Task.md)) and linked it from 1.6 and 14.1 |
 
 ### 1.6 Related documents
 
 - **[Sidekick PRD](PRD.md)**: product requirements, IDs referenced here (CTX, LIS, MEM, QA, SCR, MOD, SKL, UI, KEY).
 - **Sidekick Technical Architecture**: earlier architecture summary, now superseded by this document (not kept in the repo).
+- **[Implementation tasks](Task.md)**: every task with its tests and status; updated with each change.
 - **[Architecture decision records](adr/README.md)**: one file per decision, summarised in section 3.5.
 - External references: Tauri 2 docs, Deepgram / AssemblyAI / Soniox API docs, Anthropic / OpenAI / Gemini API docs, sqlite-vec docs.
 
@@ -1457,7 +1459,7 @@ There's no service, so these are product-quality objectives measured locally (an
 
 ### 14.1 Roadmap
 
-The phased roadmap (Prototype, MVP, V1 launch, V2) and its gates are maintained in the PRD, section 10, so there is one source of truth. Engineering milestones for Phase 0:
+The phased roadmap (Prototype, MVP, V1 launch, V2) and its gates are maintained in the PRD, section 10, so there is one source of truth. Engineering work is broken into tasks with tests and status in [Task.md](Task.md). Phase 0 milestones:
 
 - [x] Tauri 2 project scaffolded (Cargo workspace, React frontend, typed IPC, lint and test setup).
 - [ ] CI green on Windows and macOS (workflow added; confirm on first run).

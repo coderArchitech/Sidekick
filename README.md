@@ -2,7 +2,7 @@
 
 🦸 Your private, real-time AI meeting copilot. Sidekick listens to a live conversation in any meeting app (Teams, Zoom, Google Meet, Webex and others), keeps running notes, detects questions as they're asked (especially ones addressed to you by name), and suggests answers with sources from your documents, the meeting so far, screenshots and the web. Answers appear in a translucent overlay that only you can see.
 
-> **Status:** early development (Phase 0). The project skeleton, typed IPC and CI are in place; features land next. See the [roadmap milestones](docs/TECHNICAL.md#141-roadmap).
+> **Status:** early development (Phase 0). The project skeleton, typed IPC and CI are in place; features land next. Progress is tracked in [docs/Task.md](docs/Task.md).
 
 ## Documentation
 
@@ -10,6 +10,7 @@
 | ----------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------- |
 | [Product requirements (PRD)](docs/PRD.md)                   | Problem, users, requirements with IDs (CTX, LIS, MEM, QA, SCR, MOD, SKL, UI, KEY), consent and ethics, roadmap |
 | [Technical documentation](docs/TECHNICAL.md)                | Architecture, data model, IPC contract, setup, coding standards, testing, release, security, operations        |
+| [Implementation tasks](docs/Task.md)                        | Every task to build Sidekick end to end, its tests and its current status                                      |
 | [Architecture decision records](docs/adr/README.md)         | One file per significant decision (ADR-001 onwards)                                                            |
 | [Module boundaries](docs/TECHNICAL.md#78-module-boundaries) | How the code is split and the rules that keep it modular                                                       |
 | [User guide](docs/TECHNICAL.md#12-user-guide)               | Install, first run, features, shortcuts, FAQs                                                                  |
