@@ -1,0 +1,12 @@
+{
+  "$schema": "../gen/schemas/desktop-schema.json",
+  "identifier": "overlay",
+  "description": "Overlay window: sessions, capture, retrieval, answers, notes and overlay controls (tech doc 5.8). Never key commands.",
+  "windows": ["overlay"],
+  "permissions": [
+    "core:default",
+    "allow-app-info",
+    "core:window:allow-start-dragging",
+    "core:window:allow-set-always-on-top"
+  ]
+}
