@@ -199,7 +199,7 @@ Each module below is its own crate at `crates/<module>/`, named `sidekick-<modul
 | Crate | Responsibility | Status |
 | --- | --- | --- |
 | `audio` | Microphone and system audio as separate 16 kHz mono streams of 50 ms frames via cpal (WASAPI loopback on Windows, Core Audio tap on macOS 14.6+); windowed-sinc resampler; energy VAD flag per frame; pause/resume/stop; WAV `FixtureSource` for tests and `SIDEKICK_AUDIO_FIXTURE`; never writes audio (ADR-014) | Done (manual device checks pending) |
-| `stt` | `SttProvider` trait plus adapters (Deepgram, AssemblyAI, Soniox, Whisper); WebSocket lifecycle and reconnects; emit segments | Not started |
+| `stt` | `SttProvider` (one `run` per audio stream), Deepgram Nova-3 WebSocket adapter (interim + final results, diarization for system audio, `keyterm` boosts, keep-alives, silence not sent with a `Timeline` mapping provider time back to meeting time, reconnect with backoff and replay of unfinalised and buffered audio, up to 10 s), `DeepgramVerifier` for key checks, mock provider; speaker labels `me` / `speaker_N` | Done (live latency check pending) |
 | `capture` | Region, window and full-screen screenshots; downscale and encode | Not started |
 | `window` | Overlay window: transparency, always-on-top, click-through, capture exclusion and its status check | Not started |
 | `hotkeys` | Register and dispatch global shortcuts | Not started |
@@ -317,7 +317,7 @@ Each decision has its own file in [`docs/adr/`](adr/README.md). New decisions ge
 
 | Service | Protocol | Auth | Used for |
 | --- | --- | --- | --- |
-| Deepgram | WebSocket (streaming) | API key in header | Default live STT |
+| Deepgram | WebSocket (streaming, `wss://api.deepgram.com/v1/listen`, Nova-3, linear16 16 kHz) | `Authorization: Token <key>`; key check via `GET /v1/projects` | Default live STT |
 | AssemblyAI | WebSocket (streaming) | API key in header | Alternative STT |
 | Soniox | WebSocket (streaming) | API key | Alternative STT, multilingual |
 | Anthropic | HTTPS + server-sent events (`anthropic-version: 2026-10-21`, so no sampling parameters) | `x-api-key` header | LLM answers, vision. Defaults: `claude-opus-5-5` for full answers, `claude-haiku-5-5` for cues (MOD-3). Server-side refusal fallback (`fallbacks: "default"`, beta `server-side-fallback-2026-07-01`) is on for models that support it; a final `refusal` stop reason is shown as a neutral notice |
@@ -688,10 +688,18 @@ Every error crossing IPC is a `SidekickError` with a stable `code`, a user-facin
 - Provider adapters implement these Rust traits:
 
 ```rust
+// In crates/stt: one call transcribes one audio stream until it ends.
 #[async_trait]
 pub trait SttProvider: Send + Sync {
-    fn id(&self) -> ProviderId;
-    async fn connect(&self, cfg: SttConfig, key: Option<SecretString>) -> Result<SttStream, SidekickError>;
+    fn id(&self) -> &'static str;
+    async fn run(&self, config: SttConfig, key: Option<SecretString>, frames: Receiver<AudioFrame>,
+                 sink: Arc<dyn SttSink>, cancel: CancellationToken) -> SidekickResult<()>;
+}
+
+// In sidekick-core: how the gateway checks non-LLM keys before saving them.
+#[async_trait]
+pub trait KeyVerifier: Send + Sync {
+    async fn verify(&self, key: &SecretString) -> SidekickResult<()>;
 }
 
 #[async_trait]

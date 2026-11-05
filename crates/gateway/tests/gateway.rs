@@ -235,7 +235,7 @@ async fn providers_without_an_adapter_save_unverified() {
     let keys: Arc<dyn KeyStore> = Arc::new(MemoryStore::default());
     let gw = Gateway::new(keys.clone(), false);
     let check = gw
-        .set_key("deepgram", SecretString::from("dg-key-9999".to_owned()))
+        .set_key("assemblyai", SecretString::from("aai-key-9999".to_owned()))
         .await
         .unwrap();
     assert!(!check.verified);
@@ -251,6 +251,46 @@ async fn providers_without_an_adapter_save_unverified() {
             .unwrap_err()
             .code,
         ErrorCode::KeyMissing
+    );
+}
+
+struct Verifier(bool);
+
+#[async_trait::async_trait]
+impl sidekick_core::keys::KeyVerifier for Verifier {
+    async fn verify(&self, _: &SecretString) -> SidekickResult<()> {
+        if self.0 {
+            Ok(())
+        } else {
+            Err(SidekickError::new(ErrorCode::KeyInvalid, "no"))
+        }
+    }
+}
+
+#[tokio::test]
+async fn registered_verifiers_check_non_llm_keys() {
+    let keys: Arc<dyn KeyStore> = Arc::new(MemoryStore::default());
+    let gw = Gateway::new(keys.clone(), false).with_verifier("deepgram", Arc::new(Verifier(true)));
+    assert!(
+        gw.set_key("deepgram", SecretString::from("dg-1234".to_owned()))
+            .await
+            .unwrap()
+            .verified
+    );
+    let gw = Gateway::new(keys.clone(), false).with_verifier("soniox", Arc::new(Verifier(false)));
+    let err = gw
+        .set_key("soniox", SecretString::from("sx-1".to_owned()))
+        .await
+        .unwrap_err();
+    assert_eq!(err.code, ErrorCode::KeyInvalid);
+    assert!(!keys.status("soniox").unwrap().saved);
+    let stt = gw.providers(ProviderKind::Stt).unwrap();
+    assert!(
+        stt.iter()
+            .find(|p| p.info.id == "soniox")
+            .unwrap()
+            .info
+            .implemented
     );
 }
 

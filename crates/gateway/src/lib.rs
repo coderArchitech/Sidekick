@@ -13,6 +13,7 @@ use std::collections::HashMap;
 use std::sync::Arc;
 
 use serde::Serialize;
+use sidekick_core::keys::KeyVerifier;
 use sidekick_core::llm::{LlmProvider, LlmRequest, ModelInfo};
 use sidekick_core::{ErrorCode, SidekickError, SidekickResult};
 use sidekick_secrets::{KeyStatus, KeyStore, SecretString};
@@ -45,6 +46,8 @@ pub struct KeyCheck {
 
 pub struct Gateway {
     llms: HashMap<&'static str, Arc<dyn LlmProvider>>,
+    /// Key checks for non-LLM providers (STT, embeddings, search).
+    verifiers: HashMap<&'static str, Arc<dyn KeyVerifier>>,
     keys: Arc<dyn KeyStore>,
     policy: RetryPolicy,
     streams: StreamManager,
@@ -68,6 +71,7 @@ impl Gateway {
         }
         Self {
             llms,
+            verifiers: HashMap::new(),
             keys,
             policy: RetryPolicy::default(),
             streams: StreamManager::default(),
@@ -79,6 +83,13 @@ impl Gateway {
     #[must_use]
     pub fn with_llm(mut self, id: &'static str, provider: Arc<dyn LlmProvider>) -> Self {
         self.llms.insert(id, provider);
+        self
+    }
+
+    /// Registers a key check for a non-LLM provider (e.g. Deepgram from the stt crate).
+    #[must_use]
+    pub fn with_verifier(mut self, id: &'static str, verifier: Arc<dyn KeyVerifier>) -> Self {
+        self.verifiers.insert(id, verifier);
         self
     }
 
@@ -94,6 +105,9 @@ impl Gateway {
             .into_iter()
             .map(|mut info| {
                 if self.mock && info.kind == ProviderKind::Llm {
+                    info.implemented = true;
+                }
+                if info.kind != ProviderKind::Llm && self.verifiers.contains_key(info.id) {
                     info.implemented = true;
                 }
                 Ok(ProviderEntry {
@@ -198,11 +212,16 @@ impl Gateway {
         if self.mock {
             return Ok(true);
         }
-        match self.llms.get(provider) {
-            Some(llm) => with_retries(&self.policy, || llm.list_models(Some(key)))
+        if let Some(llm) = self.llms.get(provider) {
+            return with_retries(&self.policy, || llm.list_models(Some(key)))
                 .await
-                .map(|_| true),
-            None => Ok(false), // No adapter yet (e.g. Deepgram until T-010): save unverified.
+                .map(|_| true);
+        }
+        match self.verifiers.get(provider) {
+            Some(v) => with_retries(&self.policy, || v.verify(key))
+                .await
+                .map(|()| true),
+            None => Ok(false), // No adapter yet: save unverified.
         }
     }
 }

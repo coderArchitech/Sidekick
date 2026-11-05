@@ -18,6 +18,7 @@ sidekick-store = { path = "crates/store" }
 sidekick-settings = { path = "crates/settings" }
 sidekick-gateway = { path = "crates/gateway" }
 sidekick-audio = { path = "crates/audio" }
+sidekick-stt = { path = "crates/stt" }
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
 thiserror = "2"
@@ -37,6 +38,8 @@ fastrand = "2"
 wiremock = "0.6"
 cpal = "0.18"
 hound = "3"
+tokio-tungstenite = { version = "0.28", features = ["rustls-tls-native-roots"] }
+url = "2"
 tracing = "0.1"
 tracing-subscriber = { version = "0.3", features = ["env-filter", "json"] }
 specta = { version = "=2.0.0-rc.22", features = ["derive"] }

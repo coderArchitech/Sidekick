@@ -42,7 +42,7 @@ The working task list for building Sidekick end to end, derived from the [techni
 | T-007 | `gateway` crate: LLM provider trait, mock and Anthropic | 🟡 In progress: testing | Passes locally; waiting for Windows/macOS CI |
 | T-008 | Settings window: providers and API keys | 🟡 In progress: testing | Passes locally; waiting for CI and a check in the real app on Windows/macOS |
 | T-009 | `audio` crate: microphone and system audio capture | 🟡 In progress: testing | 🖥️ Automated tests pass; needs device checks on Windows and macOS 14.6+ (ADR-014) |
-| T-010 | `stt` crate: Deepgram streaming | ⬜ To do | |
+| T-010 | `stt` crate: Deepgram streaming | 🟡 In progress: testing | Automated tests pass; live latency check with a real key pending |
 | T-011 | `window` crate: capture exclusion and protection status | ⬜ To do | 🖥️ Highest technical risk |
 | T-012 | `diagnostics` crate: latency metrics and baselines | ⬜ To do | |
 
@@ -234,12 +234,16 @@ The working task list for building Sidekick end to end, derived from the [techni
 **Scope:** `SttProvider` trait in `sidekick-core`; Deepgram Nova-3 WebSocket adapter with interim and final results, diarization for the system stream; mic stream labelled "Me"; reconnect within 3 s with 10 s audio buffer; mock provider replaying a fixture transcript.
 
 **Tests**
-- [ ] Unit: Deepgram message parsing into partial and final segments (recorded fixtures).
-- [ ] Unit: mic segments labelled `me` / `is_user = 1`; system segments labelled `speaker_N`.
-- [ ] Integration (mock WebSocket server): reconnects within 3 s and replays buffered audio; emits `stt.status` reconnecting → live.
-- [ ] Integration: 401 maps to `KEY_INVALID` and stops reconnecting.
-- [ ] Integration: fixture audio through the mock provider produces the expected transcript.
-- [ ] Manual: transcript lag measured against NFR-1 on a real call; result recorded in TECHNICAL.md 13.2.
+- [x] Unit: listen URL (model, encoding, diarize for system audio only, keyterms); message parsing into partial and final results; metadata and empty results ignored.
+- [x] Unit: mic segments labelled `me` / `is_user`; system segments split per speaker run as `speaker_N`.
+- [x] Unit: timeline maps provider time to meeting time across skipped silence.
+- [x] Integration (local WebSocket server): auth header sent; final result becomes a segment with meeting timestamps; `CloseStream` on end.
+- [x] Integration: silence isn't sent beyond a 500 ms tail; keep-alives sent during silence.
+- [x] Integration: connection drop → `Reconnecting` → `Live` within 3 s; unfinalised and buffered audio replayed, nothing lost.
+- [x] Integration: 401 maps to `KEY_INVALID`, `Failed`, no retry; unreachable server gives up after the deadline; cancel stops the run; missing key reported.
+- [x] Integration: Deepgram key verifier (wiremock 200 / 401); gateway uses registered verifiers before saving keys.
+- [x] Integration: mock provider turns speech bursts in fixture frames into segments.
+- [ ] Manual: transcript lag measured against NFR-1 with a real key on a real call; result recorded in TECHNICAL.md 13.2.
 
 ### T-011 `window` crate: capture exclusion and protection status 🖥️
 

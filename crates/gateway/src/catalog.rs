@@ -12,7 +12,8 @@ pub enum ProviderKind {
     Search,
 }
 
-/// Static facts about a provider. `implemented` is false until its adapter lands.
+/// Static facts about a provider. `implemented` is false until its adapter lands
+/// (non-LLM providers are also marked implemented once a key verifier is registered).
 #[derive(Debug, Clone, PartialEq, Eq, Serialize)]
 #[cfg_attr(feature = "specta", derive(specta::Type))]
 #[serde(rename_all = "camelCase")]
@@ -52,7 +53,7 @@ pub const PROVIDERS: &[ProviderInfo] = &[
         Stt,
         "Deepgram",
         true,
-        false,
+        true,
         "https://developers.deepgram.com",
     ),
     p(

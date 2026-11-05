@@ -38,7 +38,13 @@ impl AppState {
             .map_err(|_| SidekickError::internal("Couldn't create the app data folder."))?;
         let key = database_key(keys.as_ref())?;
         let db = Database::open(&data_dir.join(DB_FILE_NAME), &key)?;
-        let gateway = Gateway::new(Arc::clone(&keys), mock);
+        let mut gateway = Gateway::new(Arc::clone(&keys), mock);
+        if !mock {
+            gateway = gateway.with_verifier(
+                "deepgram",
+                Arc::new(sidekick_stt::DeepgramVerifier::default()),
+            );
+        }
         Ok(Self {
             db: Mutex::new(db),
             gateway,
