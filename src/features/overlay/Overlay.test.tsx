@@ -21,7 +21,7 @@ describe("Overlay", () => {
   it("switches tab on click", async () => {
     render(<Overlay />);
     await userEvent.click(screen.getByRole("tab", { name: "Notes" }));
-    expect(screen.getByRole("tabpanel")).toHaveTextContent("Notes will appear here.");
+    expect(screen.getByRole("tabpanel")).toHaveTextContent("Start a session to keep notes.");
   });
 
   it("shows the app version from the Rust core (mocked)", async () => {

@@ -225,7 +225,7 @@ Each module below is its own crate at `crates/<module>/`, named `sidekick-<modul
 | `answers` | Live Answers tab, newest first: cue line (Stop while streaming), expandable full answer (open by default when the question used your name), numbered sources, thumbs up/down (`rate_answer`, click again to clear). Markdown via `react-markdown` with raw HTML skipped and links shown as text, never opened. Fenced code uses Shiki, loaded lazily on first code block with 13 languages and the JavaScript regex engine (no WASM); unknown languages fall back to plain text. Copy writes only the code, only on click. Follow-up chips are not built yet |
 | `chat` | Chat tab: typed questions answered through the same `AnswerRouter` with `source = chat` and the session context (transcript, notes, documents), plus the last 3 finished exchanges as history so follow-ups make sense. Enter sends, Shift+Enter adds a line, Stop cancels. History is per session: saved answers reload with `list_answers(session, chat)`. The Ask hotkey shows and focuses the overlay, switches to Chat and focuses the input. A chat question shares the 2-in-flight limit, so it can stop the oldest detected answer. Voice input arrives later |
 | `transcript` | Transcript tab: loads saved lines, applies live `transcript-partial` / `transcript-segment` events batched every 50 ms (`lib/batcher`), shows partial text until the final line arrives, rename/merge speakers, bookmarks, listening indicator |
-| `notes` | Rolling notes, decisions, action items |
+| `notes` | Notes tab: rolling notes (Topics, Decisions, Open questions) rendered as Markdown and updated live from `useNotesStore`; after the session ends, the Summary with decisions and action items (owner, due). Shows "Updating notes…" / "Writing the summary…" and a notice when an update fails (old notes stay) |
 | `library` | Collapsible Documents panel under the session bar: add files (native picker via `tauri-plugin-dialog`, or drop onto the window), add links, live indexing progress, failure reason with Retry, remove. Screenshot strip arrives with T-043 |
 | `settings` | Settings window: provider and model dropdowns per kind (STT, LLM, embeddings, web search), masked key field with show/hide, paste, Save and test, Test connection, Remove; Auto-answer and retention. Opened with `open_settings`; Close hides the window |
 | `skills` | Skill builder, templates, import/export |
@@ -264,7 +264,7 @@ Steps 3 to 8 must finish within the NFR-2 budget. The cue in step 9 comes from a
 | --- | --- |
 | Document upload | `library` → `ingest_document` → `ingest` parses and chunks → `gateway` embeds with the active `EmbeddingProvider` → `store` writes chunks and vectors → `ingest.progress` events |
 | Screenshot | Hotkey → `capture` → `store` saves image → `screenshot.captured` event → capture-and-ask continues at step 3 above |
-| Rolling notes | Every 45 s, `orchestrator` sends new transcript plus current notes to the fast model → `save_notes` |
+| Rolling notes | Every 45 s while live (not while paused), and only when there are new transcript lines since the last update, `orchestrator` (`NotesJob`, `useNotes`) sends just those lines plus the current notes to the fast model at low effort, fenced as untrusted data, and saves with `save_notes(version)`. On `VERSION_CONFLICT` it merges the same lines into the latest notes once more; on any other failure the lines are kept for the next run. When a session the overlay watched ends, it catches up once, then asks the main model for a JSON recap (summary, decisions, action items; transcript capped to the last 60k characters, the notes cover the start) → `save_summary`. If the reply isn't JSON, the raw text becomes the summary |
 | Session start | `start_session` → `consent` checks confirmation → `audio` and `stt` start → `session.state` event |
 
 ### 3.4 Technology stack with versions
@@ -458,7 +458,8 @@ CREATE TABLE screenshots (
 
 CREATE TABLE notes (
   session_id TEXT PRIMARY KEY REFERENCES sessions(id) ON DELETE CASCADE,
-  content_md TEXT NOT NULL, version INTEGER NOT NULL, updated_at INTEGER NOT NULL
+  content_md TEXT NOT NULL, version INTEGER NOT NULL, updated_at INTEGER NOT NULL,
+  summary_md TEXT                                -- end-of-session recap (0003)
 );
 
 CREATE TABLE action_items (
@@ -590,7 +591,7 @@ Commands are request/response calls from the frontend to Rust (`invoke`). All re
 | `set_auto_answer` | `session_id, on` | `Session` | Auto-answer on/off for the session (QA-3; header button and hotkey) |
 | `start_session` | `session_id` | `SessionStarted` (`session`, `warnings`) | Start audio capture and STT for the streams the consent allows; `CONSENT_REQUIRED` without consent; one live session at a time. With `SIDEKICK_AUDIO_FIXTURE`, the file plays as a single stream |
 | `pause_session` / `resume_session` | `session_id` | `Session` | Pause or resume listening (paused audio is dropped, never sent) |
-| `end_session` | `session_id` | `Session` | Stop capture and let STT flush; the summary arrives with T-024 |
+| `end_session` | `session_id` | `Session` | Stop capture and let STT flush; the overlay then writes the summary (`save_summary`) |
 | `delete_session` | `session_id` | `()` | Delete all session data (the consent record is kept, 4.4) |
 | `list_sessions` | `cursor?, limit?` | `SessionPage` (`items`, `nextCursor`) | Session history, newest first |
 | `get_transcript` | `session_id` | `Transcript` (`lines`, `bookmarks`) | Saved transcript in time order, for opening the Transcript tab |
@@ -608,7 +609,9 @@ Commands are request/response calls from the frontend to Rust (`invoke`). All re
 | `save_answer` | `NewAnswer` (session, question, source, directed, segment, cue, body, sources, provider, model, latency, tokens) | `String` (answer id) | Persist a question and its answer in one transaction |
 | `rate_answer` | `answer_id, rating` (1, -1, or 0 to clear) | `()` | Thumbs up/down |
 | `list_answers` | `session_id, source?` (`detected`, `chat`, `screenshot`) | `SavedAnswer[]` (question, cue, body, sources, rating, `createdAt`), oldest first | Chat history per session |
-| `save_notes` | `session_id, content_md, version` | `NotesVersion` | Update rolling notes (optimistic version check) |
+| `get_notes` | `session_id` | `Notes` (`contentMd`, `version` (0 before the first save), `updatedAt`, `summaryMd`, `actionItems`) | Notes, summary and action items |
+| `save_notes` | `session_id, content_md, version` | `Notes` | Update rolling notes if `version` is current; `VERSION_CONFLICT` otherwise |
+| `save_summary` | `session_id, summary_md, action_items` (`text, owner?, due?`) | `Notes` | Save the end-of-session summary and replace its action items |
 | `list_providers` | `kind: stt / llm / embed / search` | `ProviderInfo[]` | Dropdown options, with key status |
 | `set_api_key` | `provider, key` | `KeyStatus` | Test and store a key (key never returned) |
 | `test_api_key` | `provider` | `KeyStatus` | Re-test a stored key |
@@ -688,6 +691,7 @@ Every error crossing IPC is a `SidekickError` with a stable `code`, a user-facin
 | `CAPTURE_EXCLUSION_UNAVAILABLE` | OS doesn't support exclusion | No | Show warning; enable auto-hide fallback |
 | `DB_ERROR` | Database read/write failed | Maybe | Log; show recovery options if persistent |
 | `CANCELLED` | Request cancelled by user or newer question | No | None |
+| `VERSION_CONFLICT` | Optimistic version check failed (`save_notes`): someone saved first | No | Caller reloads and merges, then saves again |
 | `INTERNAL` | Unexpected error | No | Generic message; log with correlation ID |
 
 ### 5.5 Rate limits, pagination and versioning
@@ -1385,7 +1389,7 @@ This is not legal advice; confirm requirements with legal counsel before any pub
 2. Optional: choose a Skill (e.g. Interview Coach for mock interview practice).
 3. Click **Start**. Confirm that participants are aware of transcription, or choose **Transcribe me only**.
 4. Sidekick listens. Answers appear in **Live Answers**: a one-line cue first, then the full answer and sources.
-5. Click **End** when the meeting finishes to get a summary, decisions and action items.
+5. Click **End** when the meeting finishes. The **Notes** tab, which kept running notes during the meeting, then shows a summary, decisions and action items.
 
 **Auto-answer:** on by default, so every detected question gets an answer. Turn it off with the **Auto** button in the overlay header (or `Ctrl/Cmd+Shift+A`) to answer only questions that use your name.
 

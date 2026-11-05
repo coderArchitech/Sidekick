@@ -17,6 +17,7 @@ import type {
   ProviderKind,
   Settings,
   SettingsPatch,
+  Notes,
 } from "./bindings";
 
 type Commands = typeof tauriCommands;
@@ -72,6 +73,7 @@ export const mockSessionBus = createMockSessionBus();
 const sessions = new Map<string, Session>();
 const transcripts = new Map<string, TranscriptLine[]>();
 const bookmarks = new Map<string, Bookmark[]>();
+const notesBySession = new Map<string, Notes>();
 const documents = new Map<string, DocumentInfo[]>();
 /** Answers saved through `saveAnswer`, for assertions. */
 export const savedAnswers: {
@@ -80,6 +82,18 @@ export const savedAnswers: {
   rating: number | null;
   createdAt: number;
 }[] = [];
+
+function mockNotes(sessionId: string): Notes {
+  return (
+    notesBySession.get(sessionId) ?? {
+      contentMd: "",
+      version: 0,
+      updatedAt: 0,
+      summaryMd: null,
+      actionItems: [],
+    }
+  );
+}
 
 /** Simulates ingest like the Rust pipeline: queued → parsing → embedding → ready (or failed). */
 function mockIngest(sessionId: string, name: string, sizeBytes: number) {
@@ -268,6 +282,7 @@ export function resetMocks(): void {
   savedAnswers.length = 0;
   mockFiles.picked = [];
   bookmarks.clear();
+  notesBySession.clear();
   nextLineId = 1;
   liveSessionId = null;
   nextId = 1;
@@ -507,6 +522,36 @@ export const mockCommands: Commands = {
           createdAt: a.createdAt,
         })),
     }),
+  getNotes: (sessionId) => {
+    if (!sessions.has(sessionId))
+      return Promise.resolve(err("INTERNAL", "That session no longer exists."));
+    return Promise.resolve({ status: "ok", data: structuredClone(mockNotes(sessionId)) });
+  },
+  saveNotes: (sessionId, contentMd, version) => {
+    if (!sessions.has(sessionId))
+      return Promise.resolve(err("INTERNAL", "That session no longer exists."));
+    const n = mockNotes(sessionId);
+    if (n.version !== version)
+      return Promise.resolve(
+        err("VERSION_CONFLICT", "The notes changed while they were being updated."),
+      );
+    const next = { ...n, contentMd, version: n.version + 1, updatedAt: Date.now() };
+    notesBySession.set(sessionId, next);
+    return Promise.resolve({ status: "ok", data: structuredClone(next) });
+  },
+  saveSummary: (sessionId, summaryMd, actionItems) => {
+    if (!sessions.has(sessionId))
+      return Promise.resolve(err("INTERNAL", "That session no longer exists."));
+    const next: Notes = {
+      ...mockNotes(sessionId),
+      summaryMd,
+      actionItems: actionItems
+        .filter((a) => a.text.trim() !== "")
+        .map((a, i) => ({ ...a, text: a.text.trim(), id: `mock-item-${i}`, done: false })),
+    };
+    notesBySession.set(sessionId, next);
+    return Promise.resolve({ status: "ok", data: structuredClone(next) });
+  },
   rateAnswer: (answerId, rating) => {
     const a = savedAnswers.find((x) => x.id === answerId);
     if (!a) return Promise.resolve(err("INTERNAL", "That answer no longer exists."));

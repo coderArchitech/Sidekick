@@ -63,7 +63,7 @@ All Phase 0 code and automated tests are done and green on Linux, Windows and ma
 | T-021 | Orchestrator: prompts, Skills, two-tier answers | 🟡 In progress: testing | Waiting on dependency: prompts accept a Skill; picking the active Skill comes with T-028. Live-model quality check in T-039 |
 | T-022 | Live Answers tab | ✅ Done | Follow-up chips not in scope; Playwright pass in T-032 |
 | T-023 | Chat tab | ✅ Done | Voice input to Chat later; Playwright pass in T-032 |
-| T-024 | Rolling notes | ⬜ To do | |
+| T-024 | Rolling notes | ✅ Done | Summary written by the overlay after End; quality checked in T-039 |
 | T-025 | `capture` crate: screenshots and answer from screen | ⬜ To do | 🖥️ |
 | T-026 | More LLM providers: OpenAI, Gemini, Ollama | ⬜ To do | |
 | T-027 | More STT providers: AssemblyAI, Soniox, local Whisper | ⬜ To do | |
@@ -436,10 +436,10 @@ All Phase 0 code and automated tests are done and green on Linux, Windows and ma
 **Scope:** Every 45 s, send new transcript plus current notes to the fast model; save with optimistic version check; Notes tab shows topics, decisions, open questions; summary on session end.
 
 **Tests**
-- [ ] Unit: job runs every 45 s only while live and only with new transcript.
-- [ ] Unit: version conflict on `save_notes` retries with the latest notes.
-- [ ] Component: Notes tab renders sections and updates live.
-- [ ] Integration: `end_session` produces a summary with decisions and action items (mock model).
+- [x] Unit: job runs every 45 s only while live and only with new transcript.
+- [x] Unit: version conflict on `save_notes` retries with the latest notes.
+- [x] Component: Notes tab renders sections and updates live.
+- [x] Integration: `end_session` produces a summary with decisions and action items (mock model).
 
 ### T-025 `capture` crate: screenshots and answer from screen 🖥️
 

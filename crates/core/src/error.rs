@@ -20,6 +20,8 @@ pub enum ErrorCode {
     CaptureExclusionUnavailable,
     DbError,
     Cancelled,
+    /// An optimistic version check failed: someone saved first (e.g. `save_notes`).
+    VersionConflict,
     Internal,
 }
 
