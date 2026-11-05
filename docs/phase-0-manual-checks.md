@@ -69,6 +69,8 @@ For each of Teams, Zoom, Google Meet, Webex and Slack huddles:
 3. Share **a single window** behind the overlay. Same question.
 4. Note the shield colour in the overlay header (green, amber or red).
 
+While sharing in each app, also note the title of the app's own sharing toolbar or bar (for example "You are screen sharing"). These titles validate [ADR-015](adr/0015-screen-share-detection.md), which detects sharing from those windows.
+
 Record a table in [TECHNICAL.md 8.5](TECHNICAL.md#85-known-issues-and-limitations): OS version × meeting app × full screen / window → hidden or visible. If results contradict the shield (for example, green but visible), report it: the rules in `crates/window/src/lib.rs` get updated to match.
 
 ## T-012: Baselines (15 minutes)

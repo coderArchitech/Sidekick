@@ -259,7 +259,8 @@ All Phase 0 code and automated tests are done and green on Linux, Windows and ma
 - [x] Unit: disabled flag and failure to apply produce `disabled` / `unavailable`.
 - [x] Component: shield shows each state with colour, label and tooltip reason.
 - [x] Manual: real app on Linux applies protection at startup and shows the red shield.
-- [ ] Screen-share detection to drive auto-hide: no reliable cross-platform OS signal; design needed (manual hide hotkey in T-015 covers it until then).
+- [x] Screen-share detection design: [ADR-015](adr/0015-screen-share-detection.md) (proposed) detects meeting apps' own share windows; manual hide hotkey (T-015) stays as the fallback.
+- [ ] Validate ADR-015: record the top-level window lists while sharing in each meeting app on Windows and macOS (do this during the manual check below), then implement it as its own task.
 - [ ] Manual (Windows 10, 11; macOS 14, 15, latest): overlay not visible to others when sharing full screen and a window in Teams, Zoom, Meet, Webex, Slack huddles; results recorded in a table in TECHNICAL.md 8.5; adjust the status rules to match.
 
 ### T-012 `diagnostics` crate: latency metrics and baselines

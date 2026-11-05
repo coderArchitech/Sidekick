@@ -1559,6 +1559,7 @@ Provider APIs (Deepgram, AssemblyAI, Soniox, Anthropic, OpenAI, Google, Tavily, 
 | Nov 5, 2026 | Frontend feature boundaries enforced by lint | ADR-012 |
 | Nov 5, 2026 | Separate embeddings provider; OpenAI text-embedding-3-small default | ADR-013 |
 | Nov 5, 2026 | Audio via cpal; macOS system audio 14.6+; energy VAD first | ADR-014 |
+| Nov 5, 2026 | Screen-share detection from meeting apps' share windows (proposed) | ADR-015 |
 
 ### 14.6 Open issues
 
