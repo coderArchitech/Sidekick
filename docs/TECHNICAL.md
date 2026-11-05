@@ -204,7 +204,7 @@ Each module below is its own crate at `crates/<module>/`, named `sidekick-<modul
 | `window` | Overlay window: transparency, always-on-top, click-through, capture exclusion and its status check | Not started |
 | `hotkeys` | Register and dispatch global shortcuts | Not started |
 | `ingest` | Parse documents, split into chunks, request embeddings, write to store | Not started |
-| `store` | SQLite (SQLCipher) access, migrations, repository functions | Not started |
+| `store` | SQLCipher database (raw 256-bit key from `secrets`), WAL, foreign keys; migrations with pre-migration backups; sqlite-vec registered for every connection; `settings` (raw JSON) and `vectors` (per-model `chunk_vectors`) modules; repository modules added per feature | Done |
 | `retrieval` | Vector and keyword search over chunks; assemble context packs (transcript window, notes, chunks, screenshot) | Not started |
 | `gateway` | `LlmProvider` and `SearchProvider` traits plus adapters; attach keys; stream tokens; retries and backoff | Not started |
 | `secrets` | `KeyStore` trait with `KeychainStore` (OS keychain, service `sidekick`) and `MemoryStore` (tests, mock mode); keys as `SecretString`; `KeyStatus` exposes only the last 4 characters; account names restricted to `[a-z0-9-]` | Done |
@@ -279,7 +279,7 @@ Major versions are fixed here; exact versions are pinned in `Cargo.lock` and `pn
 | Styling | Tailwind CSS + shadcn/ui | Tailwind 4.x |
 | State | Zustand | 5.x |
 | Markdown and code | react-markdown + Shiki | Current major |
-| Database | SQLite via rusqlite (bundled SQLCipher) + sqlite-vec | Current |
+| Database | SQLite via rusqlite 0.37 (`bundled-sqlcipher-vendored-openssl`) + sqlite-vec 0.1 + rusqlite_migration 2 | OpenSSL is built from source, so builds need Perl (preinstalled on CI runners and macOS; on Windows use Strawberry Perl) |
 | Secrets | keyring crate | Current |
 | HTTP and WebSocket | reqwest + tokio-tungstenite | Current |
 | Local STT | whisper.cpp via whisper-rs | Current |
@@ -550,8 +550,8 @@ A cleanup job runs at app start and every 6 hours (section 10.7). "Delete sessio
 
 ### 4.5 Migrations and seed data
 
-- Migrations use the `rusqlite_migration` crate with numbered SQL files in `src-tauri/migrations/` (`0001_init.sql`, `0002_...`).
-- Migrations are forward-only. Each runs inside a transaction at app start, after an automatic backup of the database file.
+- Migrations use the `rusqlite_migration` crate with numbered SQL files in `crates/store/migrations/` (`0001_init.sql`, `0002_...`), listed in order in `crates/store/src/migrations.rs`.
+- Migrations are forward-only. Pending migrations run inside one transaction at app start, after an automatic backup of the database file (`sidekick.db.bak-v<from>-<unix_ms>`, last 3 kept).
 - If a migration fails, the transaction rolls back, the backup is kept, and the app shows a recovery screen with "Restore backup" and "Export logs".
 - Changing embedding model requires re-embedding: a background job processes documents whose `embedding_model` differs from the active one.
 - Seed data on first run: built-in Skill templates (Interview Coach, Sales Discovery, Technical Architect, Teacher, Negotiation Coach) copied to the Skills folder, and default settings (Deepgram for STT, Auto-answer on, retention 30 days).
@@ -876,6 +876,7 @@ sidekick/
 │   └── test/                 # Test setup
 ├── crates/                   # Rust domain crates, one per module (ADR-011)
 │   ├── core/                 # sidekick-core: SidekickError, IDs, provider traits
+│   ├── store/migrations/     # 0001_init.sql, ... (SQL migrations live with the store crate)
 │   └── <module>/             # sidekick-<module>: audio, stt, store, gateway, ...
 │       ├── Cargo.toml
 │       ├── src/lib.rs        # Small public API
@@ -887,7 +888,6 @@ sidekick/
 │   │   ├── commands/         # One file per command group; thin wrappers over crates
 │   │   └── logging.rs
 │   ├── build.rs              # Declares app commands for capability checks
-│   ├── migrations/           # 0001_init.sql, ... (with the store crate)
 │   ├── capabilities/         # Window permissions (5.8)
 │   ├── icons/
 │   └── tauri.conf.json
@@ -963,7 +963,7 @@ Every change goes through a pull request, even as a solo developer, so CI runs a
 
 **A database change**
 
-1. Add the next numbered file in `src-tauri/migrations/`; never edit a released migration.
+1. Add the next numbered file in `crates/store/migrations/` and append it to `MIGRATIONS` in `crates/store/src/migrations.rs`; never edit a released migration.
 2. Update repository functions and tests; add a migration test using a fixture database from the previous version.
 3. Update sections 4.2 and 4.3.
 

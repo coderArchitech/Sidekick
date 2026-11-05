@@ -34,10 +34,10 @@ The working task list for building Sidekick end to end, derived from the [techni
 | ID | Task | Status | Notes |
 | --- | --- | --- | --- |
 | T-001 | Project scaffold | ✅ Done | Branch `chore/scaffold` |
-| T-002 | CI green on Windows and macOS | 🟡 In progress: testing | [PR #1](https://github.com/coderArchitech/Sidekick/pull/1) opened; waiting for CI |
+| T-002 | CI green on Windows and macOS | 🟡 In progress: testing | [PR #1](https://github.com/coderArchitech/Sidekick/pull/1): Linux and macOS green; Windows test crash fixed (manifest), re-running |
 | T-003 | Apply doc fixes P1–P5 | ✅ Done | Applied with recommended defaults; ADR-013 |
 | T-004 | `secrets` crate: OS keychain | 🟡 In progress: testing | Passes locally (incl. real keychain on Linux); waiting for Windows/macOS CI |
-| T-005 | `store` crate: encrypted database and migrations | ⬜ To do | |
+| T-005 | `store` crate: encrypted database and migrations | 🟡 In progress: testing | Passes locally; waiting for Windows/macOS CI |
 | T-006 | Settings storage and commands | ⬜ To do | |
 | T-007 | `gateway` crate: LLM provider trait, mock and Anthropic | ⬜ To do | |
 | T-008 | Settings window: providers and API keys | ⬜ To do | |
@@ -151,13 +151,15 @@ The working task list for building Sidekick end to end, derived from the [techni
 **Scope:** `crates/store`: rusqlite with bundled SQLCipher; database key generated on first run and kept in the keychain via `secrets`; `rusqlite_migration` with `0001_init.sql`; WAL and foreign keys on; pre-migration backup (keep 3); repository functions per table as features need them; sqlite-vec loaded.
 
 **Tests**
-- [ ] Integration: fresh database migrates to the latest `user_version`.
-- [ ] Integration: opening the database file without the key fails (NFR-8).
-- [ ] Integration: a failing migration rolls back and keeps the backup; only 3 backups are kept.
-- [ ] Integration: foreign keys enforced; deleting a session cascades to all child rows.
-- [ ] Integration: sqlite-vec loads; insert and nearest-neighbour query return the expected row.
-- [ ] Integration: FTS stays in sync with `chunks` on insert, update and delete (after T-003 P4).
-- [ ] Unit: no API key is ever written to any table (scan after a test run).
+- [x] Integration: fresh database migrates to the latest `user_version`; reopen keeps data.
+- [x] Integration: opening with the wrong key or without a key fails; no plaintext or SQLite header in the file (NFR-8).
+- [x] Unit: an upgrade backs up first; a failing migration rolls back and keeps the backup; only 3 backups are kept.
+- [x] Integration: foreign keys enforced; deleting a session cascades to all 10 child tables.
+- [x] Integration: sqlite-vec loads; nearest-neighbour query returns the expected rows; upsert replaces.
+- [x] Integration: changing embedding size recreates the vector table (ADR-013).
+- [x] Integration: FTS stays in sync with `chunks` on insert, update and delete (P4).
+- [x] Unit: database key created once (64 hex chars), reused, random per install.
+- Moved to T-007: no API key is ever written to any table (needs the key commands).
 
 ### T-006 Settings storage and commands
 

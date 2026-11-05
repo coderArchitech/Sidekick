@@ -1,6 +1,8 @@
 //! Round trip against the real OS keychain. Ignored by default because it
 //! needs an unlocked keychain; CI runs it on Windows and macOS with `--ignored`.
 
+#![allow(clippy::unwrap_used)] // Test helpers outside #[test] functions.
+
 use sidekick_secrets::{ExposeSecret, KeyStore, KeychainStore, SecretString};
 
 #[test]
