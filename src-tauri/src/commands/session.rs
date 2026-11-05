@@ -13,6 +13,7 @@ use sidekick_session::{
     AudioFactory, ConsentOption, DeviceAudio, FixtureAudio, LiveSession, Session, SessionStatus,
     SttPlan, streams_for,
 };
+use sidekick_settings::ProviderChoice;
 use sidekick_stt::{DeepgramProvider, MockSttProvider};
 use tauri::{AppHandle, State};
 use tauri_specta::Event;
@@ -28,7 +29,7 @@ pub struct SessionStarted {
     pub warnings: Vec<String>,
 }
 
-fn changed(app: &AppHandle, session: &Session) {
+pub(crate) fn changed(app: &AppHandle, session: &Session) {
     let _ = SessionChanged {
         session: session.clone(),
     }
@@ -112,7 +113,7 @@ pub async fn start_session(
         }
         None => Box::new(DeviceAudio),
     };
-    let mut plan = stt_plan(&state, &settings.stt.provider)?;
+    let mut plan = stt_plan(&state, &settings.stt)?;
     // Boost the user's name and nicknames so directed questions are heard (PRD LIS-5a).
     plan.keyterms = settings.profile.names();
     let sink = Arc::new(TauriSttSink::new(app.clone(), session_id.clone()));
@@ -124,25 +125,46 @@ pub async fn start_session(
     Ok(SessionStarted { session, warnings })
 }
 
-fn stt_plan(state: &AppState, provider: &str) -> SidekickResult<SttPlan> {
+fn stt_plan(state: &AppState, choice: &ProviderChoice) -> SidekickResult<SttPlan> {
+    let key_for = |id: &str, name: &str| {
+        state.keys.get(id)?.ok_or_else(|| {
+            SidekickError::new(
+                ErrorCode::KeyMissing,
+                format!("Add your {name} API key in Settings."),
+            )
+        })
+    };
     let (provider, key): (Arc<dyn sidekick_stt::SttProvider>, _) = if state.mock {
         (Arc::new(MockSttProvider), None)
     } else {
-        match provider {
-            "deepgram" => {
-                let key = state.keys.get("deepgram")?.ok_or_else(|| {
-                    SidekickError::new(
-                        ErrorCode::KeyMissing,
-                        "Add your Deepgram API key in Settings.",
-                    )
-                })?;
-                (Arc::new(DeepgramProvider::default()), Some(key))
+        match choice.provider.as_str() {
+            "deepgram" => (
+                Arc::new(DeepgramProvider::default()),
+                Some(key_for("deepgram", "Deepgram")?),
+            ),
+            "assemblyai" => (
+                Arc::new(sidekick_stt::providers::assemblyai::AssemblyAiProvider::default()),
+                Some(key_for("assemblyai", "AssemblyAI")?),
+            ),
+            "soniox" => (
+                Arc::new(sidekick_stt::providers::soniox::SonioxProvider::default()),
+                Some(key_for("soniox", "Soniox")?),
+            ),
+            #[cfg(feature = "local-whisper")]
+            "whisper-local" => {
+                let model = crate::commands::stt::whisper_model(choice.model.as_deref())?;
+                let path =
+                    sidekick_stt::models::path(&crate::commands::stt::models_dir(state), model);
+                (
+                    Arc::new(sidekick_stt::providers::whisper::WhisperProvider::new(path)),
+                    None,
+                )
             }
             other => {
                 return Err(SidekickError::new(
                     ErrorCode::Internal,
                     format!(
-                        "Speech-to-text with {other} isn't available yet. Choose Deepgram in Settings."
+                        "Speech-to-text with {other} isn't available in this build. Choose another provider in Settings."
                     ),
                 ));
             }
@@ -321,4 +343,16 @@ pub fn rate_answer(
     rating: i8,
 ) -> SidekickResult<()> {
     sidekick_session::answers::rate(&state.db(), &answer_id, rating)
+}
+
+/// A session's saved answers, oldest first, optionally one source only
+/// (Chat history, PRD QA-8).
+#[tauri::command]
+#[specta::specta]
+pub fn list_answers(
+    state: State<'_, AppState>,
+    session_id: String,
+    source: Option<sidekick_session::answers::QuestionSource>,
+) -> SidekickResult<Vec<sidekick_session::answers::SavedAnswer>> {
+    sidekick_session::answers::list(&state.db(), &session_id, source)
 }

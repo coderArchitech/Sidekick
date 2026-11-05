@@ -2,10 +2,14 @@
 //! Commands stay thin: validate, call a crate, return its result.
 
 pub mod app;
+pub mod capture;
 pub mod diagnostics;
 pub mod documents;
 pub mod keys;
 pub mod llm;
+pub mod notes;
 pub mod retrieval;
 pub mod session;
 pub mod settings;
+pub mod skills;
+pub mod stt;

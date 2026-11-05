@@ -7,7 +7,7 @@ import type { AnswerEvents } from "./answerEvents";
 import { commands as tauriCommands, events as tauriEvents } from "./bindings";
 import { getCurrentWebview } from "@tauri-apps/api/webview";
 import { getCurrentWindow } from "@tauri-apps/api/window";
-import { open } from "@tauri-apps/plugin-dialog";
+import { open, save } from "@tauri-apps/plugin-dialog";
 import {
   mockAnswerBus,
   mockCommands,
@@ -31,6 +31,14 @@ export type { AnswerEvents, Unlisten } from "./answerEvents";
 export type { SessionEvents } from "./sessionEvents";
 import type { Unlisten } from "./answerEvents";
 export type {
+  ActionItem,
+  AnswerFormat,
+  FieldError,
+  ImportPreview,
+  Skill,
+  SkillEntry,
+  Tool,
+  Trigger,
   AnswerDone,
   AnswerError,
   AnswerToken,
@@ -38,6 +46,7 @@ export type {
   AppInfo,
   Binding,
   Bookmark,
+  CaptureRequest,
   ChatMessage,
   ConsentOption,
   ContextChunk,
@@ -49,19 +58,26 @@ export type {
   Effort,
   ErrorCode,
   IngestProgress,
+  ModelDownloadProgress,
   FinishReason,
   KeyCheck,
   KeyStatus,
   LlmRequest,
   ModelInfo,
+  NewActionItem,
   NewAnswer,
+  Notes,
   Profile,
   QuestionSource,
+  SavedAnswer,
+  Screenshot,
+  ScreenshotCaptured,
   ProtectionState,
   ProtectionStatus,
   ProviderChoice,
   ProviderEntry,
   ProviderKind,
+  Region,
   Result,
   Retention,
   Session,
@@ -78,6 +94,8 @@ export type {
   TranscriptPartial,
   TranscriptSegment,
   Usage,
+  WhisperModelEntry,
+  WindowInfo,
 } from "./bindings";
 
 export const isTauri = typeof window !== "undefined" && "__TAURI_INTERNALS__" in window;
@@ -99,6 +117,8 @@ const tauriSessionEvents: SessionEvents = {
   onSttStatus: (cb) => tauriEvents.sttStatusChanged.listen((e) => cb(e.payload)),
   onHotkey: (cb) => tauriEvents.hotkeyPressed.listen((e) => cb(e.payload)),
   onIngestProgress: (cb) => tauriEvents.ingestProgress.listen((e) => cb(e.payload)),
+  onScreenshotCaptured: (cb) => tauriEvents.screenshotCaptured.listen((e) => cb(e.payload)),
+  onModelDownloadProgress: (cb) => tauriEvents.modelDownloadProgress.listen((e) => cb(e.payload)),
   onFileDrop: (cb) => onFileDrop(cb),
 };
 
@@ -144,6 +164,22 @@ export async function pickFiles(): Promise<string[]> {
   });
   if (!chosen) return [];
   return Array.isArray(chosen) ? chosen : [chosen];
+}
+
+/** Opens a Skill file to import (Settings window). Null if cancelled. */
+export async function pickSkillFile(): Promise<string | null> {
+  if (!isTauri) return mockFiles.picked.shift() ?? null;
+  const chosen = await open({
+    multiple: false,
+    filters: [{ name: "Skill", extensions: ["md", "markdown"] }],
+  });
+  return typeof chosen === "string" ? chosen : null;
+}
+
+/** Asks where to export a Skill. Null if cancelled. */
+export async function chooseSkillExportPath(defaultName: string): Promise<string | null> {
+  if (!isTauri) return mockFiles.saveAs.shift() ?? null;
+  return save({ defaultPath: defaultName, filters: [{ name: "Skill", extensions: ["md"] }] });
 }
 
 /** Files dropped onto the window. */

@@ -200,17 +200,17 @@ Each module below is its own crate at `crates/<module>/`, named `sidekick-<modul
 | Crate | Responsibility | Status |
 | --- | --- | --- |
 | `audio` | Microphone and system audio as separate 16 kHz mono streams of 50 ms frames via cpal (WASAPI loopback on Windows, Core Audio tap on macOS 14.6+); windowed-sinc resampler; energy VAD flag per frame; pause/resume/stop; WAV `FixtureSource` for tests and `SIDEKICK_AUDIO_FIXTURE`; never writes audio (ADR-014) | Done (manual device checks pending) |
-| `stt` | `SttProvider` (one `run` per audio stream), Deepgram Nova-3 WebSocket adapter (interim + final results, diarization for system audio, `keyterm` boosts, keep-alives, silence not sent with a `Timeline` mapping provider time back to meeting time, reconnect with backoff and replay of unfinalised and buffered audio, up to 10 s), `DeepgramVerifier` for key checks, mock provider; speaker labels `me` / `speaker_N` | Done (live latency check pending) |
-| `capture` | Region, window and full-screen screenshots; downscale and encode | Not started |
+| `stt` | `SttProvider` (one `run` per audio stream). WebSocket providers share one engine (`providers::ws`): silence not sent apart from a short tail, a `Timeline` mapping provider time back to meeting time, keep-alives, reconnect with backoff and replay of unfinalised and buffered audio (up to 10 s), flush at the end; each provider is a `Dialect` (URL and auth, first message, keep-alive and finish messages, a message parser). Adapters: Deepgram Nova-3 (interim + final, diarization, `keyterm`), AssemblyAI Universal Streaming v3 (formatted turns, `keyterms_prompt`, no streaming diarization), Soniox (word-piece tokens joined into words, `<end>` endpoints, diarization, `en`+`hi` hints for `multi`), and local Whisper behind the `local-whisper` cargo feature (utterances cut by the VAD at 600 ms of silence or 15 s, transcribed on a blocking thread while audio keeps flowing; names as the initial prompt). Key verifiers for the cloud providers; `models` lists Whisper models and downloads them to `<data>/models`, kept only if the checksum matches; mock provider; speaker labels `me` / `speaker_N` | Done (live checks pending) |
+| `capture` | Full screen (main display), one window (other apps only, not minimised) or a region (fractions of the main display, chosen on an unsaved 800 px preview and captured afresh); downscale to 1568 px on the long side and JPEG at quality 85 (about 200 KB); SQL for `screenshots` (image BLOB in the encrypted database, never on disk, the clipboard or shared folders). Real capture uses `xcap` on Windows and macOS only; Linux (dev/CI) and mock mode use `MockCapturer`, a synthetic 2560 x 1440 screen. A failed capture maps to `PERMISSION_DENIED` with the macOS Screen Recording hint | Done (manual check on a live call pending) |
 | `window` | Capture-exclusion status rules per OS and version (Windows build 19041+ protected; macOS 13–14 protected, 15+ not guaranteed because ScreenCaptureKit can bypass it; Linux unavailable) and the auto-hide rule. Pure logic: the shell applies `set_content_protected(true)` to every window at startup. Transparency, click-through and screen-share detection still to come (T-029) | Started (status done; manual checklist pending) |
 | `hotkeys` | Actions, defaults (12.3) and validation (normalise, one modifier minimum, no duplicates, every action once). The shell registers them with `tauri-plugin-global-shortcut`, handles show/hide itself, emits `hotkey-pressed`, and only saves a new set after the OS accepts it | Done (Linux verified; Windows/macOS check pending) |
-| `ingest` | Parsers (PDF via pdf-extract, DOCX/PPTX via zip + quick-xml, spreadsheets via calamine, text/Markdown, web pages), chunker (~500 tokens ≈ 2,000 chars, 50 overlap, within a page), SHA-256 duplicate check, batched embeddings (100 per request, retries), progress events; at most 3 documents at once. Owns the SQL for `documents` and `chunks`. Images wait for vision (T-025/T-026) | Done (images pending) |
+| `ingest` | Parsers (PDF via pdf-extract, DOCX/PPTX via zip + quick-xml, spreadsheets via calamine, text/Markdown, web pages), chunker (~500 tokens ≈ 2,000 chars, 50 overlap, within a page), SHA-256 duplicate check, batched embeddings (100 per request, retries), progress events; at most 3 documents at once. Owns the SQL for `documents` and `chunks`. Images wait for vision providers (T-026) | Done (images pending) |
 | `store` | SQLCipher database (raw 256-bit key from `secrets`), WAL, foreign keys; migrations with pre-migration backups; sqlite-vec registered for every connection; `settings` (raw JSON) and `vectors` (per-model `chunk_vectors`) modules; repository modules added per feature | Done |
 | `settings` | Typed `Settings` (providers and models for STT, LLM, embeddings, search; Auto-answer; retention) with defaults and partial `SettingsPatch` updates; one `settings` row per section; unreadable sections fall back to defaults | Done |
-| `retrieval` | Vector search (sqlite-vec KNN, partitioned by owner so only the session's vectors are scanned) + keyword search (FTS5, BM25), fused with reciprocal rank fusion (k = 60); context pack = last 3 minutes of transcript + notes + top 5 passages with citation fields. Keyword-only when there's no query vector. Screenshot joins with T-025 | Done (screenshot pending) |
-| `gateway` | Provider catalog (all kinds, for Settings); `LlmProvider` adapters (Anthropic, mock; OpenAI, Gemini, Ollama in T-026); the only place keys are attached; streaming via an `AnswerSink` the shell implements; retries with backoff and `Retry-After`; cancellation; key checks before saving. `SearchProvider` and `EmbeddingProvider` arrive with T-046 and T-017 | Started (LLM done) |
+| `retrieval` | Vector search (sqlite-vec KNN, partitioned by owner so only the session's vectors are scanned) + keyword search (FTS5, BM25), fused with reciprocal rank fusion (k = 60); context pack = last 3 minutes of transcript + notes + top 5 passages with citation fields. Keyword-only when there's no query vector. Adds the session's latest screenshot from the last 10 minutes | Done |
+| `gateway` | Provider catalog (all kinds, for Settings); `LlmProvider` adapters (Anthropic, OpenAI, Gemini, Ollama, mock), all with vision; the only place keys are attached; streaming via an `AnswerSink` the shell implements, through one `pump` that decodes UTF-8 across network chunks and frames SSE or NDJSON; retries with backoff and `Retry-After`; cancellation; key checks before saving. `SearchProvider` and `EmbeddingProvider` arrive with T-046 and T-017 | Started (LLM done) |
 | `secrets` | `KeyStore` trait with `KeychainStore` (OS keychain, service `sidekick`) and `MemoryStore` (tests, mock mode); keys as `SecretString`; `KeyStatus` exposes only the last 4 characters; account names restricted to `[a-z0-9-]` | Done |
-| `skills` | Load, validate, import and export Skill files | Not started |
+| `skills` | Skill files: Markdown with YAML front matter validated against `schemas/skill.schema.json` (`jsonschema`), field-level errors (`tools[1]: "shell" isn't an allowed tool…`), tool allowlist (`doc_search`, `web_search`, `calculator`), 8,000-character instructions limit; files in `<data>/skills/<id>.md` are the source of truth with the `skills` table as an index; the five built-in templates (`skills/templates/`) seeded on first run; import returns a preview with the requested tools and saves nothing; export writes the file; lossless round trip | Done |
 | `session` | Session lifecycle (draft → live ⇄ paused → ended) and consent rules as pure functions; SQL for `sessions`, `consent_log` and `transcript_segments`; `LiveSession` runs one audio capture + one STT run per allowed stream, falling back to the mic with a warning if system audio is unavailable | Started (T-013) |
 | `consent` | Merged into `session`: consent is part of the session lifecycle (`streams_for(consent)` decides which streams may start) | Merged |
 | `usage` | Count STT minutes and LLM tokens per provider; estimate cost | Not started |
@@ -222,14 +222,14 @@ Each module below is its own crate at `crates/<module>/`, named `sidekick-<modul
 | Module | Responsibility |
 | --- | --- |
 | `overlay` | Window chrome: opacity, font size, compact/expanded, protection indicator, tabs |
-| `answers` | Live Answers tab: cue, full answer, sources, follow-up chips, code blocks |
-| `chat` | Chat tab: user questions with session context |
+| `answers` | Live Answers tab, newest first: cue line (Stop while streaming), expandable full answer (open by default when the question used your name), numbered sources, thumbs up/down (`rate_answer`, click again to clear). Markdown via `react-markdown` with raw HTML skipped and links shown as text, never opened. Fenced code uses Shiki, loaded lazily on first code block with 13 languages and the JavaScript regex engine (no WASM); unknown languages fall back to plain text. Copy writes only the code, only on click. Follow-up chips are not built yet |
+| `chat` | Chat tab: **Screenshot** menu (Full screen, A window…, An area… with a drag-to-select preview) for capture-and-ask: the capture shows as an attached thumbnail and the next question is asked with `source = screenshot`, so both cue and full answer see the image. Typed questions answered through the same `AnswerRouter` with `source = chat` and the session context (transcript, notes, documents), plus the last 3 finished exchanges as history so follow-ups make sense. Enter sends, Shift+Enter adds a line, Stop cancels. History is per session: saved chat and screenshot answers reload with `list_answers`. The Ask hotkey shows and focuses the overlay, switches to Chat and focuses the input. A chat question shares the 2-in-flight limit, so it can stop the oldest detected answer. Voice input arrives later |
 | `transcript` | Transcript tab: loads saved lines, applies live `transcript-partial` / `transcript-segment` events batched every 50 ms (`lib/batcher`), shows partial text until the final line arrives, rename/merge speakers, bookmarks, listening indicator |
-| `notes` | Rolling notes, decisions, action items |
+| `notes` | Notes tab: rolling notes (Topics, Decisions, Open questions) rendered as Markdown and updated live from `useNotesStore`; after the session ends, the Summary with decisions and action items (owner, due). Shows "Updating notes…" / "Writing the summary…" and a notice when an update fails (old notes stay) |
 | `library` | Collapsible Documents panel under the session bar: add files (native picker via `tauri-plugin-dialog`, or drop onto the window), add links, live indexing progress, failure reason with Retry, remove. Screenshot strip arrives with T-043 |
 | `settings` | Settings window: provider and model dropdowns per kind (STT, LLM, embeddings, web search), masked key field with show/hide, paste, Save and test, Test connection, Remove; Auto-answer and retention. Opened with `open_settings`; Close hides the window |
-| `skills` | Skill builder, templates, import/export |
-| `orchestrator` | Question detection (rules + fuzzy name matching, 600 ms debounce, Auto vs directed-only) and answering: `AnswerRouter` builds cue and full prompts (stable system rules; context fenced as untrusted data; numbered sources), streams both in parallel (cue on the fast model at low effort), keeps at most 2 questions in flight, answers "not found" without a model call when there's no context, records latency, saves answers with cited sources. UI updates batched every 50 ms |
+| `skills` | Settings → Skills: list with on/off, Edit, Export (save dialog), Delete; **New Skill** or start from a template in a no-code builder (name, description, instructions, where it applies, tools with what each one does, cue-then-full or full-only); field-level problems from `check_skill`; **Import…** shows the Skill's requested tools and saves only on "Allow and import". The overlay's session bar has a Skill picker (enabled Skills), and the Switch Skill shortcut cycles them, then none |
+| `orchestrator` | Question detection (rules + fuzzy name matching, 600 ms debounce, Auto vs directed-only) and answering: `AnswerRouter` builds cue and full prompts (stable system rules; context fenced as untrusted data; numbered sources), streams both in parallel (cue on the fast model at low effort), keeps at most 2 questions in flight, answers "not found" without a model call when there's no context, records latency, saves answers with cited sources. The latest screenshot is numbered as the last source and its id is attached to the final user message of the full answer (and of the cue too for capture-and-ask); Rust loads the pixels from the database in `llm_stream`, so images never cross IPC. History never carries images. The session's active Skill applies to a question only if its triggers include the question's source (detected, chat, screenshot) and it's enabled; a `full_only` Skill skips the cue request. UI updates batched every 50 ms |
 | `ipc` | Generated `bindings.ts` (section 5.6), browser mocks (`mock.ts`) that mirror every command, `answerEvents` for answer streams, and window helpers (`currentWindow`, `hideCurrentWindow`). The only module that imports Tauri |
 
 ### 3.3 Key workflow: answering a question
@@ -264,7 +264,7 @@ Steps 3 to 8 must finish within the NFR-2 budget. The cue in step 9 comes from a
 | --- | --- |
 | Document upload | `library` → `ingest_document` → `ingest` parses and chunks → `gateway` embeds with the active `EmbeddingProvider` → `store` writes chunks and vectors → `ingest.progress` events |
 | Screenshot | Hotkey → `capture` → `store` saves image → `screenshot.captured` event → capture-and-ask continues at step 3 above |
-| Rolling notes | Every 45 s, `orchestrator` sends new transcript plus current notes to the fast model → `save_notes` |
+| Rolling notes | Every 45 s while live (not while paused), and only when there are new transcript lines since the last update, `orchestrator` (`NotesJob`, `useNotes`) sends just those lines plus the current notes to the fast model at low effort, fenced as untrusted data, and saves with `save_notes(version)`. On `VERSION_CONFLICT` it merges the same lines into the latest notes once more; on any other failure the lines are kept for the next run. When a session the overlay watched ends, it catches up once, then asks the main model for a JSON recap (summary, decisions, action items; transcript capped to the last 60k characters, the notes cover the start) → `save_summary`. If the reply isn't JSON, the raw text becomes the summary |
 | Session start | `start_session` → `consent` checks confirmation → `audio` and `stt` start → `session.state` event |
 
 ### 3.4 Technology stack with versions
@@ -319,13 +319,14 @@ Each decision has its own file in [`docs/adr/`](adr/README.md). New decisions ge
 | Service | Protocol | Auth | Used for |
 | --- | --- | --- | --- |
 | Deepgram | WebSocket (streaming, `wss://api.deepgram.com/v1/listen`, Nova-3, linear16 16 kHz) | `Authorization: Token <key>`; key check via `GET /v1/projects` | Default live STT |
-| AssemblyAI | WebSocket (streaming) | API key in header | Alternative STT |
-| Soniox | WebSocket (streaming) | API key | Alternative STT, multilingual |
+| AssemblyAI | WebSocket (`wss://streaming.assemblyai.com/v3/ws`, `pcm_s16le` 16 kHz, `format_turns=true`) | `Authorization: <key>`; key check via `GET /v2/transcript?limit=1` | Alternative STT. English model by default; `universal-streaming-multilingual` for other languages. Finish with `{"type":"Terminate"}` |
+| Soniox | WebSocket (`wss://stt-rt.soniox.com/transcribe-websocket`, model `stt-rt-v3`, `pcm_s16le` 16 kHz) | Key in the first (config) message; key check via `GET /v1/models` (Bearer) | Alternative STT, multilingual: `language_hints` `["en","hi"]` for Hinglish, diarization on system audio, names as `context.terms`. Finish with an empty message |
+| Hugging Face (`ggerganov/whisper.cpp`) | HTTPS download | None | Local Whisper models (`tiny.en`, `base.en`, `base`, `small`), checked against the SHA-1 values whisper.cpp publishes before use |
 | Anthropic | HTTPS + server-sent events (`anthropic-version: 2026-10-21`, so no sampling parameters) | `x-api-key` header | LLM answers, vision. Defaults: `claude-opus-5-5` for full answers, `claude-haiku-5-5` for cues (MOD-3). Server-side refusal fallback (`fallbacks: "default"`, beta `server-side-fallback-2026-07-01`) is on for models that support it; a final `refusal` stop reason is shown as a neutral notice |
-| OpenAI | HTTPS + server-sent events | Bearer token | LLM answers, vision, embeddings (default: `text-embedding-3-small`, 1536 dims) |
+| OpenAI | HTTPS + server-sent events (`/v1/chat/completions`, `stream_options.include_usage`) | Bearer token | LLM answers, vision (`image_url` data URLs), embeddings (default: `text-embedding-3-small`, 1536 dims). Defaults: `gpt-5` full, `gpt-5-mini` cue. `max_completion_tokens`; effort sent as `reasoning_effort` only to reasoning models (GPT-5, o-series). Model list filtered to chat models |
 | Voyage AI | HTTPS | Bearer token | Embeddings (Anthropic's recommended partner; Anthropic has no embeddings API) |
-| Google Gemini | HTTPS streaming | API key header | LLM answers, vision, embeddings |
-| Ollama | HTTP on localhost:11434 | None | Local LLM and embeddings |
+| Google Gemini | HTTPS + server-sent events (`/v1beta/models/{model}:streamGenerateContent?alt=sse`) | `x-goog-api-key` header (never in the URL) | LLM answers, vision (`inline_data`). Defaults: `gemini-2.5-pro` full, `gemini-2.5-flash` cue. Effort maps to a thinking budget (Low: 0 on Flash, 128 on Pro; Medium 1024; High 4096) added on top of `maxOutputTokens`; thought parts are skipped. A bad key comes back as HTTP 400 `API_KEY_INVALID` and maps to `KEY_INVALID`. Embeddings later |
+| Ollama | HTTP (`/api/chat`, newline-delimited JSON) on `OLLAMA_HOST` or `localhost:11434` | None | Local LLM answers; vision with a vision model (`images`). Model `default` = first installed model; a missing model says which `ollama pull` to run; unreachable says to start Ollama. Embeddings later |
 | Tavily / Brave | HTTPS | API key | Web search tool |
 | OS keychain | OS API | User login | Secret storage |
 | GitHub Releases | HTTPS | Signed update manifest | Auto-updates |
@@ -458,7 +459,8 @@ CREATE TABLE screenshots (
 
 CREATE TABLE notes (
   session_id TEXT PRIMARY KEY REFERENCES sessions(id) ON DELETE CASCADE,
-  content_md TEXT NOT NULL, version INTEGER NOT NULL, updated_at INTEGER NOT NULL
+  content_md TEXT NOT NULL, version INTEGER NOT NULL, updated_at INTEGER NOT NULL,
+  summary_md TEXT                                -- end-of-session recap (0003)
 );
 
 CREATE TABLE action_items (
@@ -590,7 +592,7 @@ Commands are request/response calls from the frontend to Rust (`invoke`). All re
 | `set_auto_answer` | `session_id, on` | `Session` | Auto-answer on/off for the session (QA-3; header button and hotkey) |
 | `start_session` | `session_id` | `SessionStarted` (`session`, `warnings`) | Start audio capture and STT for the streams the consent allows; `CONSENT_REQUIRED` without consent; one live session at a time. With `SIDEKICK_AUDIO_FIXTURE`, the file plays as a single stream |
 | `pause_session` / `resume_session` | `session_id` | `Session` | Pause or resume listening (paused audio is dropped, never sent) |
-| `end_session` | `session_id` | `Session` | Stop capture and let STT flush; the summary arrives with T-024 |
+| `end_session` | `session_id` | `Session` | Stop capture and let STT flush; the overlay then writes the summary (`save_summary`) |
 | `delete_session` | `session_id` | `()` | Delete all session data (the consent record is kept, 4.4) |
 | `list_sessions` | `cursor?, limit?` | `SessionPage` (`items`, `nextCursor`) | Session history, newest first |
 | `get_transcript` | `session_id` | `Transcript` (`lines`, `bookmarks`) | Saved transcript in time order, for opening the Transcript tab |
@@ -600,23 +602,33 @@ Commands are request/response calls from the frontend to Rust (`invoke`). All re
 | `ingest_url` | `session_id, url` | `()` | Queue a web page (http/https only) |
 | `list_documents` | `session_id` | `DocumentInfo[]` | Session documents with status, pages, chunk count and error |
 | `delete_document` | `document_id` | `()` | Remove document and its chunks |
-| `capture_screenshot` | `mode: region / window / screen` | `Screenshot` | Capture and store a screenshot |
-| `retrieve_context` | `session_id, query, options?` (`windowMs`, `topK`) | `ContextPack` (`transcript`, `notes`, `chunks`) | Transcript window, notes and top passages; embeds the query (keyword-only if no embeddings key); records retrieval latency. Screenshot arrives with T-025 |
+| `capture_screenshot` | `session_id, request` (`{mode: "screen"}`, `{mode: "window", windowId}`, `{mode: "region", region: {x, y, width, height}}` as fractions) | `Screenshot` (`id`, `width`, `height`, `mimeType`, `createdAt`) | Capture, downscale and store with a live or paused session; emits `screenshot-captured` |
+| `list_windows` | none | `WindowInfo[]` (`id`, `appName`, `title`) | Windows the user can capture |
+| `preview_screen` | none | `string` (`data:` URL, 800 px) | Unsaved preview for selecting a region |
+| `list_screenshots` / `screenshot_image` | `session_id` / `screenshot_id` | `Screenshot[]` / `string` (`data:` URL) | Session screenshots; thumbnail for the overlay |
+| `retrieve_context` | `session_id, query, options?` (`windowMs`, `topK`) | `ContextPack` (`transcript`, `notes`, `chunks`, `screenshot`) | Transcript window, notes, top passages and the latest screenshot from the last 10 minutes; embeds the query (keyword-only if no embeddings key); records retrieval latency |
 | `llm_stream` | `request_id, provider?, model?, messages, tools?` | `()` (tokens arrive as events) | Start a streaming LLM call |
 | `cancel_stream` | `request_id` | `()` | Abort an in-flight LLM call |
 | `web_search` | `request_id, query, max_results?` | `SearchResult[]` | Run a web search for a model tool call; the orchestrator sends results back to the model |
 | `save_answer` | `NewAnswer` (session, question, source, directed, segment, cue, body, sources, provider, model, latency, tokens) | `String` (answer id) | Persist a question and its answer in one transaction |
 | `rate_answer` | `answer_id, rating` (1, -1, or 0 to clear) | `()` | Thumbs up/down |
-| `save_notes` | `session_id, content_md, version` | `NotesVersion` | Update rolling notes (optimistic version check) |
+| `list_answers` | `session_id, source?` (`detected`, `chat`, `screenshot`) | `SavedAnswer[]` (question, cue, body, sources, rating, `createdAt`), oldest first | Chat history per session |
+| `get_notes` | `session_id` | `Notes` (`contentMd`, `version` (0 before the first save), `updatedAt`, `summaryMd`, `actionItems`) | Notes, summary and action items |
+| `save_notes` | `session_id, content_md, version` | `Notes` | Update rolling notes if `version` is current; `VERSION_CONFLICT` otherwise |
+| `save_summary` | `session_id, summary_md, action_items` (`text, owner?, due?`) | `Notes` | Save the end-of-session summary and replace its action items |
 | `list_providers` | `kind: stt / llm / embed / search` | `ProviderInfo[]` | Dropdown options, with key status |
 | `set_api_key` | `provider, key` | `KeyStatus` | Test and store a key (key never returned) |
 | `test_api_key` | `provider` | `KeyStatus` | Re-test a stored key |
 | `delete_api_key` | `provider` | `()` | Remove a key from the keychain |
 | `list_models` | `provider` | `ModelInfo[]` | Models for the model dropdown |
+| `whisper_models` / `download_whisper_model` | none / `name` | `WhisperModelEntry[]` (`name`, `sizeMb`, `englishOnly`, `downloaded`) / `()` | Local Whisper models (Settings window); download emits `model-download-progress` and keeps the file only if its checksum matches |
 | `open_settings` | none | `()` | Show and focus the Settings window (overlay only) |
 | `get_settings` / `update_settings` | `patch?` | `Settings` | Read or change preferences. A patch replaces only the sections it names; unknown fields are rejected; `search: null` disables web search; `shortcuts` (the full set) is validated and registered with the OS before it is saved |
-| `list_skills` / `save_skill` / `delete_skill` | `skill?` | `Skill[]` / `Skill` / `()` | Manage Skills |
-| `import_skill` / `export_skill` | `file_path` / `skill_id, file_path` | `Skill` / `()` | Share Skills as files |
+| `list_skills` | none | `SkillEntry[]` (Skill + `enabled`, `builtin`), by name | Skills (overlay and Settings) |
+| `skill_templates` / `check_skill` | none / `skill` | `Skill[]` / `FieldError[]` | Templates for the builder; validate without saving |
+| `save_skill` / `set_skill_enabled` / `delete_skill` | `skill` / `skill_id, enabled` / `skill_id` | `SkillEntry` / `SkillEntry` / `()` | Manage Skills (Settings); deleting clears it from sessions |
+| `import_skill` / `export_skill` | `file_path` / `skill_id, file_path` | `ImportPreview` (`skill`, `requestedTools`, `replacesExisting`) / `()` | Share Skills as files; import saves nothing until the user approves the tools (then `save_skill`) |
+| `set_session_skill` | `session_id, skill_id?` | `Session` | The session's active Skill (overlay picker, Switch Skill shortcut) |
 | `set_overlay` | `opacity?, click_through?, compact?` | `OverlayState` | Overlay appearance |
 | `get_capture_protection` | none | `ProtectionStatus` (`state`: protected / not_guaranteed / unavailable / disabled, plus a one-sentence `reason`) | Whether capture exclusion is active; shown as the shield in the overlay header |
 | `get_usage` | `range` | `UsageSummary` | Minutes, tokens and estimated cost |
@@ -635,7 +647,7 @@ Events are pushed from Rust to the frontend. Payloads are typed and versioned wi
 | `transcript.segment` | `{ session_id, segment }` | Finalised segment |
 | `stt.status` | `{ provider, state: connecting / live / reconnecting / failed }` | STT connection changes |
 | `ingest.progress` | `{ document_id, status, percent }` | Document processing progress |
-| `screenshot.captured` | `{ screenshot }` | New screenshot stored |
+| `screenshot.captured` | `{ screenshot }` (event `screenshot-captured`) | New screenshot stored |
 | `answer.token` | `{ request_id, delta }` | Each streamed token batch |
 | `answer.tool_call` | `{ request_id, tool, args }` | Model called a tool (e.g. web search) |
 | `answer.done` | `{ request_id, usage, finish_reason }` | Stream finished |
@@ -687,6 +699,7 @@ Every error crossing IPC is a `SidekickError` with a stable `code`, a user-facin
 | `CAPTURE_EXCLUSION_UNAVAILABLE` | OS doesn't support exclusion | No | Show warning; enable auto-hide fallback |
 | `DB_ERROR` | Database read/write failed | Maybe | Log; show recovery options if persistent |
 | `CANCELLED` | Request cancelled by user or newer question | No | None |
+| `VERSION_CONFLICT` | Optimistic version check failed (`save_notes`): someone saved first | No | Caller reloads and merges, then saves again |
 | `INTERNAL` | Unexpected error | No | Generic message; log with correlation ID |
 
 ### 5.5 Rate limits, pagination and versioning
@@ -742,6 +755,8 @@ pub trait SearchProvider: Send + Sync {
 ```
 
 ### 5.7 Skill file format
+
+Front matter rules live in [`schemas/skill.schema.json`](../schemas/skill.schema.json): `schema_version` (1), `id` (lowercase letters, digits and dashes; also the file name), `name` (up to 80 characters), optional `description`, `triggers` (`question_detected`, `chat`, `screenshot`; all by default), `tools` (allowlist: `doc_search`, `web_search`, `calculator`), `answer_format` (`cue_then_full` or `full_only`) and `knowledge` (document names). Unknown fields are rejected. The body is the instructions (up to 8,000 characters), added to the system prompt as "Active Skill: <name>".
 
 ```markdown
 ---
@@ -997,8 +1012,8 @@ Every change goes through a pull request, even as a solo developer, so CI runs a
 
 **A built-in Skill template**
 
-1. Add a Markdown file in `skills/templates/` that validates against `skill.schema.json`.
-2. Add a golden-answer test case for it (section 8.3).
+1. Add a Markdown file in `skills/templates/` that validates against `skill.schema.json`, and list it in `TEMPLATES` in `crates/skills/src/repo.rs` (and `src/ipc/mockSkills.ts`).
+2. Add a golden-answer case in `skills/golden/<id>.json` (question, documents, `mustMention`, `mustNotMention`); the quality eval (section 8.3) scores it against live models.
 
 ### 7.6 Dependency management
 
@@ -1384,13 +1399,13 @@ This is not legal advice; confirm requirements with legal counsel before any pub
 2. Optional: choose a Skill (e.g. Interview Coach for mock interview practice).
 3. Click **Start**. Confirm that participants are aware of transcription, or choose **Transcribe me only**.
 4. Sidekick listens. Answers appear in **Live Answers**: a one-line cue first, then the full answer and sources.
-5. Click **End** when the meeting finishes to get a summary, decisions and action items.
+5. Click **End** when the meeting finishes. The **Notes** tab, which kept running notes during the meeting, then shows a summary, decisions and action items.
 
 **Auto-answer:** on by default, so every detected question gets an answer. Turn it off with the **Auto** button in the overlay header (or `Ctrl/Cmd+Shift+A`) to answer only questions that use your name.
 
-**Chat:** open the **Chat** tab and type or speak your own question at any time. Sidekick uses everything in the session to answer.
+**Chat:** open the **Chat** tab (or press the Ask shortcut) and type your own question at any time during a session. Sidekick uses everything in the session to answer, and remembers the last few questions so you can ask follow-ups like "and for the Free tier?". Press Enter to send and Shift+Enter for a new line. Speaking a question into Chat comes in a later release.
 
-**Screenshots:** press `Ctrl/Cmd+Shift+S`, select an area, and optionally type a question about it. The screenshot joins the session so later answers can use it.
+**Screenshots:** press `Ctrl/Cmd+Shift+S` to capture the screen, or use **Screenshot** in the Chat tab to pick the full screen, one window or an area. Then type a question about it ("What does this error mean?"). For 10 minutes after a capture, answers to other questions can use it too, and cite it as "Screenshot 14:07". On macOS, allow Sidekick under System Settings → Privacy & Security → Screen Recording the first time.
 
 **Overlay:** drag to move, drag edges to resize, use the slider to set transparency, and `Ctrl/Cmd+Shift+H` to show or hide. The shield icon shows whether the overlay is hidden from screen sharing: green means protected, amber means not guaranteed.
 

@@ -1,0 +1,12 @@
+{
+  "skill": "technical-architect",
+  "question": "How many requests per second can the Pro tier handle across 3 regions?",
+  "documents": [
+    {
+      "name": "spec-v2.pdf",
+      "text": "The Pro tier allows 600 requests per minute per region."
+    }
+  ],
+  "mustMention": ["30", "600"],
+  "mustNotMention": []
+}

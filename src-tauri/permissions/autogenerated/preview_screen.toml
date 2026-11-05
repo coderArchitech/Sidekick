@@ -1,0 +1,11 @@
+# Automatically generated - DO NOT EDIT!
+
+[[permission]]
+identifier = "allow-preview-screen"
+description = "Enables the preview_screen command without any pre-configured scope."
+commands.allow = ["preview_screen"]
+
+[[permission]]
+identifier = "deny-preview-screen"
+description = "Denies the preview_screen command without any pre-configured scope."
+commands.deny = ["preview_screen"]

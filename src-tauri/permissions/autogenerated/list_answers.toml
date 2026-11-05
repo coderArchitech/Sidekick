@@ -1,0 +1,11 @@
+# Automatically generated - DO NOT EDIT!
+
+[[permission]]
+identifier = "allow-list-answers"
+description = "Enables the list_answers command without any pre-configured scope."
+commands.allow = ["list_answers"]
+
+[[permission]]
+identifier = "deny-list-answers"
+description = "Denies the list_answers command without any pre-configured scope."
+commands.deny = ["list_answers"]

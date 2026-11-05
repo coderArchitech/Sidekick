@@ -511,6 +511,27 @@ fn answers_are_saved_with_sources_and_rated() {
     );
     assert!(directed);
     answers::rate(&db, &id, 1).unwrap();
+    let chat = answers::save(
+        &mut db,
+        &NewAnswer {
+            question: "And the burst limit?".into(),
+            source: QuestionSource::Chat,
+            directed: false,
+            sources: vec![],
+            ..a.clone()
+        },
+    )
+    .unwrap();
+    let all = answers::list(&db, &s.id, None).unwrap();
+    assert_eq!(all.len(), 2);
+    assert_eq!(all[0].answer_id, id, "oldest first");
+    assert_eq!(all[0].rating, Some(1));
+    assert_eq!(all[0].sources, a.sources);
+    let only_chat = answers::list(&db, &s.id, Some(QuestionSource::Chat)).unwrap();
+    assert_eq!(only_chat.len(), 1);
+    assert_eq!(only_chat[0].answer_id, chat);
+    assert_eq!(only_chat[0].question, "And the burst limit?");
+    assert!(answers::list(&db, "other", None).unwrap().is_empty());
     answers::rate(&db, &id, 0).unwrap();
     assert!(answers::rate(&db, &id, 2).is_err());
     assert!(answers::rate(&db, "missing", 1).is_err());
@@ -520,4 +541,112 @@ fn answers_are_saved_with_sources_and_rated() {
         .query_row("SELECT count(*) FROM answers", [], |r| r.get(0))
         .unwrap();
     assert_eq!(left, 0, "answers go with the session");
+}
+
+#[test]
+fn notes_save_with_an_optimistic_version_check() {
+    use sidekick_core::ErrorCode;
+    use sidekick_session::notes;
+    let db = db();
+    let s = repo::create(&db, &new("Notes")).unwrap();
+    let empty = notes::get(&db, &s.id).unwrap();
+    assert_eq!((empty.content_md.as_str(), empty.version), ("", 0));
+
+    let v1 = notes::save(&db, &s.id, "## Topics\n- pricing", 0).unwrap();
+    assert_eq!(v1.version, 1);
+    assert!(v1.updated_at > 0);
+    let err = notes::save(&db, &s.id, "stale", 0).unwrap_err();
+    assert_eq!(
+        err.code,
+        ErrorCode::VersionConflict,
+        "second first-save loses"
+    );
+
+    let v2 = notes::save(&db, &s.id, "## Topics\n- pricing\n- SLAs", 1).unwrap();
+    assert_eq!(v2.version, 2);
+    let err = notes::save(&db, &s.id, "stale", 1).unwrap_err();
+    assert_eq!(err.code, ErrorCode::VersionConflict);
+    assert!(!err.retryable);
+    assert_eq!(
+        notes::get(&db, &s.id).unwrap().content_md,
+        "## Topics\n- pricing\n- SLAs",
+        "a conflict changes nothing"
+    );
+    assert!(notes::get(&db, "missing").is_err());
+}
+
+#[test]
+fn summary_saves_with_action_items_and_keeps_notes() {
+    use sidekick_session::notes::{self, NewActionItem};
+    let mut db = db();
+    let s = repo::create(&db, &new("Summary")).unwrap();
+
+    // A summary before any notes still lets the first notes save work.
+    notes::save_summary(&mut db, &s.id, "Early", &[]).unwrap();
+    assert_eq!(notes::save(&db, &s.id, "n1", 0).unwrap().version, 1);
+
+    let item = |t: &str, o: Option<&str>| NewActionItem {
+        text: t.into(),
+        owner: o.map(Into::into),
+        due: None,
+    };
+    let n = notes::save_summary(
+        &mut db,
+        &s.id,
+        "We agreed on the Pro tier.\n\n## Decisions\n- Ship Friday",
+        &[
+            item("Send the quote", Some("Priya")),
+            item("  ", None),
+            item("Book a follow-up", None),
+        ],
+    )
+    .unwrap();
+    assert_eq!(n.content_md, "n1", "notes untouched");
+    assert_eq!(n.version, 1);
+    assert!(n.summary_md.unwrap().contains("Ship Friday"));
+    let texts: Vec<_> = n.action_items.iter().map(|a| a.text.as_str()).collect();
+    assert_eq!(
+        texts,
+        ["Send the quote", "Book a follow-up"],
+        "blank items dropped, order kept"
+    );
+    assert_eq!(n.action_items[0].owner.as_deref(), Some("Priya"));
+    assert!(!n.action_items[0].done);
+
+    // Summarising again replaces the items.
+    let n = notes::save_summary(&mut db, &s.id, "Again", &[item("Only one", None)]).unwrap();
+    assert_eq!(n.action_items.len(), 1);
+
+    repo::delete(&db, &s.id).unwrap();
+    let left: i64 = db
+        .conn()
+        .query_row("SELECT count(*) FROM action_items", [], |r| r.get(0))
+        .unwrap();
+    assert_eq!(left, 0, "action items go with the session");
+}
+
+#[test]
+fn a_session_can_use_a_skill() {
+    let db = db();
+    let s = repo::create(&db, &new("With Skill")).unwrap();
+    assert_eq!(s.skill_id, None);
+    db.conn()
+        .execute(
+            "INSERT INTO skills (id, name, file_path, schema_version, updated_at) VALUES ('coach', 'Coach', 'coach.md', 1, 0)",
+            [],
+        )
+        .unwrap();
+    assert_eq!(
+        repo::set_skill(&db, &s.id, Some("coach"))
+            .unwrap()
+            .skill_id
+            .as_deref(),
+        Some("coach")
+    );
+    assert!(
+        repo::set_skill(&db, &s.id, Some("missing")).is_err(),
+        "foreign key"
+    );
+    assert_eq!(repo::set_skill(&db, &s.id, None).unwrap().skill_id, None);
+    assert!(repo::set_skill(&db, "nope", None).is_err());
 }

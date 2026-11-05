@@ -1,0 +1,12 @@
+{
+  "skill": "teacher",
+  "question": "Why is the sky blue?",
+  "documents": [
+    {
+      "name": "physics-unit-3.md",
+      "text": "Rayleigh scattering: shorter (blue) wavelengths of sunlight are scattered much more strongly by air molecules than longer (red) wavelengths."
+    }
+  ],
+  "mustMention": ["scatter", "wavelength"],
+  "mustNotMention": []
+}

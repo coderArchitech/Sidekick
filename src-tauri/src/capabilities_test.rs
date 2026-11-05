@@ -31,6 +31,15 @@ const SETTINGS_ONLY: &[&str] = &[
     "allow-test-api-key",
     "allow-delete-api-key",
     "allow-list-models",
+    "allow-whisper-models",
+    "allow-download-whisper-model",
+    "allow-skill-templates",
+    "allow-check-skill",
+    "allow-save-skill",
+    "allow-set-skill-enabled",
+    "allow-delete-skill",
+    "allow-import-skill",
+    "allow-export-skill",
 ];
 
 #[test]

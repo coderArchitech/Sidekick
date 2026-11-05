@@ -25,6 +25,8 @@ sidekick-session = { path = "crates/session" }
 sidekick-hotkeys = { path = "crates/hotkeys" }
 sidekick-ingest = { path = "crates/ingest" }
 sidekick-retrieval = { path = "crates/retrieval" }
+sidekick-capture = { path = "crates/capture" }
+sidekick-skills = { path = "crates/skills" }
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
 thiserror = "2"

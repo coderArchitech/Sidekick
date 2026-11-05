@@ -1,0 +1,12 @@
+{
+  "skill": "negotiation-coach",
+  "question": "They're offering $110k base. Should I take it?",
+  "documents": [
+    {
+      "name": "my-targets.md",
+      "text": "Target base: $125k. Walk-away: $115k. Priorities: remote work, learning budget."
+    }
+  ],
+  "mustMention": ["$115k", "walk-away"],
+  "mustNotMention": ["accept the offer"]
+}

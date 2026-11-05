@@ -1,5 +1,6 @@
 import { createMockAnswerBus } from "./answerEvents";
 import { createMockSessionBus } from "./sessionEvents";
+import { createSkillStore, TEMPLATES, toMarkdown, validateSkill } from "./mockSkills";
 import type {
   commands as tauriCommands,
   Bookmark,
@@ -17,6 +18,8 @@ import type {
   ProviderKind,
   Settings,
   SettingsPatch,
+  Notes,
+  Screenshot,
 } from "./bindings";
 
 type Commands = typeof tauriCommands;
@@ -72,9 +75,41 @@ export const mockSessionBus = createMockSessionBus();
 const sessions = new Map<string, Session>();
 const transcripts = new Map<string, TranscriptLine[]>();
 const bookmarks = new Map<string, Bookmark[]>();
+const notesBySession = new Map<string, Notes>();
+export const mockSkills = createSkillStore();
+/** Mirrors crates/stt/src/models.rs. */
+const WHISPER_MODELS = [
+  { name: "tiny.en", sizeMb: 75, englishOnly: true },
+  { name: "base.en", sizeMb: 142, englishOnly: true },
+  { name: "base", sizeMb: 142, englishOnly: false },
+  { name: "small", sizeMb: 466, englishOnly: false },
+];
+const downloadedModels = new Set<string>();
+const screenshots: Screenshot[] = [];
+/** A 16:9 synthetic "screen" (SVG data URL); the mocks never hold real pixels. */
+export const MOCK_IMAGE_URL = `data:image/svg+xml;base64,${btoa(
+  '<svg xmlns="http://www.w3.org/2000/svg" width="1600" height="900"><defs><linearGradient id="g" x2="1" y2="1"><stop offset="0" stop-color="#1e293b"/><stop offset="1" stop-color="#0f766e"/></linearGradient></defs><rect width="1600" height="900" fill="url(#g)"/><rect x="120" y="120" width="900" height="560" rx="16" fill="#f8fafc"/><text x="160" y="220" font-size="56" font-family="monospace" fill="#b91c1c">TypeError: x is undefined</text></svg>',
+)}`;
 const documents = new Map<string, DocumentInfo[]>();
 /** Answers saved through `saveAnswer`, for assertions. */
-export const savedAnswers: { id: string; answer: NewAnswer; rating: number | null }[] = [];
+export const savedAnswers: {
+  id: string;
+  answer: NewAnswer;
+  rating: number | null;
+  createdAt: number;
+}[] = [];
+
+function mockNotes(sessionId: string): Notes {
+  return (
+    notesBySession.get(sessionId) ?? {
+      contentMd: "",
+      version: 0,
+      updatedAt: 0,
+      summaryMd: null,
+      actionItems: [],
+    }
+  );
+}
 
 /** Simulates ingest like the Rust pipeline: queued → parsing → embedding → ready (or failed). */
 function mockIngest(sessionId: string, name: string, sizeBytes: number) {
@@ -207,7 +242,7 @@ export const mockProtection: { status: ProtectionStatus } = {
   status: { state: "unavailable", reason: "Running in a browser: no screen-share protection." },
 };
 /** Paths the mock file picker returns next (tests set them). */
-export const mockFiles: { picked: string[] } = { picked: [] };
+export const mockFiles: { picked: string[]; saveAs: string[] } = { picked: [], saveAs: [] };
 /** Browser-demo switches; tests leave them off. */
 export const mockOptions = { demoTranscript: false, ingestStepMs: 5 };
 /** What the mocks were asked to do, for assertions. */
@@ -262,7 +297,12 @@ export function resetMocks(): void {
   documents.clear();
   savedAnswers.length = 0;
   mockFiles.picked = [];
+  mockFiles.saveAs = [];
   bookmarks.clear();
+  notesBySession.clear();
+  mockSkills.reset();
+  downloadedModels.clear();
+  screenshots.length = 0;
   nextLineId = 1;
   liveSessionId = null;
   nextId = 1;
@@ -371,8 +411,11 @@ export const mockCommands: Commands = {
       ],
     }),
   llmStream: (requestId, _provider, request) => {
-    const question = [...request.messages].reverse().find((m) => m.role === "user")?.content ?? "";
-    const words = `Mock answer to: ${question}`.split(/(?<= )/);
+    const last = [...request.messages].reverse().find((m) => m.role === "user");
+    const question = last?.content ?? "";
+    // Mirrors the Rust mock: it notes when a screenshot came with the question.
+    const prefix = last?.screenshotId ? "Mock answer (with screenshot) to:" : "Mock answer to:";
+    const words = `${prefix} ${question}`.split(/(?<= )/);
     const handle = { cancelled: false };
     activeStreams.set(requestId, handle);
     void (async () => {
@@ -414,6 +457,7 @@ export const mockCommands: Commands = {
       startedAt: null,
       endedAt: null,
       consent: null,
+      skillId: null,
     };
     return Promise.resolve(save(session));
   },
@@ -479,8 +523,175 @@ export const mockCommands: Commands = {
   },
   saveAnswer: (answer) => {
     const id = `mock-answer-${nextLineId++}`;
-    savedAnswers.push({ id, answer: structuredClone(answer), rating: null });
+    savedAnswers.push({ id, answer: structuredClone(answer), rating: null, createdAt: Date.now() });
     return Promise.resolve({ status: "ok", data: id });
+  },
+  listAnswers: (sessionId, source) =>
+    Promise.resolve({
+      status: "ok",
+      data: savedAnswers
+        .filter(
+          (a) =>
+            a.answer.sessionId === sessionId && (source === null || a.answer.source === source),
+        )
+        .map((a) => ({
+          answerId: a.id,
+          question: a.answer.question,
+          source: a.answer.source,
+          directed: a.answer.directed,
+          cue: a.answer.cue,
+          bodyMd: a.answer.bodyMd,
+          sources: structuredClone(a.answer.sources),
+          rating: a.rating,
+          createdAt: a.createdAt,
+        })),
+    }),
+  getNotes: (sessionId) => {
+    if (!sessions.has(sessionId))
+      return Promise.resolve(err("INTERNAL", "That session no longer exists."));
+    return Promise.resolve({ status: "ok", data: structuredClone(mockNotes(sessionId)) });
+  },
+  saveNotes: (sessionId, contentMd, version) => {
+    if (!sessions.has(sessionId))
+      return Promise.resolve(err("INTERNAL", "That session no longer exists."));
+    const n = mockNotes(sessionId);
+    if (n.version !== version)
+      return Promise.resolve(
+        err("VERSION_CONFLICT", "The notes changed while they were being updated."),
+      );
+    const next = { ...n, contentMd, version: n.version + 1, updatedAt: Date.now() };
+    notesBySession.set(sessionId, next);
+    return Promise.resolve({ status: "ok", data: structuredClone(next) });
+  },
+  saveSummary: (sessionId, summaryMd, actionItems) => {
+    if (!sessions.has(sessionId))
+      return Promise.resolve(err("INTERNAL", "That session no longer exists."));
+    const next: Notes = {
+      ...mockNotes(sessionId),
+      summaryMd,
+      actionItems: actionItems
+        .filter((a) => a.text.trim() !== "")
+        .map((a, i) => ({ ...a, text: a.text.trim(), id: `mock-item-${i}`, done: false })),
+    };
+    notesBySession.set(sessionId, next);
+    return Promise.resolve({ status: "ok", data: structuredClone(next) });
+  },
+  captureScreenshot: (sessionId, request) => {
+    const s = sessions.get(sessionId);
+    if (!s) return Promise.resolve(err("INTERNAL", "That session no longer exists."));
+    if (s.status === "ended")
+      return Promise.resolve(
+        err("INTERNAL", "That session has ended. Start a new one to take screenshots."),
+      );
+    // Same sizes as the Rust MockCapturer after downscaling to 1568 px.
+    let size: [number, number] = [1568, 882];
+    if (request.mode === "window") {
+      if (request.windowId === 1) size = [1200, 800];
+      else if (request.windowId === 2) size = [882, 1568];
+      else return Promise.resolve(err("INTERNAL", "That window is no longer open."));
+    } else if (request.mode === "region") {
+      const w = Math.round(2560 * Math.min(1, request.region.width));
+      const h = Math.round(1440 * Math.min(1, request.region.height));
+      if (w <= 0 || h <= 0) return Promise.resolve(err("INTERNAL", "Select an area to capture."));
+      const k = Math.min(1, 1568 / Math.max(w, h));
+      size = [Math.round(w * k), Math.round(h * k)];
+    }
+    const shot: Screenshot = {
+      id: `mock-shot-${nextLineId++}`,
+      sessionId,
+      mimeType: "image/jpeg",
+      width: size[0],
+      height: size[1],
+      createdAt: Date.now(),
+    };
+    screenshots.push(shot);
+    mockSessionBus.emit("screenshot", { screenshot: structuredClone(shot) });
+    return Promise.resolve({ status: "ok", data: structuredClone(shot) });
+  },
+  listWindows: () =>
+    Promise.resolve({
+      status: "ok",
+      data: [
+        { id: 1, appName: "Code", title: "main.rs" },
+        { id: 2, appName: "Browser", title: "Dashboard" },
+      ],
+    }),
+  previewScreen: () => Promise.resolve({ status: "ok", data: MOCK_IMAGE_URL }),
+  listScreenshots: (sessionId) =>
+    Promise.resolve({
+      status: "ok",
+      data: structuredClone(screenshots.filter((s) => s.sessionId === sessionId)),
+    }),
+  screenshotImage: (id) =>
+    Promise.resolve(
+      screenshots.some((s) => s.id === id)
+        ? { status: "ok", data: MOCK_IMAGE_URL }
+        : err("INTERNAL", "That screenshot no longer exists."),
+    ),
+  whisperModels: () =>
+    Promise.resolve(
+      WHISPER_MODELS.map((m) => ({ ...m, downloaded: downloadedModels.has(m.name) })),
+    ),
+  downloadWhisperModel: async (name) => {
+    if (!WHISPER_MODELS.some((m) => m.name === name))
+      return err("INTERNAL", `Unknown Whisper model ${name}.`);
+    const total = 1_000_000;
+    for (const done of [250_000, 500_000, 1_000_000]) {
+      await Promise.resolve();
+      mockSessionBus.emit("model", { name, doneBytes: done, totalBytes: total });
+    }
+    downloadedModels.add(name);
+    return { status: "ok", data: null };
+  },
+  listSkills: () => Promise.resolve({ status: "ok", data: mockSkills.list() }),
+  skillTemplates: () => Promise.resolve({ status: "ok", data: structuredClone(TEMPLATES) }),
+  checkSkill: (skill) => Promise.resolve(validateSkill(skill)),
+  saveSkill: (skill) => {
+    const r = mockSkills.save(skill);
+    if (Array.isArray(r))
+      return Promise.resolve(
+        err(
+          "PARSE_FAILED",
+          `This Skill file has problems. ${r.map((e) => `${e.field}: ${e.message}`).join(" ")}`,
+        ),
+      );
+    return Promise.resolve({ status: "ok", data: r });
+  },
+  setSkillEnabled: (id, enabled) => {
+    const s = mockSkills.setEnabled(id, enabled);
+    return Promise.resolve(
+      s ? { status: "ok", data: s } : err("INTERNAL", "That Skill no longer exists."),
+    );
+  },
+  deleteSkill: (id) => {
+    mockSkills.delete(id);
+    for (const s of sessions.values()) if (s.skillId === id) save({ ...s, skillId: null });
+    return Promise.resolve({ status: "ok", data: null });
+  },
+  importSkill: (path) => {
+    const p = mockSkills.preview(path);
+    if (p === null) return Promise.resolve(err("INTERNAL", "Couldn't open that file."));
+    if (Array.isArray(p))
+      return Promise.resolve(
+        err(
+          "PARSE_FAILED",
+          `This Skill file has problems. ${p.map((e) => (e.field ? `${e.field}: ${e.message}` : e.message)).join(" ")}`,
+        ),
+      );
+    return Promise.resolve({ status: "ok", data: p });
+  },
+  exportSkill: (id, path) => {
+    const s = mockSkills.get(id);
+    if (!s) return Promise.resolve(err("INTERNAL", "That Skill no longer exists."));
+    mockSkills.files.set(path, toMarkdown(s));
+    return Promise.resolve({ status: "ok", data: null });
+  },
+  setSessionSkill: (sessionId, skillId) => {
+    const s = sessions.get(sessionId);
+    if (!s) return Promise.resolve(err("INTERNAL", "That session no longer exists."));
+    if (skillId !== null && !mockSkills.has(skillId))
+      return Promise.resolve(err("INTERNAL", "That Skill no longer exists."));
+    return Promise.resolve(save({ ...s, skillId }));
   },
   rateAnswer: (answerId, rating) => {
     const a = savedAnswers.find((x) => x.id === answerId);
@@ -552,8 +763,14 @@ export const mockCommands: Commands = {
       status: "ok",
       data: {
         transcript: structuredClone(lines.filter((l) => l.endMs >= end - windowMs)),
-        notes: null,
+        notes: notesBySession.get(sessionId)?.contentMd.trim() || null,
         chunks,
+        screenshot:
+          structuredClone(
+            screenshots
+              .filter((s) => s.sessionId === sessionId && s.createdAt >= Date.now() - 600_000)
+              .at(-1),
+          ) ?? null,
       },
     });
   },

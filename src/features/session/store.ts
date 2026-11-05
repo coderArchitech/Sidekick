@@ -14,6 +14,8 @@ interface SessionState {
   end: () => Promise<void>;
   /** Auto-answer on/off for this session (QA-3). */
   toggleAuto: () => Promise<void>;
+  /** Sets the session's active Skill, or none (PRD SKL-1). */
+  setSkill: (skillId: string | null) => Promise<void>;
   /** Clears an ended session so a new one can be created. */
   reset: () => void;
   /** Applies a `session-changed` event for the current session. */
@@ -78,6 +80,12 @@ export const useSessionStore = create<SessionState>((set, get) => {
       if (s) set({ session: s, warnings: [] });
     },
 
+    setSkill: async (skillId) => {
+      const s = get().session;
+      if (!s || s.status === "ended") return;
+      const updated = await run(() => commands.setSessionSkill(s.id, skillId));
+      if (updated) set({ session: updated });
+    },
     toggleAuto: async () => {
       const s = get().session;
       if (!s || s.status === "ended") return;

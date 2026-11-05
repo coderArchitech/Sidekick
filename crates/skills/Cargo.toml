@@ -1,0 +1,28 @@
+[package]
+name = "sidekick-skills"
+description = "Skills: Markdown files with YAML front matter, validated against schemas/skill.schema.json, with a tool allowlist, built-in templates, import and export (PRD SKL-1 to SKL-3, ADR-009)."
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+publish.workspace = true
+
+[features]
+specta = ["dep:specta"]
+
+[dependencies]
+sidekick-core.workspace = true
+sidekick-store.workspace = true
+jsonschema = { version = "0.60", default-features = false }
+rusqlite.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+serde_yaml_ng = "0.10"
+tracing.workspace = true
+specta = { workspace = true, optional = true }
+
+[dev-dependencies]
+secrecy.workspace = true
+tempfile.workspace = true
+
+[lints]
+workspace = true

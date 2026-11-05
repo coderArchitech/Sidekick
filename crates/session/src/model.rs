@@ -86,6 +86,8 @@ pub struct Session {
     pub ended_at: Option<i64>,
     /// The consent recorded for this session, if any.
     pub consent: Option<ConsentOption>,
+    /// The active Skill, if any (PRD SKL-1).
+    pub skill_id: Option<String>,
 }
 
 /// Which lifecycle moves are allowed.

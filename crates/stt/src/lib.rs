@@ -9,6 +9,7 @@
 //! short tail after speech; [`timeline::Timeline`] maps provider timestamps back
 //! to meeting time, and keep-alives hold the connection open in silence.
 
+pub mod models;
 pub mod providers;
 pub mod speakers;
 pub mod timeline;

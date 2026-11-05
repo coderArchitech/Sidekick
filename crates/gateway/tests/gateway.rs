@@ -64,10 +64,7 @@ fn request(model: &str) -> LlmRequest {
     LlmRequest {
         model: model.into(),
         system: None,
-        messages: vec![ChatMessage {
-            role: Role::User,
-            content: "What's the rate limit?".into(),
-        }],
+        messages: vec![ChatMessage::text(Role::User, "What's the rate limit?")],
         max_tokens: 256,
         effort: None,
     }

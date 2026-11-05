@@ -198,3 +198,19 @@ pub struct IngestProgress {
     #[serde(flatten)]
     pub progress: sidekick_ingest::Progress,
 }
+
+/// A screenshot was stored (`screenshot.captured`, tech doc 5.2).
+#[derive(Debug, Clone, Serialize, specta::Type, Event)]
+#[serde(rename_all = "camelCase")]
+pub struct ScreenshotCaptured {
+    pub screenshot: sidekick_capture::Screenshot,
+}
+
+/// Whisper model download progress (Settings).
+#[derive(Debug, Clone, Serialize, specta::Type, Event)]
+#[serde(rename_all = "camelCase")]
+pub struct ModelDownloadProgress {
+    pub name: String,
+    pub done_bytes: f64,
+    pub total_bytes: Option<f64>,
+}

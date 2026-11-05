@@ -6,35 +6,27 @@
 //! - Keep-alive: `{"type":"KeepAlive"}` after `keepalive` of silence.
 //! - Reconnect: frames are buffered (up to 10 s) while reconnecting and replayed.
 
-use std::collections::VecDeque;
 use std::sync::Arc;
-use std::time::{Duration, Instant};
 
-use futures::{SinkExt, StreamExt};
 use serde::Deserialize;
-use sidekick_audio::{AudioFrame, FRAME_MS, StreamKind};
+use sidekick_audio::{AudioFrame, StreamKind};
 use sidekick_core::keys::KeyVerifier;
 use sidekick_core::{ErrorCode, SidekickError, SidekickResult};
 use sidekick_secrets::{ExposeSecret, SecretString};
 use tokio::sync::mpsc::Receiver;
-use tokio_tungstenite::tungstenite::{self, Message, client::IntoClientRequest};
+use tokio_tungstenite::tungstenite::{
+    Message, client::IntoClientRequest, handshake::client::Request,
+};
 use tokio_util::sync::CancellationToken;
 
-use crate::speakers::{self, Word};
-use crate::timeline::Timeline;
-use crate::{Partial, SttConfig, SttProvider, SttSink, SttStatus};
+pub use super::ws::Parsed;
+use super::ws::{Dialect, MessageParser, auth_header, ms};
+use crate::speakers::Word;
+use crate::{SttConfig, SttProvider, SttSink};
 
 pub const DEFAULT_WS_URL: &str = "wss://api.deepgram.com/v1/listen";
 pub const DEFAULT_API_URL: &str = "https://api.deepgram.com";
 pub const MODEL: &str = "nova-3";
-/// Frames kept while reconnecting (10 s, tech doc 5.4).
-const MAX_BUFFER_FRAMES: usize = 200;
-const BACKOFF: [Duration; 4] = [
-    Duration::from_millis(250),
-    Duration::from_millis(500),
-    Duration::from_secs(1),
-    Duration::from_secs(2),
-];
 
 #[derive(Debug, Clone)]
 pub struct DeepgramProvider {
@@ -121,23 +113,6 @@ struct DgWord {
     speaker: Option<u32>,
 }
 
-/// What a Deepgram message means for us.
-#[derive(Debug, Clone, PartialEq)]
-pub enum Parsed {
-    Partial(String),
-    /// Final words in provider milliseconds.
-    Final {
-        words: Vec<Word>,
-        confidence: Option<f32>,
-    },
-    Ignore,
-}
-
-#[allow(clippy::cast_possible_truncation, clippy::cast_sign_loss)]
-fn ms(seconds: f64) -> u64 {
-    (seconds.max(0.0) * 1000.0).round() as u64
-}
-
 /// Parses one text message from Deepgram.
 #[must_use]
 pub fn parse(text: &str) -> Parsed {
@@ -180,185 +155,44 @@ pub fn parse(text: &str) -> Parsed {
     }
 }
 
-// ---- Session ----------------------------------------------------------------
+// ---- Dialect --------------------------------------------------------------
 
-type Ws =
-    tokio_tungstenite::WebSocketStream<tokio_tungstenite::MaybeTlsStream<tokio::net::TcpStream>>;
+struct DeepgramParser;
 
-async fn connect(url: &str, key: &SecretString) -> SidekickResult<Ws> {
-    let mut req = url
-        .into_client_request()
-        .map_err(|_| SidekickError::internal("Invalid Deepgram URL."))?;
-    let auth = format!("Token {}", key.expose_secret())
-        .parse()
-        .map_err(|_| {
-            SidekickError::new(
-                ErrorCode::KeyInvalid,
-                "The Deepgram key has invalid characters.",
-            )
-        })?;
-    req.headers_mut().insert("Authorization", auth);
-    match tokio_tungstenite::connect_async(req).await {
-        Ok((ws, _)) => Ok(ws),
-        Err(tungstenite::Error::Http(resp)) => {
-            let status = resp.status().as_u16();
-            Err(match status {
-                401 | 403 => {
-                    SidekickError::new(ErrorCode::KeyInvalid, "Deepgram rejected the API key.")
-                }
-                429 => SidekickError::new(
-                    ErrorCode::RateLimited,
-                    "Deepgram is rate limiting. Retrying.",
-                ),
-                _ => SidekickError::new(
-                    ErrorCode::SttDisconnected,
-                    format!("Deepgram refused the connection (HTTP {status})."),
-                ),
-            })
-        }
-        Err(e) => {
-            tracing::warn!(target: "stt", error = %e, "deepgram connect failed");
-            Err(SidekickError::new(
-                ErrorCode::SttDisconnected,
-                "Couldn't reach Deepgram.",
-            ))
-        }
+impl MessageParser for DeepgramParser {
+    fn parse(&mut self, text: &str) -> SidekickResult<Vec<Parsed>> {
+        Ok(vec![parse(text)])
     }
 }
 
-fn frame_bytes(frame: &AudioFrame) -> Vec<u8> {
-    frame.samples.iter().flat_map(|s| s.to_le_bytes()).collect()
-}
-
-enum Ended {
-    /// The audio channel closed or we were cancelled: we're done.
-    Finished,
-    /// The connection dropped; reconnect.
-    Dropped,
-}
-
-struct Session<'a> {
-    cfg: &'a SttConfig,
-    sink: &'a Arc<dyn SttSink>,
-    timeline: Timeline,
-    /// Frames since the last speech frame (for the tail).
-    since_speech: u32,
-    last_send: Instant,
-    /// Sent frames not yet covered by a final result, with their provider end
-    /// time. A dropped connection may have lost them, so they're replayed.
-    unfinalized: VecDeque<(u64, AudioFrame)>,
-}
-
-impl Session<'_> {
-    fn should_send(&mut self, frame: &AudioFrame) -> bool {
-        if frame.speech {
-            self.since_speech = 0;
-            true
-        } else {
-            self.since_speech = self.since_speech.saturating_add(1);
-            self.since_speech <= self.cfg.tail_frames
-        }
+impl Dialect for DeepgramProvider {
+    fn name(&self) -> &'static str {
+        "Deepgram"
     }
 
-    async fn send(&mut self, ws: &mut Ws, frame: &AudioFrame) -> Result<(), tungstenite::Error> {
-        ws.send(Message::Binary(frame_bytes(frame).into())).await?;
-        self.timeline.sent(frame.start_ms, u64::from(FRAME_MS));
-        self.last_send = Instant::now();
-        if self.unfinalized.len() == MAX_BUFFER_FRAMES {
-            self.unfinalized.pop_front();
-        }
-        self.unfinalized
-            .push_back((self.timeline.sent_ms(), frame.clone()));
-        Ok(())
+    fn request(&self, cfg: &SttConfig, key: &SecretString) -> SidekickResult<Request> {
+        let mut req = self
+            .listen_url(cfg)
+            .into_client_request()
+            .map_err(|_| SidekickError::internal("Invalid Deepgram URL."))?;
+        req.headers_mut().insert(
+            "Authorization",
+            auth_header(&format!("Token {}", key.expose_secret()), "Deepgram")?,
+        );
+        Ok(req)
     }
 
-    fn handle_text(&mut self, text: &str) {
-        match parse(text) {
-            Parsed::Partial(t) => self.sink.partial(Partial {
-                kind: self.cfg.kind,
-                text: t,
-            }),
-            Parsed::Final { words, confidence } => {
-                // Audio up to the end of this result is transcribed; stop keeping it.
-                if let Some(end) = words.last().map(|w| w.end_ms) {
-                    while self.unfinalized.front().is_some_and(|(e, _)| *e <= end) {
-                        self.unfinalized.pop_front();
-                    }
-                }
-                for mut seg in speakers::split(self.cfg.kind, &words, confidence) {
-                    seg.start_ms = self.timeline.to_meeting(seg.start_ms);
-                    seg.end_ms = self.timeline.to_meeting(seg.end_ms);
-                    self.sink.segment(seg);
-                }
-            }
-            Parsed::Ignore => {}
-        }
+    fn parser(&self, _cfg: &SttConfig) -> Box<dyn MessageParser> {
+        Box::new(DeepgramParser)
     }
 
-    /// Streams until the connection drops or the input ends.
-    async fn stream(
-        &mut self,
-        ws: &mut Ws,
-        frames: &mut Receiver<AudioFrame>,
-        buffered: &mut VecDeque<AudioFrame>,
-        cancel: &CancellationToken,
-    ) -> Ended {
-        // Replay audio captured while disconnected.
-        while let Some(f) = buffered.pop_front() {
-            if self.should_send(&f) && self.send(ws, &f).await.is_err() {
-                buffered.push_front(f);
-                return Ended::Dropped;
-            }
-        }
-        let mut tick = tokio::time::interval(Duration::from_millis(250));
-        loop {
-            tokio::select! {
-                () = cancel.cancelled() => {
-                    let _ = ws.close(None).await;
-                    return Ended::Finished;
-                }
-                frame = frames.recv() => match frame {
-                    Some(f) => {
-                        if self.should_send(&f) && self.send(ws, &f).await.is_err() {
-                            buffered.push_back(f);
-                            return Ended::Dropped;
-                        }
-                    }
-                    None => {
-                        // Ask Deepgram to flush, then read the last results.
-                        let _ = ws.send(Message::Text(r#"{"type":"CloseStream"}"#.into())).await;
-                        let drain = async {
-                            while let Some(Ok(msg)) = ws.next().await {
-                                if let Message::Text(t) = msg { self.handle_text(&t); }
-                            }
-                        };
-                        let _ = tokio::time::timeout(Duration::from_secs(3), drain).await;
-                        return Ended::Finished;
-                    }
-                },
-                msg = ws.next() => match msg {
-                    Some(Ok(Message::Text(t))) => self.handle_text(&t),
-                    Some(Ok(Message::Close(_)) | Err(_)) | None => return Ended::Dropped,
-                    Some(Ok(_)) => {}
-                },
-                _ = tick.tick() => {
-                    if self.last_send.elapsed() >= self.cfg.keepalive {
-                        if ws.send(Message::Text(r#"{"type":"KeepAlive"}"#.into())).await.is_err() {
-                            return Ended::Dropped;
-                        }
-                        self.last_send = Instant::now();
-                    }
-                }
-            }
-        }
+    fn keepalive(&self) -> Option<Message> {
+        Some(Message::Text(r#"{"type":"KeepAlive"}"#.into()))
     }
-}
 
-fn buffer_push(buffer: &mut VecDeque<AudioFrame>, frame: AudioFrame) {
-    if buffer.len() == MAX_BUFFER_FRAMES {
-        buffer.pop_front();
+    fn finish(&self) -> Option<Message> {
+        Some(Message::Text(r#"{"type":"CloseStream"}"#.into()))
     }
-    buffer.push_back(frame);
 }
 
 #[async_trait::async_trait]
@@ -371,7 +205,7 @@ impl SttProvider for DeepgramProvider {
         &self,
         config: SttConfig,
         key: Option<SecretString>,
-        mut frames: Receiver<AudioFrame>,
+        frames: Receiver<AudioFrame>,
         sink: Arc<dyn SttSink>,
         cancel: CancellationToken,
     ) -> SidekickResult<()> {
@@ -381,83 +215,7 @@ impl SttProvider for DeepgramProvider {
                 "Add your Deepgram API key in Settings.",
             )
         })?;
-        let url = self.listen_url(&config);
-        let kind = config.kind;
-        let mut buffered: VecDeque<AudioFrame> = VecDeque::new();
-        let mut first = true;
-        loop {
-            sink.status(
-                kind,
-                if first {
-                    SttStatus::Connecting
-                } else {
-                    SttStatus::Reconnecting
-                },
-            );
-            let started = Instant::now();
-            let mut attempt = 0usize;
-            let mut ws = loop {
-                let connecting = connect(&url, &key);
-                tokio::pin!(connecting);
-                // Keep buffering audio while connecting.
-                let result = loop {
-                    tokio::select! {
-                        () = cancel.cancelled() => return Ok(()),
-                        r = &mut connecting => break r,
-                        f = frames.recv() => match f {
-                            Some(f) => buffer_push(&mut buffered, f),
-                            None if buffered.is_empty() => return Ok(()),
-                            None => {}
-                        },
-                    }
-                };
-                match result {
-                    Ok(ws) => break ws,
-                    Err(e) if e.code == ErrorCode::KeyInvalid => {
-                        sink.status(kind, SttStatus::Failed);
-                        return Err(e);
-                    }
-                    Err(e) => {
-                        if started.elapsed() >= config.reconnect_deadline {
-                            sink.status(kind, SttStatus::Failed);
-                            return Err(e);
-                        }
-                        let wait = BACKOFF[attempt.min(BACKOFF.len() - 1)];
-                        attempt += 1;
-                        tokio::select! {
-                            () = cancel.cancelled() => return Ok(()),
-                            () = tokio::time::sleep(wait) => {}
-                        }
-                    }
-                }
-            };
-            sink.status(kind, SttStatus::Live);
-            first = false;
-            let mut session = Session {
-                cfg: &config,
-                sink: &sink,
-                timeline: Timeline::default(),
-                since_speech: u32::MAX,
-                last_send: Instant::now(),
-                unfinalized: VecDeque::new(),
-            };
-            match session
-                .stream(&mut ws, &mut frames, &mut buffered, &cancel)
-                .await
-            {
-                Ended::Finished => return Ok(()),
-                Ended::Dropped => {
-                    tracing::warn!(target: "stt", ?kind, replay = session.unfinalized.len(), "deepgram connection dropped; reconnecting");
-                    // Replay audio the provider may not have transcribed, before newer buffered audio.
-                    for (_, f) in session.unfinalized.drain(..).rev() {
-                        buffered.push_front(f);
-                    }
-                    while buffered.len() > MAX_BUFFER_FRAMES {
-                        buffered.pop_front();
-                    }
-                }
-            }
-        }
+        super::ws::run(self, config, &key, frames, sink, cancel).await
     }
 }
 

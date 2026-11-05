@@ -13,6 +13,10 @@ crate-type = ["staticlib", "cdylib", "rlib"]
 [build-dependencies]
 tauri-build = { version = "2", features = [] }
 
+[features]
+# Local Whisper speech-to-text (builds whisper.cpp; needs CMake and a C++ compiler).
+local-whisper = ["sidekick-stt/local-whisper"]
+
 [dependencies]
 sidekick-core = { workspace = true, features = ["specta"] }
 sidekick-secrets = { workspace = true, features = ["specta"] }
@@ -20,7 +24,8 @@ sidekick-store.workspace = true
 sidekick-settings = { workspace = true, features = ["specta"] }
 sidekick-gateway = { workspace = true, features = ["specta"] }
 tokio.workspace = true
-sidekick-stt.workspace = true
+sidekick-stt = { workspace = true, features = ["specta"] }
+reqwest.workspace = true
 sidekick-window = { workspace = true, features = ["specta"] }
 sidekick-diagnostics = { workspace = true, features = ["specta"] }
 sidekick-session = { workspace = true, features = ["specta"] }
@@ -30,6 +35,8 @@ tauri-plugin-global-shortcut = "2"
 tauri-plugin-dialog = "2"
 sidekick-ingest = { workspace = true, features = ["specta"] }
 sidekick-retrieval = { workspace = true, features = ["specta"] }
+sidekick-capture = { workspace = true, features = ["specta"] }
+sidekick-skills = { workspace = true, features = ["specta"] }
 tauri = { version = "2", features = ["macos-private-api"] }
 serde.workspace = true
 serde_json.workspace = true

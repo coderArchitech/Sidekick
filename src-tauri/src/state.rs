@@ -19,6 +19,10 @@ pub struct AppState {
     pub keys: Arc<dyn KeyStore>,
     /// The one live (or paused) session, if any: its id and runner.
     pub live: tokio::sync::Mutex<Option<(String, sidekick_session::LiveSession)>>,
+    /// Screenshots: the OS, or a synthetic screen in mock mode.
+    pub capturer: Arc<dyn sidekick_capture::Capturer>,
+    /// The app data folder (database, Whisper models).
+    pub data_dir: PathBuf,
     pub mock: bool,
 }
 
@@ -46,14 +50,30 @@ impl AppState {
             .map_err(|_| SidekickError::internal("Couldn't create the app data folder."))?;
         let key = database_key(keys.as_ref())?;
         let db = Database::open(&data_dir.join(DB_FILE_NAME), &key)?;
+        // First run: copy the built-in Skill templates into the Skills folder (tech doc 4.5).
+        if let Err(e) = sidekick_skills::repo::seed(&db, &data_dir.join("skills")) {
+            tracing::warn!(target: "skills", code = ?e.code, "couldn't seed Skill templates");
+        }
         let diagnostics = Arc::new(Recorder::default());
         let mut gateway =
             Gateway::new(Arc::clone(&keys), mock).with_recorder(Arc::clone(&diagnostics));
         if !mock {
-            gateway = gateway.with_verifier(
-                "deepgram",
-                Arc::new(sidekick_stt::DeepgramVerifier::default()),
-            );
+            gateway = gateway
+                .with_verifier(
+                    "deepgram",
+                    Arc::new(sidekick_stt::DeepgramVerifier::default()),
+                )
+                .with_verifier(
+                    "assemblyai",
+                    Arc::new(sidekick_stt::providers::assemblyai::AssemblyAiVerifier::default()),
+                )
+                .with_verifier(
+                    "soniox",
+                    Arc::new(sidekick_stt::providers::soniox::SonioxVerifier::default()),
+                );
+        }
+        if cfg!(feature = "local-whisper") {
+            gateway = gateway.with_local("whisper-local");
         }
         Ok(Self {
             db: Arc::new(Mutex::new(db)),
@@ -62,6 +82,12 @@ impl AppState {
             diagnostics,
             keys,
             live: tokio::sync::Mutex::new(None),
+            capturer: if mock {
+                Arc::new(sidekick_capture::MockCapturer)
+            } else {
+                Arc::new(sidekick_capture::OsCapturer)
+            },
+            data_dir,
             mock,
         })
     }

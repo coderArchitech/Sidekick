@@ -173,10 +173,18 @@ export class AnswerRouter {
       { question: input.text, pack: ctx.data, skill: input.skill, history: input.history },
       "full",
     );
-    const cue = buildPrompt({ question: input.text, pack: ctx.data, skill: input.skill }, "cue");
+    const cue = buildPrompt(
+      {
+        question: input.text,
+        pack: ctx.data,
+        skill: input.skill,
+        screenshotFocus: input.source === "screenshot",
+      },
+      "cue",
+    );
     flight.sources = full.sources;
     const plan = input.models;
-    const requests: [string, "cue" | "full", LlmRequest][] = [
+    const allRequests: [string, "cue" | "full", LlmRequest][] = [
       [
         `${id}:cue`,
         "cue",
@@ -200,6 +208,11 @@ export class AnswerRouter {
         },
       ],
     ];
+    // A Skill can ask for the full answer only (no one-line cue).
+    const requests =
+      input.skill?.answerFormat === "full_only"
+        ? allRequests.filter(([, part]) => part === "full")
+        : allRequests;
     for (const [rid, part] of requests) {
       flight.requestIds.push(rid);
       this.byRequest.set(rid, { id, part });

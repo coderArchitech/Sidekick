@@ -49,6 +49,8 @@ pub struct Gateway {
     llms: HashMap<&'static str, Arc<dyn LlmProvider>>,
     /// Key checks for non-LLM providers (STT, embeddings, search).
     verifiers: HashMap<&'static str, Arc<dyn KeyVerifier>>,
+    /// Keyless local providers that are built into this app (e.g. Whisper).
+    local: Vec<&'static str>,
     keys: Arc<dyn KeyStore>,
     openai_base_url: Option<String>,
     policy: RetryPolicy,
@@ -70,10 +72,23 @@ impl Gateway {
                 "anthropic",
                 Arc::new(providers::anthropic::AnthropicProvider::default()),
             );
+            llms.insert(
+                "openai",
+                Arc::new(providers::openai_chat::OpenAiProvider::default()),
+            );
+            llms.insert(
+                "gemini",
+                Arc::new(providers::gemini::GeminiProvider::default()),
+            );
+            llms.insert(
+                "ollama",
+                Arc::new(providers::ollama::OllamaProvider::default()),
+            );
         }
         Self {
             llms,
             verifiers: HashMap::new(),
+            local: Vec::new(),
             keys,
             openai_base_url: None,
             policy: RetryPolicy::default(),
@@ -93,6 +108,13 @@ impl Gateway {
     #[must_use]
     pub fn with_verifier(mut self, id: &'static str, verifier: Arc<dyn KeyVerifier>) -> Self {
         self.verifiers.insert(id, verifier);
+        self
+    }
+
+    /// Marks a keyless local provider (no verifier) as available.
+    #[must_use]
+    pub fn with_local(mut self, id: &'static str) -> Self {
+        self.local.push(id);
         self
     }
 
@@ -117,7 +139,9 @@ impl Gateway {
                 if self.mock && info.kind == ProviderKind::Llm {
                     info.implemented = true;
                 }
-                if info.kind != ProviderKind::Llm && self.verifiers.contains_key(info.id) {
+                if info.kind != ProviderKind::Llm
+                    && (self.verifiers.contains_key(info.id) || self.local.contains(&info.id))
+                {
                     info.implemented = true;
                 }
                 Ok(ProviderEntry {

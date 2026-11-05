@@ -12,4 +12,5 @@ export {
   mockWindowCalls,
   resetMocks,
   savedAnswers,
+  mockSkills,
 } from "./mock";

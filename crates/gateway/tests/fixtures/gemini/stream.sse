@@ -1,0 +1,6 @@
+data: {"candidates": [{"content": {"parts": [{"text": "Considering the spec...", "thought": true}],"role": "model"},"index": 0}],"usageMetadata": {"promptTokenCount": 790,"totalTokenCount": 790},"modelVersion": "gemini-2.5-flash"}
+
+data: {"candidates": [{"content": {"parts": [{"text": "The Pro tier allows "}],"role": "model"},"index": 0}],"usageMetadata": {"promptTokenCount": 790,"candidatesTokenCount": 5,"totalTokenCount": 795},"modelVersion": "gemini-2.5-flash"}
+
+data: {"candidates": [{"content": {"parts": [{"text": "600 requests per minute [1]."}],"role": "model"},"finishReason": "STOP","index": 0}],"usageMetadata": {"promptTokenCount": 790,"candidatesTokenCount": 15,"totalTokenCount": 805},"modelVersion": "gemini-2.5-flash"}
+

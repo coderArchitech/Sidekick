@@ -54,20 +54,20 @@ All Phase 0 code and automated tests are done and green on Linux, Windows and ma
 | --- | --- | --- | --- |
 | T-013 | Sessions and consent | 🟡 In progress: testing | Waiting on dependency: E2E needs the WebdriverIO harness (T-033). Everything else done, including a real-app run |
 | T-014 | Live transcript tab | ✅ Done | Verified in the real app with fixture audio |
-| T-015 | `hotkeys` crate: global shortcuts | 🟡 In progress: testing | 🖥️ Waiting on hardware: verified on Linux (X11); needs a check on Windows and macOS. Ask/Screenshot/Auto/Skill actions hook in with T-023/T-025/T-020/T-028 |
+| T-015 | `hotkeys` crate: global shortcuts | 🟡 In progress: testing | 🖥️ Waiting on hardware: verified on Linux (X11); needs a check on Windows and macOS. All actions are wired |
 | T-016 | Profile: name and nicknames | ✅ Done | Detection use lands in T-020 |
 | T-017 | `ingest` crate: parse, chunk, embed | 🟡 In progress: testing | Waiting on dependency: image files need a vision model (T-025/T-026); Gemini, Voyage and Ollama embeddings come with T-026. Everything else done |
-| T-018 | `retrieval` crate: hybrid search and context packs | 🟡 In progress: testing | Waiting on dependency: the latest screenshot joins the pack with T-025. Everything else done; 20k-chunk search 8 ms in release |
+| T-018 | `retrieval` crate: hybrid search and context packs | ✅ Done | 20k-chunk search 8 ms in release; latest screenshot joined with T-025 |
 | T-019 | Library feature: documents in a session | 🟡 In progress: testing | Waiting on dependency: Playwright drag-and-drop spec comes with the UI suite (T-032); native picker/drop check on Windows/macOS |
 | T-020 | Orchestrator: question detection and modes | ✅ Done | Rules meet the targets on a never-tuned set (95% / 100%); real-meeting check in T-039 |
-| T-021 | Orchestrator: prompts, Skills, two-tier answers | 🟡 In progress: testing | Waiting on dependency: prompts accept a Skill; picking the active Skill comes with T-028. Live-model quality check in T-039 |
-| T-022 | Live Answers tab | ⬜ To do | |
-| T-023 | Chat tab | ⬜ To do | |
-| T-024 | Rolling notes | ⬜ To do | |
-| T-025 | `capture` crate: screenshots and answer from screen | ⬜ To do | 🖥️ |
-| T-026 | More LLM providers: OpenAI, Gemini, Ollama | ⬜ To do | |
-| T-027 | More STT providers: AssemblyAI, Soniox, local Whisper | ⬜ To do | |
-| T-028 | `skills` crate and Skill builder | ⬜ To do | |
+| T-021 | Orchestrator: prompts, Skills, two-tier answers | 🟡 In progress: testing | Waiting on dependency: live-model quality check in T-039. Active Skill done with T-028 |
+| T-022 | Live Answers tab | ✅ Done | Follow-up chips not in scope; Playwright pass in T-032 |
+| T-023 | Chat tab | ✅ Done | Voice input to Chat later; Playwright pass in T-032 |
+| T-024 | Rolling notes | ✅ Done | Summary written by the overlay after End; quality checked in T-039 |
+| T-025 | `capture` crate: screenshots and answer from screen | 🟡 In progress: testing | 🖥️ Code and automated tests done. Waiting on: real capture on Windows/macOS during a live call (doesn't notify the meeting app), macOS Screen Recording prompt |
+| T-026 | More LLM providers: OpenAI, Gemini, Ollama | ✅ Done | Default model names may need refreshing as providers release new ones; live-key check in T-039 |
+| T-027 | More STT providers: AssemblyAI, Soniox, local Whisper | 🟡 In progress: testing | Code and automated tests done. Waiting on: Whisper accuracy run with a real model (Hugging Face is blocked in the cloud dev environment), live AssemblyAI/Soniox checks, Hinglish comparison (PRD open question). Whisper ships behind the `local-whisper` cargo feature |
+| T-028 | `skills` crate and Skill builder | ✅ Done | Golden cases run against live models in T-039; tool use itself comes with Agents (T-045) |
 | T-029 | Overlay controls and private display | ⬜ To do | 🖥️ |
 | T-030 | Data control: retention, delete session | ⬜ To do | |
 | T-031 | Logging to file and log export | ⬜ To do | |
@@ -321,7 +321,8 @@ All Phase 0 code and automated tests are done and green on Linux, Windows and ma
 - [x] Component: pause/resume and bookmark run on their events; nothing happens without a session; unmount stops listening.
 - [x] Component: Settings → Shortcuts lists, saves, rejects duplicates with a reason, and undoes.
 - [x] Manual (Linux, Xvfb): Ctrl+Shift+P pauses the session and Ctrl+Shift+H hides the overlay while another window has focus.
-- [ ] Ask, Screenshot, Auto-answer and Switch Skill actions: wired when T-023, T-025, T-020 and T-028 land.
+- [x] Ask (T-023), Screenshot (T-025) and Auto-answer (T-020) actions wired, with component tests.
+- [x] Switch Skill action (T-028): cycles enabled Skills, then none.
 - [ ] Manual: shortcuts work while a meeting app has focus on Windows and macOS.
 
 ### T-016 Profile: name and nicknames
@@ -363,7 +364,7 @@ All Phase 0 code and automated tests are done and green on Linux, Windows and ma
 - [x] Integration: results never include another session's documents (vector index partitioned by owner; keyword search filtered).
 - [x] Integration: pack carries recent transcript, notes, top-k passages with document name, id and page.
 - [x] Benchmark: 20k chunks, release build: vector search 8 ms (target 50 ms), full context pack 23 ms (budget 100 ms). Debug: 17 / 91 ms.
-- [ ] Latest screenshot in the pack: with T-025.
+- [x] Latest screenshot in the pack (last 10 minutes, this session only): added with T-025.
 
 ### T-019 Library feature: documents in a session
 
@@ -406,7 +407,7 @@ All Phase 0 code and automated tests are done and green on Linux, Windows and ma
 - [x] Unit: a third concurrent question cancels the oldest's streams; its late tokens are ignored; manual cancel works.
 - [x] Unit: a stream that fails shows on that answer only and the router keeps working (NFR-5); a failed cue doesn't sink the full answer; refusals show a neutral note.
 - [x] Integration (mocks): transcript line → detection → router → saved answer.
-- [ ] Active Skill selection: with T-028.
+- [x] Active Skill selection (T-028): per session, applied by trigger; `full_only` Skills skip the cue.
 - [ ] Answer quality with live models: T-039.
 
 ### T-022 Live Answers tab
@@ -415,11 +416,11 @@ All Phase 0 code and automated tests are done and green on Linux, Windows and ma
 **Scope:** Cue line, expandable full answer, sources list, code blocks with Shiki highlighting and copy, thumbs up/down (`rate_answer`), sanitised Markdown with no raw HTML.
 
 **Tests**
-- [ ] Component: cue shows first, expands to full answer, then sources.
-- [ ] Component: copy button copies code only when clicked (UI-4c).
-- [ ] Component: raw HTML and script in Markdown are not rendered.
-- [ ] Component: rating calls `rate_answer` with the right value.
-- [ ] UI: streamed tokens render progressively with mocked events.
+- [x] Component: cue shows first, expands to full answer, then sources.
+- [x] Component: copy button copies code only when clicked (UI-4c).
+- [x] Component: raw HTML and script in Markdown are not rendered.
+- [x] Component: rating calls `rate_answer` with the right value.
+- [x] UI: streamed tokens render progressively with mocked events.
 
 ### T-023 Chat tab
 
@@ -427,10 +428,10 @@ All Phase 0 code and automated tests are done and green on Linux, Windows and ma
 **Scope:** Typed questions with full session context; follow-ups with history; per-session chat history; Ask hotkey focuses the input.
 
 **Tests**
-- [ ] Component: sending a message streams an answer and keeps history.
-- [ ] Component: follow-up includes previous turns in the request.
-- [ ] Integration: chat questions stored with `source = chat`.
-- [ ] UI: Ask hotkey focuses the chat input.
+- [x] Component: sending a message streams an answer and keeps history.
+- [x] Component: follow-up includes previous turns in the request.
+- [x] Integration: chat questions stored with `source = chat`.
+- [x] UI: Ask hotkey focuses the chat input.
 
 ### T-024 Rolling notes
 
@@ -438,10 +439,10 @@ All Phase 0 code and automated tests are done and green on Linux, Windows and ma
 **Scope:** Every 45 s, send new transcript plus current notes to the fast model; save with optimistic version check; Notes tab shows topics, decisions, open questions; summary on session end.
 
 **Tests**
-- [ ] Unit: job runs every 45 s only while live and only with new transcript.
-- [ ] Unit: version conflict on `save_notes` retries with the latest notes.
-- [ ] Component: Notes tab renders sections and updates live.
-- [ ] Integration: `end_session` produces a summary with decisions and action items (mock model).
+- [x] Unit: job runs every 45 s only while live and only with new transcript.
+- [x] Unit: version conflict on `save_notes` retries with the latest notes.
+- [x] Component: Notes tab renders sections and updates live.
+- [x] Integration: `end_session` produces a summary with decisions and action items (mock model).
 
 ### T-025 `capture` crate: screenshots and answer from screen 🖥️
 
@@ -449,10 +450,10 @@ All Phase 0 code and automated tests are done and green on Linux, Windows and ma
 **Scope:** Region, window and full-screen capture; downscale to 1568 px long side; encrypted BLOB storage; capture-and-ask; latest screenshot added to context; never copied to clipboard or shared folders.
 
 **Tests**
-- [ ] Unit: downscale keeps aspect ratio and the 1568 px limit.
-- [ ] Integration: screenshot stored encrypted and linked to the session.
-- [ ] Unit: screenshot questions include the image and cite it as a source.
-- [ ] Component: capture-and-ask flow (capture, type question, answer).
+- [x] Unit: downscale keeps aspect ratio and the 1568 px limit.
+- [x] Integration: screenshot stored encrypted and linked to the session.
+- [x] Unit: screenshot questions include the image and cite it as a source.
+- [x] Component: capture-and-ask flow (capture, type question, answer).
 - [ ] Manual: capture during a live call doesn't notify or interrupt the meeting app.
 
 ### T-026 More LLM providers: OpenAI, Gemini, Ollama
@@ -461,9 +462,9 @@ All Phase 0 code and automated tests are done and green on Linux, Windows and ma
 **Scope:** Adapters following TECHNICAL.md 7.5, including vision and `list_models`; Ollama without a key on localhost.
 
 **Tests**
-- [ ] Unit (each provider): request building, stream parsing, error mapping from recorded fixtures.
-- [ ] Integration (wiremock, each provider): happy path, 401, 429, 500.
-- [ ] Unit: Ollama unreachable maps to `PROVIDER_UNAVAILABLE` with a helpful message.
+- [x] Unit (each provider): request building, stream parsing, error mapping from recorded fixtures.
+- [x] Integration (wiremock, each provider): happy path, 401, 429, 500.
+- [x] Unit: Ollama unreachable maps to `PROVIDER_UNAVAILABLE` with a helpful message.
 
 ### T-027 More STT providers: AssemblyAI, Soniox, local Whisper
 
@@ -471,9 +472,9 @@ All Phase 0 code and automated tests are done and green on Linux, Windows and ma
 **Scope:** Adapters behind `SttProvider`; whisper-rs in `spawn_blocking` behind the `local-whisper` feature flag; model download with hash check.
 
 **Tests**
-- [ ] Unit (each provider): message parsing and error mapping from fixtures.
-- [ ] Integration: Whisper transcribes the short English fixture within tolerance.
-- [ ] Unit: model download rejects a file with the wrong SHA-256.
+- [x] Unit (each provider): message parsing and error mapping from fixtures; AssemblyAI and Soniox also end to end against a local WebSocket server (auth, results, speakers, finish message, rejected key).
+- [ ] Integration: Whisper transcribes the short English fixture within tolerance (opt-in test `crates/stt/tests/whisper.rs`, at least 80% word recall; needs a model and a recording).
+- [x] Unit: model download rejects a file with the wrong SHA-256 (and SHA-1, which whisper.cpp publishes) and leaves nothing behind.
 - [ ] Manual: Hinglish comparison across providers recorded (PRD open question).
 
 ### T-028 `skills` crate and Skill builder
@@ -482,11 +483,11 @@ All Phase 0 code and automated tests are done and green on Linux, Windows and ma
 **Scope:** Load and validate Skill files against `schemas/skill.schema.json`; save, delete, import, export; built-in templates seeded on first run; no-code builder UI; import shows requested tools for approval; tool allowlist.
 
 **Tests**
-- [ ] Unit: valid templates pass schema validation; invalid files give field-level errors.
-- [ ] Unit: unknown tools are rejected; import lists tools for approval.
-- [ ] Unit: export then import round trip is lossless.
-- [ ] Golden: each built-in template has one golden-answer case (TECHNICAL.md 7.5).
-- [ ] Component: builder creates a Skill from a template and saves it.
+- [x] Unit: valid templates pass schema validation; invalid files give field-level errors.
+- [x] Unit: unknown tools are rejected; import lists tools for approval.
+- [x] Unit: export then import round trip is lossless.
+- [x] Golden: each built-in template has one golden-answer case (TECHNICAL.md 7.5) in `skills/golden/`; a test checks coverage and shape. Scoring with a live model is part of T-039.
+- [x] Component: builder creates a Skill from a template and saves it.
 
 ### T-029 Overlay controls and private display 🖥️
 
