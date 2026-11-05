@@ -44,9 +44,17 @@ Also check on macOS: deny System Audio Recording and run the system audio test. 
 
 ## T-010: Deepgram latency (10 minutes)
 
-1. Add a Deepgram key in Settings (it's checked against Deepgram before saving).
-2. Until sessions exist (T-013), measure with the stt integration by pointing it at Deepgram: speak a sentence and note the time from the end of the sentence to the final segment. Target: under 1 s (NFR-1).
-3. Record p50 and p95 over 10 sentences in [TECHNICAL.md 13.2](TECHNICAL.md#132-benchmarks-and-baselines).
+1. Add a Deepgram key in Settings (it's checked against Deepgram before saving; it's stored in the OS keychain).
+2. Stream your microphone to Deepgram for 60 seconds and speak about 10 full sentences:
+
+```bash
+cargo run -p sidekick-stt --example live_transcribe
+```
+
+Each final segment prints with its transcript lag (end of speech to segment received), followed by p50 and p95 at the end. Target: p50 under 1,000 ms, p95 under 1,500 ms (NFR-1).
+
+3. Repeat for other participants' audio during a real call (add `-- --system`), and on a slower connection if you can.
+4. Record p50 and p95 per OS in [TECHNICAL.md 13.2](TECHNICAL.md#132-benchmarks-and-baselines).
 
 ## T-011: Screen-share hiding (20 minutes per OS)
 

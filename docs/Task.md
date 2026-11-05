@@ -245,6 +245,7 @@ All Phase 0 code and automated tests are done and green on Linux, Windows and ma
 - [x] Integration: 401 maps to `KEY_INVALID`, `Failed`, no retry; unreachable server gives up after the deadline; cancel stops the run; missing key reported.
 - [x] Integration: Deepgram key verifier (wiremock 200 / 401); gateway uses registered verifiers before saving keys.
 - [x] Integration: mock provider turns speech bursts in fixture frames into segments.
+- [x] Tool: `cargo run -p sidekick-stt --example live_transcribe` streams live audio to Deepgram and reports lag p50/p95 (key read from the keychain).
 - [ ] Manual: transcript lag measured against NFR-1 with a real key on a real call; result recorded in TECHNICAL.md 13.2.
 
 ### T-011 `window` crate: capture exclusion and protection status 🖥️
