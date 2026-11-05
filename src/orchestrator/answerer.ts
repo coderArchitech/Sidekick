@@ -173,7 +173,15 @@ export class AnswerRouter {
       { question: input.text, pack: ctx.data, skill: input.skill, history: input.history },
       "full",
     );
-    const cue = buildPrompt({ question: input.text, pack: ctx.data, skill: input.skill }, "cue");
+    const cue = buildPrompt(
+      {
+        question: input.text,
+        pack: ctx.data,
+        skill: input.skill,
+        screenshotFocus: input.source === "screenshot",
+      },
+      "cue",
+    );
     flight.sources = full.sources;
     const plan = input.models;
     const requests: [string, "cue" | "full", LlmRequest][] = [

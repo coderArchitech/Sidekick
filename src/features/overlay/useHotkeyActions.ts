@@ -7,8 +7,8 @@ import { useOverlayStore } from "./store";
 
 /**
  * Runs overlay actions for global shortcuts (PRD UI-6). Show/hide is handled in
- * Rust. Ask opens Chat and focuses its input. Screenshot and Switch Skill hook
- * in when their features land (T-025, T-028).
+ * Rust. Ask opens Chat and focuses its input; Screenshot captures the screen
+ * and opens Chat to ask about it. Switch Skill hooks in with T-028.
  */
 export function useHotkeyActions() {
   useEffect(() => {
@@ -33,6 +33,13 @@ export async function handle(action: Action): Promise<void> {
       break;
     case "bookmark":
       await bookmarkNow(store.session);
+      break;
+    case "screenshot":
+      // Capture-and-ask (SCR-4): full screen now, then type the question.
+      if (store.session && store.session.status !== "ended") {
+        useOverlayStore.getState().setTab("chat");
+        await useChatStore.getState().capture(store.session.id, { mode: "screen" });
+      }
       break;
     case "ask":
       useOverlayStore.getState().setTab("chat");

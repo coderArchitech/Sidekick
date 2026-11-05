@@ -18,6 +18,7 @@ import type {
   Settings,
   SettingsPatch,
   Notes,
+  Screenshot,
 } from "./bindings";
 
 type Commands = typeof tauriCommands;
@@ -74,6 +75,11 @@ const sessions = new Map<string, Session>();
 const transcripts = new Map<string, TranscriptLine[]>();
 const bookmarks = new Map<string, Bookmark[]>();
 const notesBySession = new Map<string, Notes>();
+const screenshots: Screenshot[] = [];
+/** A 16:9 synthetic "screen" (SVG data URL); the mocks never hold real pixels. */
+export const MOCK_IMAGE_URL = `data:image/svg+xml;base64,${btoa(
+  '<svg xmlns="http://www.w3.org/2000/svg" width="1600" height="900"><defs><linearGradient id="g" x2="1" y2="1"><stop offset="0" stop-color="#1e293b"/><stop offset="1" stop-color="#0f766e"/></linearGradient></defs><rect width="1600" height="900" fill="url(#g)"/><rect x="120" y="120" width="900" height="560" rx="16" fill="#f8fafc"/><text x="160" y="220" font-size="56" font-family="monospace" fill="#b91c1c">TypeError: x is undefined</text></svg>',
+)}`;
 const documents = new Map<string, DocumentInfo[]>();
 /** Answers saved through `saveAnswer`, for assertions. */
 export const savedAnswers: {
@@ -283,6 +289,7 @@ export function resetMocks(): void {
   mockFiles.picked = [];
   bookmarks.clear();
   notesBySession.clear();
+  screenshots.length = 0;
   nextLineId = 1;
   liveSessionId = null;
   nextId = 1;
@@ -391,8 +398,11 @@ export const mockCommands: Commands = {
       ],
     }),
   llmStream: (requestId, _provider, request) => {
-    const question = [...request.messages].reverse().find((m) => m.role === "user")?.content ?? "";
-    const words = `Mock answer to: ${question}`.split(/(?<= )/);
+    const last = [...request.messages].reverse().find((m) => m.role === "user");
+    const question = last?.content ?? "";
+    // Mirrors the Rust mock: it notes when a screenshot came with the question.
+    const prefix = last?.screenshotId ? "Mock answer (with screenshot) to:" : "Mock answer to:";
+    const words = `${prefix} ${question}`.split(/(?<= )/);
     const handle = { cancelled: false };
     activeStreams.set(requestId, handle);
     void (async () => {
@@ -552,6 +562,58 @@ export const mockCommands: Commands = {
     notesBySession.set(sessionId, next);
     return Promise.resolve({ status: "ok", data: structuredClone(next) });
   },
+  captureScreenshot: (sessionId, request) => {
+    const s = sessions.get(sessionId);
+    if (!s) return Promise.resolve(err("INTERNAL", "That session no longer exists."));
+    if (s.status === "ended")
+      return Promise.resolve(
+        err("INTERNAL", "That session has ended. Start a new one to take screenshots."),
+      );
+    // Same sizes as the Rust MockCapturer after downscaling to 1568 px.
+    let size: [number, number] = [1568, 882];
+    if (request.mode === "window") {
+      if (request.windowId === 1) size = [1200, 800];
+      else if (request.windowId === 2) size = [882, 1568];
+      else return Promise.resolve(err("INTERNAL", "That window is no longer open."));
+    } else if (request.mode === "region") {
+      const w = Math.round(2560 * Math.min(1, request.region.width));
+      const h = Math.round(1440 * Math.min(1, request.region.height));
+      if (w <= 0 || h <= 0) return Promise.resolve(err("INTERNAL", "Select an area to capture."));
+      const k = Math.min(1, 1568 / Math.max(w, h));
+      size = [Math.round(w * k), Math.round(h * k)];
+    }
+    const shot: Screenshot = {
+      id: `mock-shot-${nextLineId++}`,
+      sessionId,
+      mimeType: "image/jpeg",
+      width: size[0],
+      height: size[1],
+      createdAt: Date.now(),
+    };
+    screenshots.push(shot);
+    mockSessionBus.emit("screenshot", { screenshot: structuredClone(shot) });
+    return Promise.resolve({ status: "ok", data: structuredClone(shot) });
+  },
+  listWindows: () =>
+    Promise.resolve({
+      status: "ok",
+      data: [
+        { id: 1, appName: "Code", title: "main.rs" },
+        { id: 2, appName: "Browser", title: "Dashboard" },
+      ],
+    }),
+  previewScreen: () => Promise.resolve({ status: "ok", data: MOCK_IMAGE_URL }),
+  listScreenshots: (sessionId) =>
+    Promise.resolve({
+      status: "ok",
+      data: structuredClone(screenshots.filter((s) => s.sessionId === sessionId)),
+    }),
+  screenshotImage: (id) =>
+    Promise.resolve(
+      screenshots.some((s) => s.id === id)
+        ? { status: "ok", data: MOCK_IMAGE_URL }
+        : err("INTERNAL", "That screenshot no longer exists."),
+    ),
   rateAnswer: (answerId, rating) => {
     const a = savedAnswers.find((x) => x.id === answerId);
     if (!a) return Promise.resolve(err("INTERNAL", "That answer no longer exists."));
@@ -622,8 +684,14 @@ export const mockCommands: Commands = {
       status: "ok",
       data: {
         transcript: structuredClone(lines.filter((l) => l.endMs >= end - windowMs)),
-        notes: null,
+        notes: notesBySession.get(sessionId)?.contentMd.trim() || null,
         chunks,
+        screenshot:
+          structuredClone(
+            screenshots
+              .filter((s) => s.sessionId === sessionId && s.createdAt >= Date.now() - 600_000)
+              .at(-1),
+          ) ?? null,
       },
     });
   },

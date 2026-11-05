@@ -14,13 +14,13 @@ pub struct MockProvider;
 /// The text the mock answers with, for assertions.
 #[must_use]
 pub fn mock_answer(req: &LlmRequest) -> String {
-    let question = req
-        .messages
-        .iter()
-        .rev()
-        .find(|m| m.role == Role::User)
-        .map_or("", |m| m.content.as_str());
-    format!("Mock answer to: {question}")
+    let last = req.messages.iter().rev().find(|m| m.role == Role::User);
+    let question = last.map_or("", |m| m.content.as_str());
+    if last.is_some_and(|m| m.image.is_some()) {
+        format!("Mock answer (with screenshot) to: {question}")
+    } else {
+        format!("Mock answer to: {question}")
+    }
 }
 
 #[async_trait::async_trait]

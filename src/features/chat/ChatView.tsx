@@ -2,12 +2,15 @@ import { useEffect, useRef, useState, type FormEvent, type KeyboardEvent } from 
 import { Markdown } from "@/features/answers";
 import { useSessionStore } from "@/features/session";
 import { activeRouter, askChat, useChatStore, type AnswerView } from "@/orchestrator";
+import { CaptureMenu, PendingScreenshot } from "./CaptureMenu";
 
 /** The Chat tab (PRD QA-8): ask your own questions with the session as context. */
 export function ChatView() {
   const session = useSessionStore((s) => s.session);
   const turns = useChatStore((s) => s.turns);
   const focusTick = useChatStore((s) => s.focusTick);
+  const captureError = useChatStore((s) => s.captureError);
+  const pending = useChatStore((s) => s.pending);
   const [text, setText] = useState("");
   const [error, setError] = useState<string | null>(null);
   const input = useRef<HTMLTextAreaElement>(null);
@@ -53,19 +56,27 @@ export function ChatView() {
         ))}
         <div ref={end} />
       </div>
-      {error && (
+      {(error ?? captureError) && (
         <p role="alert" className="text-sm text-red-300">
-          {error}
+          {error ?? captureError}
         </p>
       )}
+      <PendingScreenshot />
       <form onSubmit={(e) => void send(e)} className="flex items-end gap-2">
+        {session && <CaptureMenu sessionId={session.id} disabled={!canAsk} />}
         <textarea
           ref={input}
           aria-label="Ask a question"
           rows={2}
           value={text}
           disabled={!canAsk}
-          placeholder={canAsk ? "Ask a question (Enter to send, Shift+Enter for a new line)" : ""}
+          placeholder={
+            !canAsk
+              ? ""
+              : pending
+                ? "What do you want to know about this screenshot?"
+                : "Ask a question (Enter to send, Shift+Enter for a new line)"
+          }
           onChange={(e) => setText(e.target.value)}
           onKeyDown={onKeyDown}
           className="min-w-0 flex-1 resize-none rounded-md border border-slate-700 bg-slate-950 p-2 text-sm text-slate-100 disabled:opacity-50"

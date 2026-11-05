@@ -20,12 +20,40 @@ pub enum Role {
     Assistant,
 }
 
-/// One turn of the conversation. Text only for now; images arrive with screenshots (T-025).
+/// One turn of the conversation: text, plus optionally one screenshot (PRD SCR-3).
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[cfg_attr(feature = "specta", derive(specta::Type))]
+#[serde(rename_all = "camelCase")]
 pub struct ChatMessage {
     pub role: Role,
     pub content: String,
+    /// A stored screenshot to show the model with this message. The app
+    /// loads it from the encrypted database into `image`; pixels never cross IPC.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[cfg_attr(feature = "specta", specta(optional))]
+    pub screenshot_id: Option<String>,
+    #[serde(skip)]
+    #[cfg_attr(feature = "specta", specta(skip))]
+    pub image: Option<ImageData>,
+}
+
+impl ChatMessage {
+    #[must_use]
+    pub fn text(role: Role, content: impl Into<String>) -> Self {
+        Self {
+            role,
+            content: content.into(),
+            screenshot_id: None,
+            image: None,
+        }
+    }
+}
+
+/// An image for a vision model, base64-encoded.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct ImageData {
+    pub mime_type: String,
+    pub base64: String,
 }
 
 /// How hard the model should think. Lower is faster and cheaper.

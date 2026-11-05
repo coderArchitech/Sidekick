@@ -25,6 +25,7 @@ const PACK: ContextPack = {
       text: "Pro: 600 requests/min.",
     },
   ],
+  screenshot: null,
 };
 
 const ok = <T>(data: T): Result<T, SidekickError> => ({ status: "ok", data });
@@ -154,7 +155,7 @@ describe("AnswerRouter", () => {
   });
 
   it("answers 'not found' without calling a model when there is no context", async () => {
-    const h = harness({ transcript: [], notes: null, chunks: [] });
+    const h = harness({ transcript: [], notes: null, chunks: [], screenshot: null });
     const v = await h.router.ask(input());
     expect(h.streams).toHaveLength(0);
     expect(v).toMatchObject({ status: "done", body: NOT_FOUND, cue: NOT_FOUND });

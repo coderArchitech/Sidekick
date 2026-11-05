@@ -5,7 +5,7 @@
 use std::sync::Arc;
 
 use sidekick_core::SidekickResult;
-use sidekick_core::llm::LlmRequest;
+use sidekick_core::llm::{ImageData, LlmRequest};
 use tauri::{AppHandle, State};
 
 use crate::events::TauriAnswerSink;
@@ -20,14 +20,30 @@ pub async fn llm_stream(
     state: State<'_, AppState>,
     request_id: String,
     provider: String,
-    request: LlmRequest,
+    mut request: LlmRequest,
 ) -> SidekickResult<()> {
+    attach_screenshots(&state, &mut request)?;
     state.gateway.start_stream(
         request_id,
         &provider,
         request,
         Arc::new(TauriAnswerSink(app)),
     )
+}
+
+/// Loads each referenced screenshot from the encrypted database into the
+/// message (PRD SCR-3). The frontend only ever sends the id.
+fn attach_screenshots(state: &AppState, request: &mut LlmRequest) -> SidekickResult<()> {
+    for m in &mut request.messages {
+        if let Some(id) = &m.screenshot_id {
+            let img = sidekick_capture::repo::image(&state.db(), id)?;
+            m.image = Some(ImageData {
+                base64: img.base64(),
+                mime_type: img.mime_type,
+            });
+        }
+    }
+    Ok(())
 }
 
 /// Returns false if the stream had already finished.

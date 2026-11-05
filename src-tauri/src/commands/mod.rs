@@ -2,6 +2,7 @@
 //! Commands stay thin: validate, call a crate, return its result.
 
 pub mod app;
+pub mod capture;
 pub mod diagnostics;
 pub mod documents;
 pub mod keys;

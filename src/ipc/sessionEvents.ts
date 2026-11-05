@@ -5,6 +5,7 @@
 import type {
   HotkeyPressed,
   IngestProgress,
+  ScreenshotCaptured,
   SessionChanged,
   SttStatusChanged,
   TranscriptPartial,
@@ -21,6 +22,8 @@ export interface SessionEvents {
   onHotkey(cb: (e: HotkeyPressed) => void): Promise<Unlisten>;
   /** Document ingest progress (tech doc 5.2 `ingest.progress`). */
   onIngestProgress(cb: (e: IngestProgress) => void): Promise<Unlisten>;
+  /** A screenshot was stored (tech doc 5.2 `screenshot.captured`). */
+  onScreenshotCaptured(cb: (e: ScreenshotCaptured) => void): Promise<Unlisten>;
   /** Mock only: files dropped onto the window (Tauri uses the webview's drop event). */
   onFileDrop(cb: (paths: string[]) => void): Promise<Unlisten>;
 }
@@ -32,6 +35,7 @@ type Payloads = {
   stt: SttStatusChanged;
   hotkey: HotkeyPressed;
   ingest: IngestProgress;
+  screenshot: ScreenshotCaptured;
   drop: string[];
 };
 
@@ -44,6 +48,7 @@ export function createMockSessionBus() {
     stt: new Set(),
     hotkey: new Set(),
     ingest: new Set(),
+    screenshot: new Set(),
     drop: new Set(),
   };
   function on<K extends keyof Payloads>(kind: K, cb: (e: Payloads[K]) => void): Promise<Unlisten> {
@@ -62,6 +67,7 @@ export function createMockSessionBus() {
     onSttStatus: (cb) => on("stt", cb),
     onHotkey: (cb) => on("hotkey", cb),
     onIngestProgress: (cb) => on("ingest", cb),
+    onScreenshotCaptured: (cb) => on("screenshot", cb),
     onFileDrop: (cb) => on("drop", cb),
   };
   return { events, emit };

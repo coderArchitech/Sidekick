@@ -39,6 +39,7 @@ export type {
   AppInfo,
   Binding,
   Bookmark,
+  CaptureRequest,
   ChatMessage,
   ConsentOption,
   ContextChunk,
@@ -61,11 +62,14 @@ export type {
   Profile,
   QuestionSource,
   SavedAnswer,
+  Screenshot,
+  ScreenshotCaptured,
   ProtectionState,
   ProtectionStatus,
   ProviderChoice,
   ProviderEntry,
   ProviderKind,
+  Region,
   Result,
   Retention,
   Session,
@@ -82,6 +86,7 @@ export type {
   TranscriptPartial,
   TranscriptSegment,
   Usage,
+  WindowInfo,
 } from "./bindings";
 
 export const isTauri = typeof window !== "undefined" && "__TAURI_INTERNALS__" in window;
@@ -103,6 +108,7 @@ const tauriSessionEvents: SessionEvents = {
   onSttStatus: (cb) => tauriEvents.sttStatusChanged.listen((e) => cb(e.payload)),
   onHotkey: (cb) => tauriEvents.hotkeyPressed.listen((e) => cb(e.payload)),
   onIngestProgress: (cb) => tauriEvents.ingestProgress.listen((e) => cb(e.payload)),
+  onScreenshotCaptured: (cb) => tauriEvents.screenshotCaptured.listen((e) => cb(e.payload)),
   onFileDrop: (cb) => onFileDrop(cb),
 };
 
