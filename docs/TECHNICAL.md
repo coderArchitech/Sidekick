@@ -229,7 +229,7 @@ Each module below is its own crate at `crates/<module>/`, named `sidekick-<modul
 | `library` | Collapsible Documents panel under the session bar: add files (native picker via `tauri-plugin-dialog`, or drop onto the window), add links, live indexing progress, failure reason with Retry, remove. Screenshot strip arrives with T-043 |
 | `settings` | Settings window: provider and model dropdowns per kind (STT, LLM, embeddings, web search), masked key field with show/hide, paste, Save and test, Test connection, Remove; Auto-answer and retention. Opened with `open_settings`; Close hides the window |
 | `skills` | Skill builder, templates, import/export |
-| `orchestrator` | Question detection, prompt building, Skill application, notes job, two-tier model routing |
+| `orchestrator` | Question detection (rules: question marks, question words, implicit asks, chit-chat filter, trusts STT punctuation; fuzzy name/nickname matching), `QuestionDetector` (600 ms debounce, merges a speaker's split question, ignores the user's own speech), Auto vs directed-only routing; prompt building and model routing arrive with T-021 |
 | `ipc` | Generated `bindings.ts` (section 5.6), browser mocks (`mock.ts`) that mirror every command, `answerEvents` for answer streams, and window helpers (`currentWindow`, `hideCurrentWindow`). The only module that imports Tauri |
 
 ### 3.3 Key workflow: answering a question
@@ -587,6 +587,7 @@ Commands are request/response calls from the frontend to Rust (`invoke`). All re
 | --- | --- | --- | --- |
 | `create_session` | `title, skill_id?` | `Session` | Create a draft session |
 | `confirm_consent` | `session_id, option` | `()` | Record consent choice; required before `start_session` |
+| `set_auto_answer` | `session_id, on` | `Session` | Auto-answer on/off for the session (QA-3; header button and hotkey) |
 | `start_session` | `session_id` | `SessionStarted` (`session`, `warnings`) | Start audio capture and STT for the streams the consent allows; `CONSENT_REQUIRED` without consent; one live session at a time. With `SIDEKICK_AUDIO_FIXTURE`, the file plays as a single stream |
 | `pause_session` / `resume_session` | `session_id` | `Session` | Pause or resume listening (paused audio is dropped, never sent) |
 | `end_session` | `session_id` | `Session` | Stop capture and let STT flush; the summary arrives with T-024 |
@@ -762,7 +763,7 @@ There are no users or roles; access control is about which window may call which
 
 | Window | Allowed commands |
 | --- | --- |
-| Overlay | Session, capture, retrieval, LLM, web search, answers, notes, overlay, protection status |
+| Overlay | Session, capture, retrieval, LLM, web search, answers, notes, overlay, protection status, and read-only `get_settings` (profile names for detection) |
 | Settings | Providers, keys, models, settings, skills, usage, diagnostics, backup |
 
 Key commands (`set_api_key`, `delete_api_key`) are only exposed to the Settings window. No window gets filesystem or shell access beyond the dialogs it needs.
