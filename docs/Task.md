@@ -36,7 +36,7 @@ The working task list for building Sidekick end to end, derived from the [techni
 | T-001 | Project scaffold | ✅ Done | Branch `chore/scaffold` |
 | T-002 | CI green on Windows and macOS | 🟡 In progress: testing | [PR #1](https://github.com/coderArchitech/Sidekick/pull/1) opened; waiting for CI |
 | T-003 | Apply doc fixes P1–P5 | ✅ Done | Applied with recommended defaults; ADR-013 |
-| T-004 | `secrets` crate: OS keychain | ⬜ To do | |
+| T-004 | `secrets` crate: OS keychain | 🟡 In progress: testing | Passes locally (incl. real keychain on Linux); waiting for Windows/macOS CI |
 | T-005 | `store` crate: encrypted database and migrations | ⬜ To do | |
 | T-006 | Settings storage and commands | ⬜ To do | |
 | T-007 | `gateway` crate: LLM provider trait, mock and Anthropic | ⬜ To do | |
@@ -138,11 +138,12 @@ The working task list for building Sidekick end to end, derived from the [techni
 **Scope:** `crates/secrets`: `set`, `get`, `delete`, `status` for `sidekick/<provider>` entries; keys held as `SecretString`; `mask()` returns only the last 4 characters; a `KeyStore` trait so other crates and tests can use an in-memory store.
 
 **Tests**
-- [ ] Unit: `mask()` shows only the last 4 characters, handles keys shorter than 4.
-- [ ] Unit: in-memory store set/get/delete/overwrite; multiple providers kept independently.
-- [ ] Unit: `SecretString` values never appear in `Debug` output of any public type.
-- [ ] Integration: real keychain round trip (ignored by default; run on CI for Windows and macOS).
-- [ ] Unit: keychain errors map to `SidekickError` codes, message contains no key.
+- [x] Unit: `last4()` shows only the last 4 characters, handles keys shorter than 4 and multi-byte text.
+- [x] Unit: in-memory store set/get/delete/overwrite; multiple providers kept independently.
+- [x] Unit: `SecretString` values never appear in `Debug` output; `KeyStatus` JSON holds only the last 4.
+- [x] Unit: account names restricted to `[a-z0-9-]`, max 64.
+- [ ] Integration: real keychain round trip (`--ignored`; passes on Linux, CI runs it on Windows and macOS).
+- [x] Unit: keychain errors map to `SidekickError` codes, message contains no key.
 
 ### T-005 `store` crate: encrypted database and migrations
 
