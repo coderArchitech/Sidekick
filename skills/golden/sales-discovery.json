@@ -1,0 +1,12 @@
+{
+  "skill": "sales-discovery",
+  "question": "Can you do 20% off if we sign this quarter?",
+  "documents": [
+    {
+      "name": "pricing.md",
+      "text": "Pro plan: $49 per seat per month. Annual prepay: 10% off. Discounts above 10% need VP approval."
+    }
+  ],
+  "mustMention": ["10%", "approval"],
+  "mustNotMention": ["Yes, 20%"]
+}

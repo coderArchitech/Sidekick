@@ -1,0 +1,38 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://sidekick.app/schemas/skill.schema.json",
+  "title": "Sidekick Skill",
+  "description": "Front matter of a Skill file (TECHNICAL.md 5.7). The Markdown body after the front matter holds the instructions.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema_version", "id", "name"],
+  "properties": {
+    "schema_version": { "const": 1 },
+    "id": {
+      "type": "string",
+      "pattern": "^[a-z0-9][a-z0-9-]{0,63}$",
+      "description": "Lowercase letters, digits and dashes; also the file name."
+    },
+    "name": { "type": "string", "minLength": 1, "maxLength": 80 },
+    "description": { "type": "string", "maxLength": 300 },
+    "triggers": {
+      "type": "array",
+      "uniqueItems": true,
+      "items": { "enum": ["question_detected", "chat", "screenshot"] },
+      "description": "Where the Skill applies. Defaults to all three."
+    },
+    "tools": {
+      "type": "array",
+      "uniqueItems": true,
+      "items": { "enum": ["doc_search", "web_search", "calculator"] },
+      "description": "Allowlist (TECHNICAL.md 11.5). Anything else is rejected."
+    },
+    "answer_format": { "enum": ["cue_then_full", "full_only"] },
+    "knowledge": {
+      "type": "array",
+      "maxItems": 20,
+      "items": { "type": "string", "minLength": 1, "maxLength": 255 },
+      "description": "Names of reference documents to attach."
+    }
+  }
+}

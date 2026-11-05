@@ -150,4 +150,20 @@ describe("Auto-answer toggle", () => {
       stored.status === "ok" && stored.data.items.find((x) => x.id === s?.id)?.autoAnswer,
     ).toBe(false);
   });
+
+  it("picks the session's Skill from enabled Skills", async () => {
+    const user = userEvent.setup();
+    await mockCommands.setSkillEnabled("teacher", false);
+    render(<SessionBar />);
+    await createSession(user);
+    const picker = screen.getByRole("combobox", { name: "Skill" });
+    await waitFor(() => expect(within(picker).getAllByRole("option")).toHaveLength(5));
+    expect(within(picker).queryByRole("option", { name: "Teacher" })).toBeNull();
+    await user.selectOptions(picker, "sales-discovery");
+    await waitFor(() =>
+      expect(useSessionStore.getState().session?.skillId).toBe("sales-discovery"),
+    );
+    await user.selectOptions(picker, "");
+    await waitFor(() => expect(useSessionStore.getState().session?.skillId).toBeNull());
+  });
 });

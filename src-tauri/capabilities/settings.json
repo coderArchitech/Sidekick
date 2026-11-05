@@ -16,6 +16,16 @@
     "allow-list-models",
     "allow-whisper-models",
     "allow-download-whisper-model",
+    "allow-list-skills",
+    "allow-skill-templates",
+    "allow-check-skill",
+    "allow-save-skill",
+    "allow-set-skill-enabled",
+    "allow-delete-skill",
+    "allow-import-skill",
+    "allow-export-skill",
+    "dialog:allow-open",
+    "dialog:allow-save",
     "allow-get-diagnostics"
   ]
 }

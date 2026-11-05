@@ -218,4 +218,23 @@ describe("AnswerRouter", () => {
     expect(h.views.get(v.id)?.status).toBe("cancelled");
     expect(h.cancelled).toHaveLength(2);
   });
+
+  it("a full-only Skill skips the cue and still finishes and saves", async () => {
+    const h = harness();
+    const view = await h.router.ask({
+      ...input(),
+      skill: { name: "Architect", instructions: "Be precise.", answerFormat: "full_only" },
+    });
+    expect(h.streams.map((s) => s.id.split(":")[1])).toEqual(["full"]);
+    expect(h.streams[0]?.req.system).toContain("Active Skill: Architect\nBe precise.");
+    token(`${view.id}:full`, "600 requests/min [2].");
+    done(`${view.id}:full`);
+    await tick();
+    expect(h.views.get(view.id)).toMatchObject({
+      status: "done",
+      cue: "",
+      body: "600 requests/min [2].",
+    });
+    expect(h.saved).toHaveLength(1);
+  });
 });

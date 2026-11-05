@@ -210,7 +210,7 @@ Each module below is its own crate at `crates/<module>/`, named `sidekick-<modul
 | `retrieval` | Vector search (sqlite-vec KNN, partitioned by owner so only the session's vectors are scanned) + keyword search (FTS5, BM25), fused with reciprocal rank fusion (k = 60); context pack = last 3 minutes of transcript + notes + top 5 passages with citation fields. Keyword-only when there's no query vector. Adds the session's latest screenshot from the last 10 minutes | Done |
 | `gateway` | Provider catalog (all kinds, for Settings); `LlmProvider` adapters (Anthropic, OpenAI, Gemini, Ollama, mock), all with vision; the only place keys are attached; streaming via an `AnswerSink` the shell implements, through one `pump` that decodes UTF-8 across network chunks and frames SSE or NDJSON; retries with backoff and `Retry-After`; cancellation; key checks before saving. `SearchProvider` and `EmbeddingProvider` arrive with T-046 and T-017 | Started (LLM done) |
 | `secrets` | `KeyStore` trait with `KeychainStore` (OS keychain, service `sidekick`) and `MemoryStore` (tests, mock mode); keys as `SecretString`; `KeyStatus` exposes only the last 4 characters; account names restricted to `[a-z0-9-]` | Done |
-| `skills` | Load, validate, import and export Skill files | Not started |
+| `skills` | Skill files: Markdown with YAML front matter validated against `schemas/skill.schema.json` (`jsonschema`), field-level errors (`tools[1]: "shell" isn't an allowed tool…`), tool allowlist (`doc_search`, `web_search`, `calculator`), 8,000-character instructions limit; files in `<data>/skills/<id>.md` are the source of truth with the `skills` table as an index; the five built-in templates (`skills/templates/`) seeded on first run; import returns a preview with the requested tools and saves nothing; export writes the file; lossless round trip | Done |
 | `session` | Session lifecycle (draft → live ⇄ paused → ended) and consent rules as pure functions; SQL for `sessions`, `consent_log` and `transcript_segments`; `LiveSession` runs one audio capture + one STT run per allowed stream, falling back to the mic with a warning if system audio is unavailable | Started (T-013) |
 | `consent` | Merged into `session`: consent is part of the session lifecycle (`streams_for(consent)` decides which streams may start) | Merged |
 | `usage` | Count STT minutes and LLM tokens per provider; estimate cost | Not started |
@@ -228,8 +228,8 @@ Each module below is its own crate at `crates/<module>/`, named `sidekick-<modul
 | `notes` | Notes tab: rolling notes (Topics, Decisions, Open questions) rendered as Markdown and updated live from `useNotesStore`; after the session ends, the Summary with decisions and action items (owner, due). Shows "Updating notes…" / "Writing the summary…" and a notice when an update fails (old notes stay) |
 | `library` | Collapsible Documents panel under the session bar: add files (native picker via `tauri-plugin-dialog`, or drop onto the window), add links, live indexing progress, failure reason with Retry, remove. Screenshot strip arrives with T-043 |
 | `settings` | Settings window: provider and model dropdowns per kind (STT, LLM, embeddings, web search), masked key field with show/hide, paste, Save and test, Test connection, Remove; Auto-answer and retention. Opened with `open_settings`; Close hides the window |
-| `skills` | Skill builder, templates, import/export |
-| `orchestrator` | Question detection (rules + fuzzy name matching, 600 ms debounce, Auto vs directed-only) and answering: `AnswerRouter` builds cue and full prompts (stable system rules; context fenced as untrusted data; numbered sources), streams both in parallel (cue on the fast model at low effort), keeps at most 2 questions in flight, answers "not found" without a model call when there's no context, records latency, saves answers with cited sources. The latest screenshot is numbered as the last source and its id is attached to the final user message of the full answer (and of the cue too for capture-and-ask); Rust loads the pixels from the database in `llm_stream`, so images never cross IPC. History never carries images. UI updates batched every 50 ms |
+| `skills` | Settings → Skills: list with on/off, Edit, Export (save dialog), Delete; **New Skill** or start from a template in a no-code builder (name, description, instructions, where it applies, tools with what each one does, cue-then-full or full-only); field-level problems from `check_skill`; **Import…** shows the Skill's requested tools and saves only on "Allow and import". The overlay's session bar has a Skill picker (enabled Skills), and the Switch Skill shortcut cycles them, then none |
+| `orchestrator` | Question detection (rules + fuzzy name matching, 600 ms debounce, Auto vs directed-only) and answering: `AnswerRouter` builds cue and full prompts (stable system rules; context fenced as untrusted data; numbered sources), streams both in parallel (cue on the fast model at low effort), keeps at most 2 questions in flight, answers "not found" without a model call when there's no context, records latency, saves answers with cited sources. The latest screenshot is numbered as the last source and its id is attached to the final user message of the full answer (and of the cue too for capture-and-ask); Rust loads the pixels from the database in `llm_stream`, so images never cross IPC. History never carries images. The session's active Skill applies to a question only if its triggers include the question's source (detected, chat, screenshot) and it's enabled; a `full_only` Skill skips the cue request. UI updates batched every 50 ms |
 | `ipc` | Generated `bindings.ts` (section 5.6), browser mocks (`mock.ts`) that mirror every command, `answerEvents` for answer streams, and window helpers (`currentWindow`, `hideCurrentWindow`). The only module that imports Tauri |
 
 ### 3.3 Key workflow: answering a question
@@ -624,8 +624,11 @@ Commands are request/response calls from the frontend to Rust (`invoke`). All re
 | `whisper_models` / `download_whisper_model` | none / `name` | `WhisperModelEntry[]` (`name`, `sizeMb`, `englishOnly`, `downloaded`) / `()` | Local Whisper models (Settings window); download emits `model-download-progress` and keeps the file only if its checksum matches |
 | `open_settings` | none | `()` | Show and focus the Settings window (overlay only) |
 | `get_settings` / `update_settings` | `patch?` | `Settings` | Read or change preferences. A patch replaces only the sections it names; unknown fields are rejected; `search: null` disables web search; `shortcuts` (the full set) is validated and registered with the OS before it is saved |
-| `list_skills` / `save_skill` / `delete_skill` | `skill?` | `Skill[]` / `Skill` / `()` | Manage Skills |
-| `import_skill` / `export_skill` | `file_path` / `skill_id, file_path` | `Skill` / `()` | Share Skills as files |
+| `list_skills` | none | `SkillEntry[]` (Skill + `enabled`, `builtin`), by name | Skills (overlay and Settings) |
+| `skill_templates` / `check_skill` | none / `skill` | `Skill[]` / `FieldError[]` | Templates for the builder; validate without saving |
+| `save_skill` / `set_skill_enabled` / `delete_skill` | `skill` / `skill_id, enabled` / `skill_id` | `SkillEntry` / `SkillEntry` / `()` | Manage Skills (Settings); deleting clears it from sessions |
+| `import_skill` / `export_skill` | `file_path` / `skill_id, file_path` | `ImportPreview` (`skill`, `requestedTools`, `replacesExisting`) / `()` | Share Skills as files; import saves nothing until the user approves the tools (then `save_skill`) |
+| `set_session_skill` | `session_id, skill_id?` | `Session` | The session's active Skill (overlay picker, Switch Skill shortcut) |
 | `set_overlay` | `opacity?, click_through?, compact?` | `OverlayState` | Overlay appearance |
 | `get_capture_protection` | none | `ProtectionStatus` (`state`: protected / not_guaranteed / unavailable / disabled, plus a one-sentence `reason`) | Whether capture exclusion is active; shown as the shield in the overlay header |
 | `get_usage` | `range` | `UsageSummary` | Minutes, tokens and estimated cost |
@@ -752,6 +755,8 @@ pub trait SearchProvider: Send + Sync {
 ```
 
 ### 5.7 Skill file format
+
+Front matter rules live in [`schemas/skill.schema.json`](../schemas/skill.schema.json): `schema_version` (1), `id` (lowercase letters, digits and dashes; also the file name), `name` (up to 80 characters), optional `description`, `triggers` (`question_detected`, `chat`, `screenshot`; all by default), `tools` (allowlist: `doc_search`, `web_search`, `calculator`), `answer_format` (`cue_then_full` or `full_only`) and `knowledge` (document names). Unknown fields are rejected. The body is the instructions (up to 8,000 characters), added to the system prompt as "Active Skill: <name>".
 
 ```markdown
 ---
@@ -1007,8 +1012,8 @@ Every change goes through a pull request, even as a solo developer, so CI runs a
 
 **A built-in Skill template**
 
-1. Add a Markdown file in `skills/templates/` that validates against `skill.schema.json`.
-2. Add a golden-answer test case for it (section 8.3).
+1. Add a Markdown file in `skills/templates/` that validates against `skill.schema.json`, and list it in `TEMPLATES` in `crates/skills/src/repo.rs` (and `src/ipc/mockSkills.ts`).
+2. Add a golden-answer case in `skills/golden/<id>.json` (question, documents, `mustMention`, `mustNotMention`); the quality eval (section 8.3) scores it against live models.
 
 ### 7.6 Dependency management
 

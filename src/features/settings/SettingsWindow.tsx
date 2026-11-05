@@ -9,6 +9,7 @@ import {
 import { DiagnosticsPanel } from "./DiagnosticsPanel";
 import { ProfileSection } from "./ProfileSection";
 import { ProviderSection } from "./ProviderSection";
+import { SkillsSection } from "@/features/skills";
 import { ShortcutsSection } from "./ShortcutsSection";
 
 const RETENTION_LABELS: Record<Retention, string> = {
@@ -137,6 +138,7 @@ export function SettingsWindow() {
                 ))}
               </select>
             </section>
+            <SkillsSection />
             <ShortcutsSection
               shortcuts={settings.shortcuts}
               onSave={async (shortcuts) => {

@@ -409,6 +409,104 @@ export const commands = {
     }
   },
   /**
+   * All Skills, by name.
+   */
+  async listSkills(): Promise<Result<SkillEntry[], SidekickError>> {
+    try {
+      return { status: "ok", data: await TAURI_INVOKE("list_skills") };
+    } catch (e) {
+      if (e instanceof Error) throw e;
+      else return { status: "error", error: e as any };
+    }
+  },
+  /**
+   * The built-in templates, for "New Skill from template".
+   */
+  async skillTemplates(): Promise<Result<Skill[], SidekickError>> {
+    try {
+      return { status: "ok", data: await TAURI_INVOKE("skill_templates") };
+    } catch (e) {
+      if (e instanceof Error) throw e;
+      else return { status: "error", error: e as any };
+    }
+  },
+  /**
+   * Checks a Skill without saving it: field-level problems for the builder.
+   */
+  async checkSkill(skill: Skill): Promise<FieldError[]> {
+    return await TAURI_INVOKE("check_skill", { skill });
+  },
+  /**
+   * Validates and saves a Skill (new or edited).
+   */
+  async saveSkill(skill: Skill): Promise<Result<SkillEntry, SidekickError>> {
+    try {
+      return { status: "ok", data: await TAURI_INVOKE("save_skill", { skill }) };
+    } catch (e) {
+      if (e instanceof Error) throw e;
+      else return { status: "error", error: e as any };
+    }
+  },
+  async setSkillEnabled(
+    skillId: string,
+    enabled: boolean,
+  ): Promise<Result<SkillEntry, SidekickError>> {
+    try {
+      return { status: "ok", data: await TAURI_INVOKE("set_skill_enabled", { skillId, enabled }) };
+    } catch (e) {
+      if (e instanceof Error) throw e;
+      else return { status: "error", error: e as any };
+    }
+  },
+  async deleteSkill(skillId: string): Promise<Result<null, SidekickError>> {
+    try {
+      return { status: "ok", data: await TAURI_INVOKE("delete_skill", { skillId }) };
+    } catch (e) {
+      if (e instanceof Error) throw e;
+      else return { status: "error", error: e as any };
+    }
+  },
+  /**
+   * Reads a Skill file for import and returns it with the tools it asks for.
+   * Nothing is saved until the user approves (then `save_skill`).
+   */
+  async importSkill(filePath: string): Promise<Result<ImportPreview, SidekickError>> {
+    try {
+      return { status: "ok", data: await TAURI_INVOKE("import_skill", { filePath }) };
+    } catch (e) {
+      if (e instanceof Error) throw e;
+      else return { status: "error", error: e as any };
+    }
+  },
+  /**
+   * Writes a Skill to a file the user picked in the save dialog.
+   */
+  async exportSkill(skillId: string, filePath: string): Promise<Result<null, SidekickError>> {
+    try {
+      return { status: "ok", data: await TAURI_INVOKE("export_skill", { skillId, filePath }) };
+    } catch (e) {
+      if (e instanceof Error) throw e;
+      else return { status: "error", error: e as any };
+    }
+  },
+  /**
+   * Sets the session's active Skill (overlay; the Switch Skill shortcut).
+   */
+  async setSessionSkill(
+    sessionId: string,
+    skillId: string | null,
+  ): Promise<Result<Session, SidekickError>> {
+    try {
+      return {
+        status: "ok",
+        data: await TAURI_INVOKE("set_session_skill", { sessionId, skillId }),
+      };
+    } catch (e) {
+      if (e instanceof Error) throw e;
+      else return { status: "error", error: e as any };
+    }
+  },
+  /**
    * Queues a file for parsing and embedding.
    */
   async ingestDocument(sessionId: string, path: string): Promise<Result<null, SidekickError>> {
@@ -512,6 +610,7 @@ export type ActionItem = {
 };
 export type AnswerDone = { requestId: string; usage: Usage; finishReason: FinishReason };
 export type AnswerError = { requestId: string; error: SidekickError };
+export type AnswerFormat = "cue_then_full" | "full_only";
 export type AnswerToken = { requestId: string; delta: string };
 /**
  * Basic facts about the running app, shown in the overlay and diagnostics.
@@ -645,6 +744,16 @@ export type ErrorCode =
   | "VERSION_CONFLICT"
   | "INTERNAL";
 /**
+ * One problem in a Skill file, for the builder and import dialog.
+ */
+export type FieldError = {
+  /**
+   * `tools[1]`, `name`, `instructions`, or empty for the whole file.
+   */
+  field: string;
+  message: string;
+};
+/**
  * Why generation stopped.
  */
 export type FinishReason =
@@ -660,6 +769,20 @@ export type FinishReason =
  * A global shortcut was pressed (`hotkey.pressed`).
  */
 export type HotkeyPressed = { action: Action };
+/**
+ * What an import would add, shown for approval before saving (tech doc 11.5).
+ */
+export type ImportPreview = {
+  skill: Skill;
+  /**
+   * Tools the Skill asks for; the user approves them by importing.
+   */
+  requestedTools: Tool[];
+  /**
+   * A Skill with this id already exists and would be replaced.
+   */
+  replacesExisting: boolean;
+};
 /**
  * Document ingest progress (`ingest.progress`).
  */
@@ -875,6 +998,10 @@ export type Session = {
    * The consent recorded for this session, if any.
    */
   consent: ConsentOption | null;
+  /**
+   * The active Skill, if any (PRD SKL-1).
+   */
+  skillId: string | null;
 };
 /**
  * A session was created or changed status (`session.state`).
@@ -941,6 +1068,32 @@ export type SettingsPatch = {
  */
 export type SidekickError = { code: ErrorCode; message: string; retryable: boolean };
 /**
+ * A Skill: front matter fields plus the instructions body.
+ */
+export type Skill = {
+  id: string;
+  name: string;
+  description?: string;
+  triggers?: Trigger[];
+  tools?: Tool[];
+  answerFormat?: AnswerFormat;
+  knowledge?: string[];
+  instructions: string;
+};
+/**
+ * A saved Skill and whether it's enabled.
+ */
+export type SkillEntry = {
+  id: string;
+  name: string;
+  description?: string;
+  triggers?: Trigger[];
+  tools?: Tool[];
+  answerFormat?: AnswerFormat;
+  knowledge?: string[];
+  instructions: string;
+} & { enabled: boolean; builtin: boolean };
+/**
  * One citation (`answers.sources_json`, tech doc 4.3).
  */
 export type Source = {
@@ -1000,6 +1153,10 @@ export type SttState = "connecting" | "live" | "reconnecting" | "failed";
  */
 export type SttStatusChanged = { sessionId: string; stream: Stream; state: SttState };
 /**
+ * The tool allowlist (tech doc 11.5). Tool use itself arrives with Agents (T-045).
+ */
+export type Tool = "doc_search" | "web_search" | "calculator";
+/**
  * Everything the Transcript tab needs when it opens (T-014).
  */
 export type Transcript = { lines: TranscriptLine[]; bookmarks: Bookmark[] };
@@ -1030,6 +1187,7 @@ export type TranscriptSegment = {
   startMs: number;
   endMs: number;
 };
+export type Trigger = "question_detected" | "chat" | "screenshot";
 /**
  * Token counts reported by the provider.
  */

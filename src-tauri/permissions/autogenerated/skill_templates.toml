@@ -1,0 +1,11 @@
+# Automatically generated - DO NOT EDIT!
+
+[[permission]]
+identifier = "allow-skill-templates"
+description = "Enables the skill_templates command without any pre-configured scope."
+commands.allow = ["skill_templates"]
+
+[[permission]]
+identifier = "deny-skill-templates"
+description = "Denies the skill_templates command without any pre-configured scope."
+commands.deny = ["skill_templates"]

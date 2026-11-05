@@ -50,6 +50,10 @@ impl AppState {
             .map_err(|_| SidekickError::internal("Couldn't create the app data folder."))?;
         let key = database_key(keys.as_ref())?;
         let db = Database::open(&data_dir.join(DB_FILE_NAME), &key)?;
+        // First run: copy the built-in Skill templates into the Skills folder (tech doc 4.5).
+        if let Err(e) = sidekick_skills::repo::seed(&db, &data_dir.join("skills")) {
+            tracing::warn!(target: "skills", code = ?e.code, "couldn't seed Skill templates");
+        }
         let diagnostics = Arc::new(Recorder::default());
         let mut gateway =
             Gateway::new(Arc::clone(&keys), mock).with_recorder(Arc::clone(&diagnostics));

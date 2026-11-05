@@ -624,3 +624,29 @@ fn summary_saves_with_action_items_and_keeps_notes() {
         .unwrap();
     assert_eq!(left, 0, "action items go with the session");
 }
+
+#[test]
+fn a_session_can_use_a_skill() {
+    let db = db();
+    let s = repo::create(&db, &new("With Skill")).unwrap();
+    assert_eq!(s.skill_id, None);
+    db.conn()
+        .execute(
+            "INSERT INTO skills (id, name, file_path, schema_version, updated_at) VALUES ('coach', 'Coach', 'coach.md', 1, 0)",
+            [],
+        )
+        .unwrap();
+    assert_eq!(
+        repo::set_skill(&db, &s.id, Some("coach"))
+            .unwrap()
+            .skill_id
+            .as_deref(),
+        Some("coach")
+    );
+    assert!(
+        repo::set_skill(&db, &s.id, Some("missing")).is_err(),
+        "foreign key"
+    );
+    assert_eq!(repo::set_skill(&db, &s.id, None).unwrap().skill_id, None);
+    assert!(repo::set_skill(&db, "nope", None).is_err());
+}

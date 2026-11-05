@@ -1,4 +1,4 @@
-import type { ChatMessage, ContextPack } from "@/ipc";
+import type { AnswerFormat, ChatMessage, ContextPack } from "@/ipc";
 
 /** A numbered source the model can cite as [n]. */
 export interface SourceRef {
@@ -11,6 +11,8 @@ export interface SourceRef {
 export interface SkillPrompt {
   name: string;
   instructions: string;
+  /** `full_only` skips the one-line cue. */
+  answerFormat?: AnswerFormat;
 }
 
 export interface PromptInput {

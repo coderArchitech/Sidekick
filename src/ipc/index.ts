@@ -7,7 +7,7 @@ import type { AnswerEvents } from "./answerEvents";
 import { commands as tauriCommands, events as tauriEvents } from "./bindings";
 import { getCurrentWebview } from "@tauri-apps/api/webview";
 import { getCurrentWindow } from "@tauri-apps/api/window";
-import { open } from "@tauri-apps/plugin-dialog";
+import { open, save } from "@tauri-apps/plugin-dialog";
 import {
   mockAnswerBus,
   mockCommands,
@@ -32,6 +32,13 @@ export type { SessionEvents } from "./sessionEvents";
 import type { Unlisten } from "./answerEvents";
 export type {
   ActionItem,
+  AnswerFormat,
+  FieldError,
+  ImportPreview,
+  Skill,
+  SkillEntry,
+  Tool,
+  Trigger,
   AnswerDone,
   AnswerError,
   AnswerToken,
@@ -157,6 +164,22 @@ export async function pickFiles(): Promise<string[]> {
   });
   if (!chosen) return [];
   return Array.isArray(chosen) ? chosen : [chosen];
+}
+
+/** Opens a Skill file to import (Settings window). Null if cancelled. */
+export async function pickSkillFile(): Promise<string | null> {
+  if (!isTauri) return mockFiles.picked.shift() ?? null;
+  const chosen = await open({
+    multiple: false,
+    filters: [{ name: "Skill", extensions: ["md", "markdown"] }],
+  });
+  return typeof chosen === "string" ? chosen : null;
+}
+
+/** Asks where to export a Skill. Null if cancelled. */
+export async function chooseSkillExportPath(defaultName: string): Promise<string | null> {
+  if (!isTauri) return mockFiles.saveAs.shift() ?? null;
+  return save({ defaultPath: defaultName, filters: [{ name: "Skill", extensions: ["md"] }] });
 }
 
 /** Files dropped onto the window. */

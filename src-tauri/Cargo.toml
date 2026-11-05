@@ -36,6 +36,7 @@ tauri-plugin-dialog = "2"
 sidekick-ingest = { workspace = true, features = ["specta"] }
 sidekick-retrieval = { workspace = true, features = ["specta"] }
 sidekick-capture = { workspace = true, features = ["specta"] }
+sidekick-skills = { workspace = true, features = ["specta"] }
 tauri = { version = "2", features = ["macos-private-api"] }
 serde.workspace = true
 serde_json.workspace = true

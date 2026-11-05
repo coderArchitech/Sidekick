@@ -53,15 +53,18 @@ export function AnswerCard({ view }: { view: AnswerView }) {
 
       {(view.body || view.sources.length > 0) && view.body !== view.cue && (
         <>
-          <button
-            type="button"
-            aria-expanded={open}
-            className="mt-1 text-xs text-slate-400 hover:text-slate-200"
-            onClick={() => setOpen((o) => !o)}
-          >
-            {open ? "▾ Hide full answer" : "▸ Full answer"}
-          </button>
-          {open && (
+          {view.cue && (
+            <button
+              type="button"
+              aria-expanded={open}
+              className="mt-1 text-xs text-slate-400 hover:text-slate-200"
+              onClick={() => setOpen((o) => !o)}
+            >
+              {open ? "▾ Hide full answer" : "▸ Full answer"}
+            </button>
+          )}
+          {/* No cue (a full-only Skill): the answer itself is the content. */}
+          {(open || !view.cue) && (
             <div className="mt-1 text-sm text-slate-200">
               <Markdown text={view.body} />
               {view.sources.length > 0 && (

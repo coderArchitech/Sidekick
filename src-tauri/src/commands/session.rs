@@ -29,7 +29,7 @@ pub struct SessionStarted {
     pub warnings: Vec<String>,
 }
 
-fn changed(app: &AppHandle, session: &Session) {
+pub(crate) fn changed(app: &AppHandle, session: &Session) {
     let _ = SessionChanged {
         session: session.clone(),
     }

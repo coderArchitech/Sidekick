@@ -111,4 +111,25 @@ describe("auto-answer shortcut", () => {
     await tick();
     expect(useChatStore.getState().pending).toBeNull();
   });
+
+  it("Switch Skill cycles enabled Skills, then none", async () => {
+    const s = await liveSession();
+    render(<Harness />);
+    await tick();
+    const ids: (string | null)[] = [];
+    for (let i = 0; i < 6; i++) {
+      mockSessionBus.emit("hotkey", { action: "switch_skill" });
+      await tick(40);
+      ids.push(useSessionStore.getState().session?.skillId ?? null);
+    }
+    expect(ids).toEqual([
+      "interview-coach",
+      "negotiation-coach",
+      "sales-discovery",
+      "teacher",
+      "technical-architect",
+      null,
+    ]);
+    expect(s.id).toBeTruthy();
+  });
 });

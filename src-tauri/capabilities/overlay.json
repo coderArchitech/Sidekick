@@ -28,6 +28,8 @@
     "allow-save-answer",
     "allow-rate-answer",
     "allow-list-answers",
+    "allow-list-skills",
+    "allow-set-session-skill",
     "allow-get-notes",
     "allow-save-notes",
     "allow-save-summary",

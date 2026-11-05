@@ -56,7 +56,8 @@ pub fn create(db: &Database, new: &NewSession<'_>) -> SidekickResult<Session> {
 }
 
 const SELECT: &str = "SELECT s.id, s.title, s.status, s.auto_answer, s.created_at, s.started_at, s.ended_at,
-    (SELECT c.option FROM consent_log c WHERE c.session_id = s.id ORDER BY c.confirmed_at DESC, c.rowid DESC LIMIT 1)
+    (SELECT c.option FROM consent_log c WHERE c.session_id = s.id ORDER BY c.confirmed_at DESC, c.rowid DESC LIMIT 1),
+    s.skill_id
     FROM sessions s";
 
 fn from_row(r: &Row<'_>) -> rusqlite::Result<(Session, String, Option<String>)> {
@@ -70,6 +71,7 @@ fn from_row(r: &Row<'_>) -> rusqlite::Result<(Session, String, Option<String>)> 
             started_at: r.get(5)?,
             ended_at: r.get(6)?,
             consent: None,
+            skill_id: r.get(8)?,
         },
         r.get(2)?,
         r.get(7)?,
@@ -340,6 +342,32 @@ pub fn list_bookmarks(db: &Database, session_id: &str) -> SidekickResult<Vec<Boo
         .map_err(|e| db_err("reading bookmarks", &e))?;
     rows.collect::<Result<_, _>>()
         .map_err(|e| db_err("reading bookmarks", &e))
+}
+
+/// Sets or clears the session's active Skill (PRD SKL-1). The Skill must exist.
+pub fn set_skill(
+    db: &Database,
+    session_id: &str,
+    skill_id: Option<&str>,
+) -> SidekickResult<Session> {
+    let n = db
+        .conn()
+        .execute(
+            "UPDATE sessions SET skill_id = ?2 WHERE id = ?1",
+            params![session_id, skill_id],
+        )
+        .map_err(|e| match e {
+            rusqlite::Error::SqliteFailure(f, _)
+                if f.code == rusqlite::ErrorCode::ConstraintViolation =>
+            {
+                SidekickError::internal("That Skill no longer exists.")
+            }
+            e => db_err("updating a session", &e),
+        })?;
+    if n == 0 {
+        return Err(SidekickError::internal("That session no longer exists."));
+    }
+    get(db, session_id)
 }
 
 /// Turns Auto-answer on or off for one session (PRD QA-3).

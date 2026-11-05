@@ -1,5 +1,6 @@
 import { createMockAnswerBus } from "./answerEvents";
 import { createMockSessionBus } from "./sessionEvents";
+import { createSkillStore, TEMPLATES, toMarkdown, validateSkill } from "./mockSkills";
 import type {
   commands as tauriCommands,
   Bookmark,
@@ -75,6 +76,7 @@ const sessions = new Map<string, Session>();
 const transcripts = new Map<string, TranscriptLine[]>();
 const bookmarks = new Map<string, Bookmark[]>();
 const notesBySession = new Map<string, Notes>();
+export const mockSkills = createSkillStore();
 /** Mirrors crates/stt/src/models.rs. */
 const WHISPER_MODELS = [
   { name: "tiny.en", sizeMb: 75, englishOnly: true },
@@ -240,7 +242,7 @@ export const mockProtection: { status: ProtectionStatus } = {
   status: { state: "unavailable", reason: "Running in a browser: no screen-share protection." },
 };
 /** Paths the mock file picker returns next (tests set them). */
-export const mockFiles: { picked: string[] } = { picked: [] };
+export const mockFiles: { picked: string[]; saveAs: string[] } = { picked: [], saveAs: [] };
 /** Browser-demo switches; tests leave them off. */
 export const mockOptions = { demoTranscript: false, ingestStepMs: 5 };
 /** What the mocks were asked to do, for assertions. */
@@ -295,8 +297,10 @@ export function resetMocks(): void {
   documents.clear();
   savedAnswers.length = 0;
   mockFiles.picked = [];
+  mockFiles.saveAs = [];
   bookmarks.clear();
   notesBySession.clear();
+  mockSkills.reset();
   downloadedModels.clear();
   screenshots.length = 0;
   nextLineId = 1;
@@ -453,6 +457,7 @@ export const mockCommands: Commands = {
       startedAt: null,
       endedAt: null,
       consent: null,
+      skillId: null,
     };
     return Promise.resolve(save(session));
   },
@@ -637,6 +642,56 @@ export const mockCommands: Commands = {
     }
     downloadedModels.add(name);
     return { status: "ok", data: null };
+  },
+  listSkills: () => Promise.resolve({ status: "ok", data: mockSkills.list() }),
+  skillTemplates: () => Promise.resolve({ status: "ok", data: structuredClone(TEMPLATES) }),
+  checkSkill: (skill) => Promise.resolve(validateSkill(skill)),
+  saveSkill: (skill) => {
+    const r = mockSkills.save(skill);
+    if (Array.isArray(r))
+      return Promise.resolve(
+        err(
+          "PARSE_FAILED",
+          `This Skill file has problems. ${r.map((e) => `${e.field}: ${e.message}`).join(" ")}`,
+        ),
+      );
+    return Promise.resolve({ status: "ok", data: r });
+  },
+  setSkillEnabled: (id, enabled) => {
+    const s = mockSkills.setEnabled(id, enabled);
+    return Promise.resolve(
+      s ? { status: "ok", data: s } : err("INTERNAL", "That Skill no longer exists."),
+    );
+  },
+  deleteSkill: (id) => {
+    mockSkills.delete(id);
+    for (const s of sessions.values()) if (s.skillId === id) save({ ...s, skillId: null });
+    return Promise.resolve({ status: "ok", data: null });
+  },
+  importSkill: (path) => {
+    const p = mockSkills.preview(path);
+    if (p === null) return Promise.resolve(err("INTERNAL", "Couldn't open that file."));
+    if (Array.isArray(p))
+      return Promise.resolve(
+        err(
+          "PARSE_FAILED",
+          `This Skill file has problems. ${p.map((e) => (e.field ? `${e.field}: ${e.message}` : e.message)).join(" ")}`,
+        ),
+      );
+    return Promise.resolve({ status: "ok", data: p });
+  },
+  exportSkill: (id, path) => {
+    const s = mockSkills.get(id);
+    if (!s) return Promise.resolve(err("INTERNAL", "That Skill no longer exists."));
+    mockSkills.files.set(path, toMarkdown(s));
+    return Promise.resolve({ status: "ok", data: null });
+  },
+  setSessionSkill: (sessionId, skillId) => {
+    const s = sessions.get(sessionId);
+    if (!s) return Promise.resolve(err("INTERNAL", "That session no longer exists."));
+    if (skillId !== null && !mockSkills.has(skillId))
+      return Promise.resolve(err("INTERNAL", "That Skill no longer exists."));
+    return Promise.resolve(save({ ...s, skillId }));
   },
   rateAnswer: (answerId, rating) => {
     const a = savedAnswers.find((x) => x.id === answerId);

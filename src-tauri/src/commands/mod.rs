@@ -11,4 +11,5 @@ pub mod notes;
 pub mod retrieval;
 pub mod session;
 pub mod settings;
+pub mod skills;
 pub mod stt;

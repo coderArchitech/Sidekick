@@ -1,5 +1,6 @@
 import { useEffect, useId, useState } from "react";
 import { sessionEvents } from "@/ipc";
+import { useSkillsStore } from "@/orchestrator";
 import { ConsentDialog } from "./ConsentDialog";
 import { useSessionStore } from "./store";
 
@@ -112,6 +113,7 @@ export function SessionBar() {
           >
             Auto
           </button>
+          <SkillPicker />
           <button type="button" className={button} disabled={busy} onClick={() => void end()}>
             End
           </button>
@@ -137,5 +139,37 @@ export function SessionBar() {
         />
       )}
     </div>
+  );
+}
+
+/** The session's active Skill (PRD SKL-1); the list is managed in Settings. */
+function SkillPicker() {
+  const session = useSessionStore((s) => s.session);
+  const setSkill = useSessionStore((s) => s.setSkill);
+  const busy = useSessionStore((s) => s.busy);
+  const skills = useSkillsStore((s) => s.skills);
+  const load = useSkillsStore((s) => s.load);
+  useEffect(() => {
+    void load();
+  }, [load]);
+  if (!session || session.status === "ended") return null;
+  const enabled = skills.filter((s) => s.enabled || s.id === session.skillId);
+  return (
+    <select
+      aria-label="Skill"
+      title="Skill: how Sidekick answers in this session"
+      className="max-w-32 rounded-md border border-slate-600 bg-slate-950 px-1 py-0.5 text-xs"
+      value={session.skillId ?? ""}
+      disabled={busy}
+      onFocus={() => void load()}
+      onChange={(e) => void setSkill(e.target.value || null)}
+    >
+      <option value="">No Skill</option>
+      {enabled.map((s) => (
+        <option key={s.id} value={s.id}>
+          {s.name}
+        </option>
+      ))}
+    </select>
   );
 }

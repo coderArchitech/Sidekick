@@ -1,0 +1,12 @@
+{
+  "skill": "interview-coach",
+  "question": "Tell me about a time you handled a production outage.",
+  "documents": [
+    {
+      "name": "resume.pdf",
+      "text": "Led the response to a 3-hour payments outage at Acme in 2024: coordinated 6 engineers, rolled back a bad deploy, and introduced canary releases that cut incidents by 40%."
+    }
+  ],
+  "mustMention": ["Situation", "Action", "Result", "canary"],
+  "mustNotMention": ["I don't have"]
+}
