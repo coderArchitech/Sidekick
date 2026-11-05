@@ -41,7 +41,7 @@ The working task list for building Sidekick end to end, derived from the [techni
 | T-006 | Settings storage and commands | 🟡 In progress: testing | Passes locally; waiting for Windows/macOS CI |
 | T-007 | `gateway` crate: LLM provider trait, mock and Anthropic | 🟡 In progress: testing | Passes locally; waiting for Windows/macOS CI |
 | T-008 | Settings window: providers and API keys | 🟡 In progress: testing | Passes locally; waiting for CI and a check in the real app on Windows/macOS |
-| T-009 | `audio` crate: microphone and system audio capture | ⬜ To do | 🖥️ |
+| T-009 | `audio` crate: microphone and system audio capture | 🟡 In progress: testing | 🖥️ Automated tests pass; needs device checks on Windows and macOS 14.6+ (ADR-014) |
 | T-010 | `stt` crate: Deepgram streaming | ⬜ To do | |
 | T-011 | `window` crate: capture exclusion and protection status | ⬜ To do | 🖥️ Highest technical risk |
 | T-012 | `diagnostics` crate: latency metrics and baselines | ⬜ To do | |
@@ -214,16 +214,19 @@ The working task list for building Sidekick end to end, derived from the [techni
 ### T-009 `audio` crate: microphone and system audio capture 🖥️
 
 **Refs:** LIS-1, LIS-4, LIS-6; TECHNICAL.md 3.2, 6.4 (`SIDEKICK_AUDIO_FIXTURE`), NFR-3, NFR-6; ADR-006
-**Scope:** `AudioSource` trait; microphone via cpal; Windows system audio via WASAPI loopback; macOS system audio via ScreenCaptureKit; resample to 16 kHz mono PCM; Silero VAD; WAV fixture source; pause and resume; never writes audio to disk.
+**Scope:** microphone and system audio via cpal 0.18 (WASAPI loopback on Windows, Core Audio tap on macOS 14.6+, ADR-014); resample to 16 kHz mono PCM in 50 ms frames; energy VAD; WAV fixture source; pause, resume, stop; never writes audio to disk.
 
 **Tests**
-- [ ] Unit: resampler converts 48 kHz stereo to 16 kHz mono within tolerance.
-- [ ] Unit: VAD marks speech and silence correctly on fixture audio.
-- [ ] Unit: fixture source streams a WAV file in real time and in fast mode.
-- [ ] Unit: pause stops frames; resume restarts without a gap error.
-- [ ] Integration: no files are created in the data folder during capture (NFR-6).
+- [x] Unit: resampler converts 48 kHz stereo (and 44.1/32/16 kHz) to 16 kHz mono, keeping pitch and level; content above 8 kHz attenuated below -38 dB.
+- [x] Unit: VAD marks silence, speech, and the 300 ms hangover; absorbs steady hum; keeps 10 s of continuous speech as speech.
+- [x] Unit: pipeline emits 800-sample frames with 50 ms timestamps.
+- [x] Integration: fixture source streams a WAV file (fast and real time) with correct speech flags.
+- [x] Integration: pause drops frames (time still passes); resume continues; stop closes the stream.
+- [x] Integration: no files are created during capture (NFR-6).
+- [x] Unit: system audio on Linux reports `PERMISSION_DENIED` clearly.
+- [ ] Manual (Windows, macOS 14.6+): `cargo test -p sidekick-audio -- --ignored` with a mic and audio playing.
 - [ ] Manual (Windows, macOS): mic and system audio captured as separate streams during a Teams, Zoom and Meet call, with no dropouts in the meeting app.
-- [ ] Manual (macOS): clear error and help link when Screen Recording permission is missing (`PERMISSION_DENIED`).
+- [ ] Manual (macOS): clear error when System Audio Recording permission is missing (`PERMISSION_DENIED`), and on macOS 13–14.5.
 
 ### T-010 `stt` crate: Deepgram streaming
 

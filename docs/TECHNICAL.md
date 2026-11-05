@@ -133,7 +133,7 @@ Full requirements with priorities are in the PRD. This table maps each requireme
 
 - No hosted backend: everything runs in the desktop app.
 - Capture exclusion depends on OS behaviour and can't be guaranteed for every capture method (see ADR-007).
-- macOS system audio capture requires macOS 13+ and Screen Recording permission.
+- macOS system audio capture requires macOS 14.6+ and the System Audio Recording permission (ADR-014). On macOS 13.0–14.5, sessions run in "Transcribe me only" mode.
 - Provider rate limits and pricing are outside our control.
 - Single developer at the start, so the design favours simplicity over flexibility.
 
@@ -198,7 +198,7 @@ Each module below is its own crate at `crates/<module>/`, named `sidekick-<modul
 
 | Crate | Responsibility | Status |
 | --- | --- | --- |
-| `audio` | Capture system audio and microphone as separate 16 kHz mono PCM streams; run Silero VAD | Not started |
+| `audio` | Microphone and system audio as separate 16 kHz mono streams of 50 ms frames via cpal (WASAPI loopback on Windows, Core Audio tap on macOS 14.6+); windowed-sinc resampler; energy VAD flag per frame; pause/resume/stop; WAV `FixtureSource` for tests and `SIDEKICK_AUDIO_FIXTURE`; never writes audio (ADR-014) | Done (manual device checks pending) |
 | `stt` | `SttProvider` trait plus adapters (Deepgram, AssemblyAI, Soniox, Whisper); WebSocket lifecycle and reconnects; emit segments | Not started |
 | `capture` | Region, window and full-screen screenshots; downscale and encode | Not started |
 | `window` | Overlay window: transparency, always-on-top, click-through, capture exclusion and its status check | Not started |
@@ -284,7 +284,8 @@ Major versions are fixed here; exact versions are pinned in `Cargo.lock` and `pn
 | Secrets | keyring crate | Current |
 | HTTP and WebSocket | reqwest + tokio-tungstenite | Current |
 | Local STT | whisper.cpp via whisper-rs | Current |
-| VAD | Silero VAD (ONNX) | v5 model |
+| Audio I/O | cpal + hound (WAV fixtures) | cpal 0.18, hound 3 |
+| VAD | Energy VAD with adaptive noise floor (ADR-014); Silero VAD (ONNX) only if measurements need it | n/a |
 | Document parsing | pdf-extract, docx-rs, calamine, zip + quick-xml | Current |
 | IPC types | tauri-specta + specta + specta-typescript | Pinned exactly (`=2.0.0-rc.21`, `=2.0.0-rc.22`, `=0.0.9`) because these are pre-release and must match each other |
 | Logging | tracing + tracing-appender | Current |
@@ -308,6 +309,7 @@ Major versions are fixed here; exact versions are pinned in `Cargo.lock` and `pn
 | ADR-011 | Cargo workspace: one crate per Rust module; `sidekick-core` for shared types; `src-tauri` is a thin shell | One crate with modules | Compiler-enforced boundaries, crates testable without Tauri, faster incremental builds. Trade-off: more `Cargo.toml` files |
 | ADR-012 | Frontend features expose a public `index.ts`; all Rust calls through `@/ipc`; enforced by ESLint | Convention only; eslint-plugin-boundaries | Features can change freely behind their API; UI runs in a browser with mocks. Trade-off: relative cross-feature imports aren't caught, so use the `@/features/<name>` alias |
 | ADR-013 | Embeddings behind their own `EmbeddingProvider`; default OpenAI `text-embedding-3-small`; vector table sized per model | Embed on `LlmProvider`; fixed 1024 dims | Anthropic has no embeddings API; any model can be used without a schema migration. Trade-off: changing model means re-embedding |
+| ADR-014 | Audio capture with cpal (WASAPI loopback, Core Audio tap); macOS system audio needs 14.6+; energy VAD first | ScreenCaptureKit (macOS 13+); Silero VAD now | One tested code path; smaller installer. Trade-off: macOS 13.0–14.5 transcribe the user only |
 
 Each decision has its own file in [`docs/adr/`](adr/README.md). New decisions get the next ADR number (copy [`docs/adr/template.md`](adr/template.md)) and are added here in the same pull request as the code change.
 
@@ -657,7 +659,7 @@ Every error crossing IPC is a `SidekickError` with a stable `code`, a user-facin
 | Code | Meaning | Retryable | UI behaviour |
 | --- | --- | --- | --- |
 | `CONSENT_REQUIRED` | Session started without consent confirmation | No | Show consent dialog |
-| `PERMISSION_DENIED` | Microphone or Screen Recording permission missing | No | Open permission help with a link to OS settings |
+| `PERMISSION_DENIED` | Microphone, System Audio Recording or Screen Recording permission missing, or no device | No | Open permission help with a link to OS settings |
 | `KEY_MISSING` | No key saved for the selected provider | No | Open Settings at that provider |
 | `KEY_INVALID` | Provider rejected the key (401/403) | No | Mark key invalid in Settings |
 | `RATE_LIMITED` | Provider returned 429 | Yes | Retry with backoff; show "busy" hint |
@@ -762,7 +764,7 @@ This section is for developers building Sidekick from source. End-user installat
 **Linux (development and CI only).** Linux isn't a supported target (section 1.2), but the app builds and runs there, which CI and cloud development use. Install the Tauri system libraries first:
 
 ```bash
-sudo apt-get install -y libwebkit2gtk-4.1-dev libgtk-3-dev librsvg2-dev libssl-dev
+sudo apt-get install -y libwebkit2gtk-4.1-dev libgtk-3-dev librsvg2-dev libssl-dev libasound2-dev
 ```
 
 ### 6.2 Local environment setup
@@ -778,7 +780,7 @@ pnpm install
 
 # 3. Fetch Rust dependencies and models
 cargo fetch
-pnpm run models:download     # Silero VAD model; optional Whisper model (added with the audio crate)
+pnpm run models:download     # Optional Whisper model (added with local Whisper, T-027)
 
 # 4. Local config
 cp .env.example .env.local
@@ -787,7 +789,7 @@ cp .env.example .env.local
 pnpm tauri dev
 ```
 
-On first launch, grant Microphone (and on macOS, Screen Recording) permission, then add at least one STT and one LLM key in Settings, or set `SIDEKICK_MOCK_PROVIDERS=1` to work without keys.
+On first launch, grant Microphone (and on macOS, System Audio Recording) permission, then add at least one STT and one LLM key in Settings, or set `SIDEKICK_MOCK_PROVIDERS=1` to work without keys.
 
 ### 6.3 Dependency installation and version pinning
 
@@ -847,7 +849,7 @@ Run from the repository root. Cargo commands apply to the whole workspace.
 | `linker 'link.exe' not found` (Windows) | C++ Build Tools missing | Install "Desktop development with C++" workload |
 | whisper-rs build fails | CMake or Clang missing | Install CMake and LLVM/Clang; restart the terminal |
 | Blank window on Windows 10 | WebView2 runtime missing | Install the WebView2 Evergreen runtime |
-| No system audio on macOS | Screen Recording permission not granted to the dev build | System Settings → Privacy & Security → Screen Recording → enable the terminal or app, then restart it |
+| No system audio on macOS | macOS older than 14.6, or System Audio Recording permission not granted to the dev build | Update macOS; System Settings → Privacy & Security → Screen & System Audio Recording → enable the terminal or app under System Audio Recording, then restart it |
 | Keychain prompts every launch (macOS dev) | Unsigned dev builds get a new identity each build | Click "Always Allow", or sign dev builds with a local certificate |
 | `bindings.ts is out of date` in CI | Command signatures changed | Run `pnpm ipc:gen` and commit |
 | Database locked errors | Two dev instances using the same data folder | Close the other instance or set `SIDEKICK_DATA_DIR` |
@@ -1080,7 +1082,7 @@ All fixtures use invented content; no real meeting recordings or personal data. 
 | Speaker separation is approximate | Speaker labels may merge or split | User can rename and merge speakers |
 | Brute-force vector search | Slows beyond about 100k chunks | Per-session indexes; revisit ADR-004 if needed |
 | Hinglish accuracy varies by provider | Some missed words | Provider choice in Settings; custom vocabulary |
-| macOS requires Screen Recording permission for system audio | Extra setup step | Onboarding walkthrough |
+| macOS needs 14.6+ and the System Audio Recording permission for system audio | Extra setup step; older macOS transcribes the user only | Onboarding walkthrough; ScreenCaptureKit path if needed (ADR-014) |
 
 ## 9. Deployment and release
 
@@ -1211,7 +1213,7 @@ There's no on-call; alerts are in-app notices shown to the user:
 | Symptom | Check | Fix |
 | --- | --- | --- |
 | No transcript at all | Diagnostics: STT state; Settings: key status; OS microphone permission | Re-test key; grant permission; switch provider; check internet |
-| Only my voice transcribed, not others | macOS Screen Recording permission; Windows output device | Grant permission and restart the app; make sure the meeting audio plays through the default output device |
+| Only my voice transcribed, not others | macOS version (14.6+) and System Audio Recording permission; Windows output device | Grant permission and restart the app; make sure the meeting audio plays through the default output device |
 | Overlay visible in screen share | Diagnostics: capture exclusion status; OS version | Update OS; enable auto-hide on share; use second-device mode; report the meeting app and OS version |
 | Answers slow | Diagnostics latency; model chosen; context size | Pick a faster model for cues; reduce attached documents; check provider status page |
 | Answers wrong or uncited | Document status is "ready"; question in transcript is correct | Re-ingest the document; check transcript accuracy; rate the answer down for eval |
@@ -1277,7 +1279,8 @@ Sidekick is single-user, so there is no role matrix. The permission model that m
 | Permission | Why it's needed | When requested |
 | --- | --- | --- |
 | Microphone | Capture the user's voice | First session start |
-| Screen Recording (macOS) | System audio capture and screenshots | First session start or first screenshot |
+| System Audio Recording (macOS 14.6+) | System audio capture | First session start |
+| Screen Recording (macOS) | Screenshots | First screenshot |
 | Keychain access | Store and read API keys and the database key | First key save |
 | Network | Call providers and check updates | Always (no prompt) |
 | File access (dialogs only) | Upload documents, import/export Skills and backups | When the user picks a file |
@@ -1344,7 +1347,7 @@ This is not legal advice; confirm requirements with legal counsel before any pub
 ### 12.1 Install and first run
 
 1. Download the installer for your system (`.exe` or `.msi` for Windows, `.dmg` for macOS) and run it.
-2. Open Sidekick. The onboarding screen asks for Microphone permission, and on macOS, Screen Recording permission. Grant both and restart Sidekick if macOS asks.
+2. Open Sidekick. The onboarding screen asks for Microphone permission, and on macOS, System Audio Recording permission (macOS 14.6 or later). Grant both and restart Sidekick if macOS asks.
 3. Open **Settings → Providers**. Choose a speech-to-text provider (Deepgram is the default), paste your key, and click **Test connection**. Do the same for an LLM provider and pick a model.
 4. Optional: add a web search key (Tavily or Brave).
 
@@ -1403,7 +1406,7 @@ All shortcuts can be changed in Settings → Shortcuts.
 
 **Does Sidekick record audio?** No. Audio is streamed for transcription and not saved.
 
-**Why does it only transcribe me?** On macOS, Screen Recording permission is needed to hear other participants. Also check you didn't choose "Transcribe me only".
+**Why does it only transcribe me?** On macOS, hearing other participants needs macOS 14.6 or later and the System Audio Recording permission. Also check you didn't choose "Transcribe me only".
 
 **How much will it cost?** You pay providers directly for what you use. See Settings → Usage for estimates.
 
@@ -1518,7 +1521,7 @@ Sidekick's own license is to be decided (private repository for now). All depend
 | SQLCipher (community edition) | BSD-style |
 | sqlite-vec | MIT or Apache-2.0 |
 | whisper.cpp and Whisper models | MIT |
-| Silero VAD | MIT |
+| cpal, hound | Apache-2.0 |
 | Tokio, reqwest, rusqlite, keyring (most Rust crates) | MIT or Apache-2.0 |
 | Playwright | Apache-2.0 |
 | WebdriverIO | MIT |
@@ -1546,6 +1549,7 @@ Provider APIs (Deepgram, AssemblyAI, Soniox, Anthropic, OpenAI, Google, Tavily, 
 | Nov 5, 2026 | Cargo workspace, one crate per Rust module | ADR-011 |
 | Nov 5, 2026 | Frontend feature boundaries enforced by lint | ADR-012 |
 | Nov 5, 2026 | Separate embeddings provider; OpenAI text-embedding-3-small default | ADR-013 |
+| Nov 5, 2026 | Audio via cpal; macOS system audio 14.6+; energy VAD first | ADR-014 |
 
 ### 14.6 Open issues
 
