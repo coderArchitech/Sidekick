@@ -9,7 +9,11 @@ use crate::commands;
 
 /// Builds the typed command and event registry.
 pub fn builder() -> Builder<tauri::Wry> {
-    Builder::<tauri::Wry>::new().commands(collect_commands![commands::app::app_info])
+    Builder::<tauri::Wry>::new().commands(collect_commands![
+        commands::app::app_info,
+        commands::settings::get_settings,
+        commands::settings::update_settings,
+    ])
 }
 
 #[cfg(test)]

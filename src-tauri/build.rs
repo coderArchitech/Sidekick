@@ -1,7 +1,7 @@
 //! Declares the app's own IPC commands so each window must be granted them
 //! explicitly in capabilities/*.json (tech doc 5.8). Add new commands here.
 
-const COMMANDS: &[&str] = &["app_info"];
+const COMMANDS: &[&str] = &["app_info", "get_settings", "update_settings"];
 
 fn main() {
     let mut attributes = tauri_build::Attributes::new()

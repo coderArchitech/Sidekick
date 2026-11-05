@@ -3012,11 +3012,15 @@ dependencies = [
  "serde",
  "serde_json",
  "sidekick-core",
+ "sidekick-secrets",
+ "sidekick-settings",
+ "sidekick-store",
  "specta",
  "specta-typescript",
  "tauri",
  "tauri-build",
  "tauri-specta",
+ "tempfile",
  "tracing",
  "tracing-subscriber",
 ]
@@ -3041,6 +3045,19 @@ dependencies = [
  "serde_json",
  "sidekick-core",
  "specta",
+]
+
+[[package]]
+name = "sidekick-settings"
+version = "0.1.0"
+dependencies = [
+ "serde",
+ "serde_json",
+ "sidekick-core",
+ "sidekick-secrets",
+ "sidekick-store",
+ "specta",
+ "tempfile",
 ]
 
 [[package]]

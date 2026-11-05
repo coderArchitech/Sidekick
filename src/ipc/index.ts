@@ -6,7 +6,16 @@
 import { commands as tauriCommands } from "./bindings";
 import { mockCommands } from "./mock";
 
-export type { AppInfo, ErrorCode, Result, SidekickError } from "./bindings";
+export type {
+  AppInfo,
+  ErrorCode,
+  ProviderChoice,
+  Result,
+  Retention,
+  Settings,
+  SettingsPatch,
+  SidekickError,
+} from "./bindings";
 
 export const isTauri = typeof window !== "undefined" && "__TAURI_INTERNALS__" in window;
 

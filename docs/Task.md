@@ -38,7 +38,7 @@ The working task list for building Sidekick end to end, derived from the [techni
 | T-003 | Apply doc fixes P1–P5 | ✅ Done | Applied with recommended defaults; ADR-013 |
 | T-004 | `secrets` crate: OS keychain | 🟡 In progress: testing | Passes locally (incl. real keychain on Linux); waiting for Windows/macOS CI |
 | T-005 | `store` crate: encrypted database and migrations | 🟡 In progress: testing | Passes locally; waiting for Windows/macOS CI |
-| T-006 | Settings storage and commands | ⬜ To do | |
+| T-006 | Settings storage and commands | 🟡 In progress: testing | Passes locally; waiting for Windows/macOS CI |
 | T-007 | `gateway` crate: LLM provider trait, mock and Anthropic | ⬜ To do | |
 | T-008 | Settings window: providers and API keys | ⬜ To do | |
 | T-009 | `audio` crate: microphone and system audio capture | ⬜ To do | 🖥️ |
@@ -167,10 +167,14 @@ The working task list for building Sidekick end to end, derived from the [techni
 **Scope:** Typed `Settings` struct with defaults (Deepgram, Auto-answer on, retention 30 days); stored in the `settings` table; `get_settings` and `update_settings(patch)` commands; settings window capability.
 
 **Tests**
-- [ ] Unit: defaults match TECHNICAL.md 4.5.
-- [ ] Unit: partial patch updates only the given fields; unknown keys rejected.
-- [ ] Integration: settings persist across store reopen.
-- [ ] Unit: capability files grant settings commands to the Settings window only.
+- [x] Unit: defaults match TECHNICAL.md 4.5 and ADR-013.
+- [x] Unit: partial patch updates only the given sections; unknown keys rejected; invalid provider ids rejected.
+- [x] Unit: `search` absent leaves it, `null` clears it; retention uses the documented wire values.
+- [x] Unit: a corrupt stored section falls back to its default.
+- [x] Integration: settings persist across store reopen; app state creates the key and database on first run and reuses them.
+- [x] Unit: capability files grant settings commands to the Settings window only; every declared command is granted to some window.
+- [x] Component: browser mocks mirror the Rust patch rules.
+- [x] Manual: app starts with `SIDEKICK_DATA_DIR` and mock providers, creates and migrates the database.
 
 ### T-007 `gateway` crate: LLM provider trait, mock and Anthropic
 

@@ -205,6 +205,7 @@ Each module below is its own crate at `crates/<module>/`, named `sidekick-<modul
 | `hotkeys` | Register and dispatch global shortcuts | Not started |
 | `ingest` | Parse documents, split into chunks, request embeddings, write to store | Not started |
 | `store` | SQLCipher database (raw 256-bit key from `secrets`), WAL, foreign keys; migrations with pre-migration backups; sqlite-vec registered for every connection; `settings` (raw JSON) and `vectors` (per-model `chunk_vectors`) modules; repository modules added per feature | Done |
+| `settings` | Typed `Settings` (providers and models for STT, LLM, embeddings, search; Auto-answer; retention) with defaults and partial `SettingsPatch` updates; one `settings` row per section; unreadable sections fall back to defaults | Done |
 | `retrieval` | Vector and keyword search over chunks; assemble context packs (transcript window, notes, chunks, screenshot) | Not started |
 | `gateway` | `LlmProvider` and `SearchProvider` traits plus adapters; attach keys; stream tokens; retries and backoff | Not started |
 | `secrets` | `KeyStore` trait with `KeychainStore` (OS keychain, service `sidekick`) and `MemoryStore` (tests, mock mode); keys as `SecretString`; `KeyStatus` exposes only the last 4 characters; account names restricted to `[a-z0-9-]` | Done |
@@ -533,7 +534,7 @@ Foreign keys are enforced (`PRAGMA foreign_keys = ON`), and the database runs in
 | `answers.latency_ms` | INTEGER | Question end to first answer token | `1840` |
 | `consent_log.option` | TEXT | Consent choice made at session start | `participants_agreed` |
 | `usage.cost_estimate_usd` | REAL | Estimated cost using rates in settings | `0.0042` |
-| `settings.key` | TEXT | Setting name | `llm.active_provider` |
+| `settings.key` | TEXT | Section name; the value is that section as JSON | `llm` → `{"provider":"anthropic","model":null}` |
 
 ### 4.4 Retention, archival and deletion
 
@@ -595,7 +596,7 @@ Commands are request/response calls from the frontend to Rust (`invoke`). All re
 | `test_api_key` | `provider` | `KeyStatus` | Re-test a stored key |
 | `delete_api_key` | `provider` | `()` | Remove a key from the keychain |
 | `list_models` | `provider` | `ModelInfo[]` | Models for the model dropdown |
-| `get_settings` / `update_settings` | `patch?` | `Settings` | Read or change preferences |
+| `get_settings` / `update_settings` | `patch?` | `Settings` | Read or change preferences. A patch replaces only the sections it names; unknown fields are rejected; `search: null` disables web search |
 | `list_skills` / `save_skill` / `delete_skill` | `skill?` | `Skill[]` / `Skill` / `()` | Manage Skills |
 | `import_skill` / `export_skill` | `file_path` / `skill_id, file_path` | `Skill` / `()` | Share Skills as files |
 | `set_overlay` | `opacity?, click_through?, compact?` | `OverlayState` | Overlay appearance |

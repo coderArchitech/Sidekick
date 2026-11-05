@@ -14,6 +14,22 @@ export const commands = {
       else return { status: "error", error: e as any };
     }
   },
+  async getSettings(): Promise<Result<Settings, SidekickError>> {
+    try {
+      return { status: "ok", data: await TAURI_INVOKE("get_settings") };
+    } catch (e) {
+      if (e instanceof Error) throw e;
+      else return { status: "error", error: e as any };
+    }
+  },
+  async updateSettings(patch: SettingsPatch): Promise<Result<Settings, SidekickError>> {
+    try {
+      return { status: "ok", data: await TAURI_INVOKE("update_settings", { patch }) };
+    } catch (e) {
+      if (e instanceof Error) throw e;
+      else return { status: "error", error: e as any };
+    }
+  },
 };
 
 /** user-defined events **/
@@ -44,6 +60,52 @@ export type ErrorCode =
   | "DB_ERROR"
   | "CANCELLED"
   | "INTERNAL";
+/**
+ * The active provider and model for one kind of service.
+ */
+export type ProviderChoice = {
+  /**
+   * Provider id, e.g. `deepgram`, `anthropic`, `openai`.
+   */
+  provider: string;
+  /**
+   * Model id, or `None` to use the provider's default.
+   */
+  model: string | null;
+};
+/**
+ * How long session data is kept after a session ends (tech doc 4.4).
+ */
+export type Retention = "session" | "7d" | "30d" | "forever";
+/**
+ * All user settings.
+ */
+export type Settings = {
+  stt: ProviderChoice;
+  llm: ProviderChoice;
+  embeddings: ProviderChoice;
+  /**
+   * Web search is optional; `None` means disabled.
+   */
+  search: ProviderChoice | null;
+  autoAnswer: boolean;
+  retention: Retention;
+};
+/**
+ * A partial update. Only the sections present are replaced; unknown fields are
+ * rejected so typos don't silently do nothing.
+ */
+export type SettingsPatch = {
+  stt?: ProviderChoice | null;
+  llm?: ProviderChoice | null;
+  embeddings?: ProviderChoice | null;
+  /**
+   * Omit to leave unchanged; `null` disables web search.
+   */
+  search?: ProviderChoice | null;
+  autoAnswer?: boolean | null;
+  retention?: Retention | null;
+};
 /**
  * Error returned by every fallible Sidekick function and IPC command.
  *
