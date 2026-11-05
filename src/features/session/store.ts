@@ -12,6 +12,8 @@ interface SessionState {
   pause: () => Promise<void>;
   resume: () => Promise<void>;
   end: () => Promise<void>;
+  /** Auto-answer on/off for this session (QA-3). */
+  toggleAuto: () => Promise<void>;
   /** Clears an ended session so a new one can be created. */
   reset: () => void;
   /** Applies a `session-changed` event for the current session. */
@@ -74,6 +76,13 @@ export const useSessionStore = create<SessionState>((set, get) => {
       if (!id) return;
       const s = await run(() => commands.endSession(id));
       if (s) set({ session: s, warnings: [] });
+    },
+
+    toggleAuto: async () => {
+      const s = get().session;
+      if (!s || s.status === "ended") return;
+      const updated = await run(() => commands.setAutoAnswer(s.id, !s.autoAnswer));
+      if (updated) set({ session: updated });
     },
 
     reset: () => set({ session: null, warnings: [], error: null }),

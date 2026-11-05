@@ -117,7 +117,7 @@ pub const PROVIDERS: &[ProviderInfo] = &[
         Embed,
         "OpenAI",
         true,
-        false,
+        true,
         "https://platform.openai.com/docs",
     ),
     p(

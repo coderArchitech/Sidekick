@@ -1,0 +1,83 @@
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { QuestionDetector, type DetectedQuestion, type SegmentIn } from "./detector";
+
+let id = 0;
+const seg = (text: string, speakerLabel = "speaker_1", isUser = false): SegmentIn => ({
+  id: ++id,
+  speakerLabel,
+  isUser,
+  text,
+  endMs: id * 1000,
+});
+
+describe("QuestionDetector", () => {
+  let found: DetectedQuestion[];
+  let d: QuestionDetector;
+
+  beforeEach(() => {
+    vi.useFakeTimers();
+    found = [];
+    d = new QuestionDetector({ names: ["Nitesh", "Nitu"], onQuestion: (q) => found.push(q) });
+  });
+  afterEach(() => vi.useRealTimers());
+
+  it("waits 600 ms after a segment ends before deciding", () => {
+    d.push(seg("What's the rate limit for the Pro tier?"));
+    vi.advanceTimersByTime(599);
+    expect(found).toHaveLength(0);
+    vi.advanceTimersByTime(1);
+    expect(found).toHaveLength(1);
+    expect(found[0]?.directed).toBe(false);
+  });
+
+  it("merges a question split across segments of the same speaker", () => {
+    d.push(seg("So what's the rate limit"));
+    vi.advanceTimersByTime(300);
+    d.push(seg("for the Pro tier?"));
+    vi.advanceTimersByTime(600);
+    expect(found.map((q) => q.text)).toEqual(["So what's the rate limit for the Pro tier?"]);
+    expect(found[0]?.segmentIds).toHaveLength(2);
+  });
+
+  it("flags directed questions, including misspelled names", () => {
+    d.push(seg("Nitish, can you confirm the SLA?"));
+    vi.advanceTimersByTime(600);
+    expect(found[0]).toMatchObject({ directed: true, matchedName: "Nitesh" });
+  });
+
+  it("ignores statements and the user's own speech", () => {
+    d.push(seg("The rate limit is 600 per minute."));
+    d.push(seg("What should I say?", "me", true));
+    vi.advanceTimersByTime(1000);
+    expect(found).toHaveLength(0);
+  });
+
+  it("the user starting to talk ends the other speaker's turn immediately", () => {
+    d.push(seg("Any blockers on your side?"));
+    d.push(seg("Let me think.", "me", true));
+    expect(found).toHaveLength(1);
+  });
+
+  it("a different speaker ends the previous one's turn", () => {
+    d.push(seg("Can you send the deck?", "speaker_1"));
+    d.push(seg("Yes, I'll do that.", "speaker_2"));
+    expect(found.map((q) => q.speakerLabel)).toEqual(["speaker_1"]);
+  });
+
+  it("finds a question at the end of a longer turn", () => {
+    d.push(seg("Thanks for the overview. Really helpful. And how do refunds work?"));
+    vi.advanceTimersByTime(600);
+    expect(found).toHaveLength(1);
+  });
+
+  it("names can change while running; dispose drops pending work", () => {
+    d.setNames(["Priya"]);
+    d.push(seg("Priya, the numbers for March please."));
+    vi.advanceTimersByTime(600);
+    expect(found[0]?.matchedName).toBe("Priya");
+    d.push(seg("What's next?"));
+    d.dispose();
+    vi.advanceTimersByTime(1000);
+    expect(found).toHaveLength(1);
+  });
+});

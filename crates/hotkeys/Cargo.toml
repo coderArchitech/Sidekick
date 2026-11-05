@@ -1,0 +1,21 @@
+[package]
+name = "sidekick-hotkeys"
+description = "Global shortcut actions, their defaults (tech doc 12.3), and validation: parsing, normalising, and rejecting duplicates. Pure logic; the shell registers them with the OS."
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+publish.workspace = true
+
+[features]
+specta = ["dep:specta"]
+
+[dependencies]
+sidekick-core.workspace = true
+serde.workspace = true
+specta = { workspace = true, optional = true }
+
+[dev-dependencies]
+serde_json.workspace = true
+
+[lints]
+workspace = true

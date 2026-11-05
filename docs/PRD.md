@@ -259,7 +259,7 @@ The question detector and the manual ask both hand the orchestrator a request; i
 | --- | --- |
 | Desktop shell | Tauri 2, with native modules for audio capture and screen-share exclusion |
 | Speech-to-text | Deepgram (default), AssemblyAI or Soniox, chosen in Settings; whisper.cpp for local mode |
-| Question detection | Small fast LLM or fine-tuned classifier on transcript windows, plus name matching |
+| Question detection | Rules plus fuzzy name matching, measured on labelled sets (see TECHNICAL.md 3.2); a small fast model only if real meetings show the need |
 | Embeddings and index | Provider embeddings or local models; SQLite with sqlite-vec, or LanceDB |
 | LLM access | Provider SDKs (Anthropic, OpenAI, Google) and Ollama for local models, behind one router |
 | Web search | Search API (e.g. Brave, Tavily, Bing) exposed as a tool to the model |

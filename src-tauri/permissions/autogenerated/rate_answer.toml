@@ -1,0 +1,11 @@
+# Automatically generated - DO NOT EDIT!
+
+[[permission]]
+identifier = "allow-rate-answer"
+description = "Enables the rate_answer command without any pre-configured scope."
+commands.allow = ["rate_answer"]
+
+[[permission]]
+identifier = "deny-rate-answer"
+description = "Denies the rate_answer command without any pre-configured scope."
+commands.deny = ["rate_answer"]

@@ -122,7 +122,9 @@ impl Database {
         &self.conn
     }
 
-    pub(crate) fn conn_mut(&mut self) -> &mut Connection {
+    /// Mutable connection, for transactions in repository code.
+    #[doc(hidden)]
+    pub fn conn_mut(&mut self) -> &mut Connection {
         &mut self.conn
     }
 }

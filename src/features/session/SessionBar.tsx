@@ -20,6 +20,7 @@ export function SessionBar() {
     end,
     reset,
     applyChange,
+    toggleAuto,
   } = useSessionStore();
   const [title, setTitle] = useState("");
   const [asking, setAsking] = useState(false);
@@ -101,6 +102,16 @@ export function SessionBar() {
               </button>
             </>
           )}
+          <button
+            type="button"
+            className={`${button} ${session.autoAnswer ? "border-emerald-500 text-emerald-300" : ""}`}
+            aria-pressed={session.autoAnswer}
+            title="Auto-answer: on answers every question; off answers only questions that use your name"
+            disabled={busy}
+            onClick={() => void toggleAuto()}
+          >
+            Auto
+          </button>
           <button type="button" className={button} disabled={busy} onClick={() => void end()}>
             End
           </button>

@@ -52,15 +52,15 @@ All Phase 0 code and automated tests are done and green on Linux, Windows and ma
 
 | ID | Task | Status | Notes |
 | --- | --- | --- | --- |
-| T-013 | Sessions and consent | 🟡 In progress: testing | Automated tests pass; real-app run and E2E (T-033) pending |
-| T-014 | Live transcript tab | ⬜ To do | |
-| T-015 | `hotkeys` crate: global shortcuts | ⬜ To do | 🖥️ |
-| T-016 | Profile: name and nicknames | ⬜ To do | |
-| T-017 | `ingest` crate: parse, chunk, embed | ⬜ To do | |
-| T-018 | `retrieval` crate: hybrid search and context packs | ⬜ To do | |
-| T-019 | Library feature: documents in a session | ⬜ To do | |
-| T-020 | Orchestrator: question detection and modes | ⬜ To do | |
-| T-021 | Orchestrator: prompts, Skills, two-tier answers | ⬜ To do | |
+| T-013 | Sessions and consent | 🟡 In progress: testing | Waiting on dependency: E2E needs the WebdriverIO harness (T-033). Everything else done, including a real-app run |
+| T-014 | Live transcript tab | ✅ Done | Verified in the real app with fixture audio |
+| T-015 | `hotkeys` crate: global shortcuts | 🟡 In progress: testing | 🖥️ Waiting on hardware: verified on Linux (X11); needs a check on Windows and macOS. Ask/Screenshot/Auto/Skill actions hook in with T-023/T-025/T-020/T-028 |
+| T-016 | Profile: name and nicknames | ✅ Done | Detection use lands in T-020 |
+| T-017 | `ingest` crate: parse, chunk, embed | 🟡 In progress: testing | Waiting on dependency: image files need a vision model (T-025/T-026); Gemini, Voyage and Ollama embeddings come with T-026. Everything else done |
+| T-018 | `retrieval` crate: hybrid search and context packs | 🟡 In progress: testing | Waiting on dependency: the latest screenshot joins the pack with T-025. Everything else done; 20k-chunk search 8 ms in release |
+| T-019 | Library feature: documents in a session | 🟡 In progress: testing | Waiting on dependency: Playwright drag-and-drop spec comes with the UI suite (T-032); native picker/drop check on Windows/macOS |
+| T-020 | Orchestrator: question detection and modes | ✅ Done | Rules meet the targets on a never-tuned set (95% / 100%); real-meeting check in T-039 |
+| T-021 | Orchestrator: prompts, Skills, two-tier answers | 🟡 In progress: testing | Waiting on dependency: prompts accept a Skill; picking the active Skill comes with T-028. Live-model quality check in T-039 |
 | T-022 | Live Answers tab | ⬜ To do | |
 | T-023 | Chat tab | ⬜ To do | |
 | T-024 | Rolling notes | ⬜ To do | |
@@ -293,7 +293,7 @@ All Phase 0 code and automated tests are done and green on Linux, Windows and ma
 - [x] Integration: lifecycle timestamps (first start kept, end recorded); segments saved and deleted with the session.
 - [x] Integration: pause drops audio and splits the transcript; stop flushes STT.
 - [x] Component: session bar creates, starts, pauses, resumes and ends; consent dialog needs a choice, Cancel/Escape start nothing, focus starts on the first option; errors shown; axe passes.
-- [ ] Manual: real app with `SIDEKICK_MOCK_PROVIDERS=1` and `SIDEKICK_AUDIO_FIXTURE`: start a session, see it go live, end it (transcript UI is T-014).
+- [x] Manual: real app (Linux, Xvfb, driven with xdotool) with `SIDEKICK_MOCK_PROVIDERS=1` and `SIDEKICK_AUDIO_FIXTURE`: created a session, consent dialog shown, went live ("Listening"), ended cleanly; no errors in the log.
 - [ ] E2E: create session → consent → start with fixture audio → transcript appears → end (needs the WebdriverIO harness, T-033).
 
 ### T-014 Live transcript tab
@@ -302,10 +302,12 @@ All Phase 0 code and automated tests are done and green on Linux, Windows and ma
 **Scope:** Transcript feature subscribing to `transcript.partial` and `transcript.segment`; speaker names with rename and merge; partial text replaced by final; listening indicator; bookmarks list.
 
 **Tests**
-- [ ] Component: partial text replaced by final segment.
-- [ ] Component: renaming a speaker updates all their segments.
-- [ ] Component: listening indicator reflects `session.state` and pause.
-- [ ] Unit: token batching every 50 ms (TECHNICAL.md 13.5) keeps render count bounded.
+- [x] Component: saved lines load in time order; partial text replaced by the final segment; other sessions' events ignored.
+- [x] Component: renaming a speaker updates all their lines (and the database); renaming to an existing name merges (Rust test).
+- [x] Component: listening indicator reflects `session.state` and pause.
+- [x] Component: bookmarks added and listed (Rust test covers ordering and labels).
+- [x] Unit: batching every 50 ms keeps flushes to one per interval under a steady stream.
+- [x] Manual: real app with fixture audio and mock STT shows live lines in the Transcript tab.
 
 ### T-015 `hotkeys` crate: global shortcuts 🖥️
 
@@ -313,9 +315,13 @@ All Phase 0 code and automated tests are done and green on Linux, Windows and ma
 **Scope:** Register shortcuts from settings; emit `hotkey.pressed`; conflicts reported; customisable in Settings → Shortcuts.
 
 **Tests**
-- [ ] Unit: default bindings match TECHNICAL.md 12.3 per OS.
-- [ ] Unit: conflicting or invalid bindings rejected with a clear error.
-- [ ] Component: each action handler (show/hide, ask, screenshot, Auto, pause, switch Skill, bookmark) runs on its event.
+- [x] Unit: default bindings match TECHNICAL.md 12.3 (`CmdOrCtrl` = Cmd on macOS, Ctrl on Windows).
+- [x] Unit: invalid bindings (no modifier, two keys, unknown key) and duplicates rejected with a clear error naming both actions; spelling normalised.
+- [x] Unit: settings store the set, invalid patches change nothing.
+- [x] Component: pause/resume and bookmark run on their events; nothing happens without a session; unmount stops listening.
+- [x] Component: Settings → Shortcuts lists, saves, rejects duplicates with a reason, and undoes.
+- [x] Manual (Linux, Xvfb): Ctrl+Shift+P pauses the session and Ctrl+Shift+H hides the overlay while another window has focus.
+- [ ] Ask, Screenshot, Auto-answer and Switch Skill actions: wired when T-023, T-025, T-020 and T-028 land.
 - [ ] Manual: shortcuts work while a meeting app has focus on Windows and macOS.
 
 ### T-016 Profile: name and nicknames
@@ -324,8 +330,9 @@ All Phase 0 code and automated tests are done and green on Linux, Windows and ma
 **Scope:** Settings → Profile; names and nicknames stored in settings; passed to STT as vocabulary boost and to detection.
 
 **Tests**
-- [ ] Component: add, edit and remove nicknames.
-- [ ] Unit: STT config includes the names as keywords.
+- [x] Component: set the name, add (Enter or button), ignore duplicates, remove and save nicknames.
+- [x] Unit: names trimmed, blanks and duplicates removed, limits (10 nicknames, 40 characters), persisted.
+- [x] Integration: every STT stream of a session gets the names as keyterms; Deepgram adds them as `keyterm` parameters (T-010 test).
 
 ### T-017 `ingest` crate: parse, chunk, embed
 
@@ -333,13 +340,16 @@ All Phase 0 code and automated tests are done and green on Linux, Windows and ma
 **Scope:** Parsers for PDF, DOCX, PPTX, XLSX, TXT, MD, images (OCR or vision description), URLs; ~500-token chunks with 50-token overlap and page numbers; duplicate detection by SHA-256; batched embeddings (100 per request, 3 docs in parallel); progress events; `EmbeddingProvider` from T-003.
 
 **Tests**
-- [ ] Unit: each parser extracts text and page numbers from fixture files.
-- [ ] Unit: corrupted file returns `PARSE_FAILED`; unknown type returns `UNSUPPORTED_FILE`.
-- [ ] Unit: chunker sizes, overlap and page attribution.
-- [ ] Unit: same file twice is detected by hash and not re-embedded.
-- [ ] Integration: fixture 50-page PDF ingests end to end in under 30 s with the mock embedder (CTX-3).
-- [ ] Integration: progress events go queued → parsing → embedding → ready.
-- [ ] Integration: deleting a document removes its chunks, vectors and FTS rows.
+- [x] Unit: PDF (pages), DOCX (paragraphs, entities), PPTX (slide numbers), XLSX (sheet rows), text and Markdown parsers, on generated fixture files; web pages to text (scripts, nav and tags removed).
+- [x] Unit: corrupted file returns `PARSE_FAILED`; unknown type and images return `UNSUPPORTED_FILE`; text-less files fail clearly.
+- [x] Unit: chunker sizes (450–500 tokens), overlap (~50 tokens), page attribution, nothing lost.
+- [x] Integration: same file twice in a session is detected by hash and not re-embedded; another session gets its own copy.
+- [x] Integration: 50-page PDF ingests end to end in 0.1 s with the mock embedder (CTX-3 target 30 s); every chunk has a vector and keyword entry; page attribution checked.
+- [x] Integration: progress goes queued → parsing → embedding → ready, percent only rises; failures stored on the document and reported.
+- [x] Integration: deleting a document removes its chunks, vectors and keyword rows.
+- [x] Integration: OpenAI embeddings adapter (order by index, bearer auth, 401, wrong sizes) and the gateway's embedder choice.
+- [ ] Images (OCR or vision description): needs the vision-capable LLM adapters (T-025, T-026).
+- [ ] Gemini, Voyage and Ollama embeddings: with the other providers (T-026).
 
 ### T-018 `retrieval` crate: hybrid search and context packs
 
@@ -347,11 +357,13 @@ All Phase 0 code and automated tests are done and green on Linux, Windows and ma
 **Scope:** Vector and FTS search filtered to the session, merged with reciprocal rank fusion; context pack = last 3 minutes of transcript + notes + top 5 chunks + latest screenshot; retrieval order transcript → documents → web.
 
 **Tests**
-- [ ] Unit: rank fusion ordering on known inputs.
-- [ ] Unit: transcript window trimming to 3 minutes.
-- [ ] Integration: golden queries return the expected chunk in the top 5 on fixture docs.
-- [ ] Integration: results never include another session's documents.
-- [ ] Benchmark: under 50 ms over 20k chunks (TECHNICAL.md 13.2).
+- [x] Unit: rank fusion ordering on known inputs (items in both lists first; deterministic ties).
+- [x] Unit: transcript window trimming to 3 minutes; safe FTS queries (quoted words, stop words and operators dropped).
+- [x] Integration: 5 golden queries return the expected document first (top 5 returned), with vector + keyword and keyword-only.
+- [x] Integration: results never include another session's documents (vector index partitioned by owner; keyword search filtered).
+- [x] Integration: pack carries recent transcript, notes, top-k passages with document name, id and page.
+- [x] Benchmark: 20k chunks, release build: vector search 8 ms (target 50 ms), full context pack 23 ms (budget 100 ms). Debug: 17 / 91 ms.
+- [ ] Latest screenshot in the pack: with T-025.
 
 ### T-019 Library feature: documents in a session
 
@@ -359,9 +371,11 @@ All Phase 0 code and automated tests are done and green on Linux, Windows and ma
 **Scope:** Drag-and-drop and file picker; per-document status and errors; delete; URL input.
 
 **Tests**
-- [ ] Component: dropped files call `ingest_document`; progress events update status.
-- [ ] Component: failed documents show the reason and a retry.
-- [ ] UI: drag and drop with mocked IPC.
+- [x] Component: picked files and files dropped onto the window call `ingest_document`; progress events move them to Ready with a count in the header.
+- [x] Component: failed documents show the reason and a retry; unsupported files are refused with the reason.
+- [x] Component: links added (http/https only, others refused), documents removed.
+- [ ] UI: drag and drop with mocked IPC in Playwright (T-032).
+- [ ] Manual: native file picker and OS drag-and-drop on Windows and macOS.
 
 ### T-020 Orchestrator: question detection and modes
 
@@ -369,11 +383,14 @@ All Phase 0 code and automated tests are done and green on Linux, Windows and ma
 **Scope:** Rules for interrogatives and implicit asks; name and nickname matching (fuzzy, tolerant of STT spelling); optional small-model classifier; Auto vs Directed-only mode with header button and hotkey; manual asks in both modes; early detection on interim results for directed questions.
 
 **Tests**
-- [ ] Unit: labelled fixture set of 200+ utterances; precision ≥ 85%, recall ≥ 80% (PRD success metrics).
-- [ ] Unit: name matching with misspellings and nicknames; no false trigger on similar words.
-- [ ] Unit: Directed-only mode ignores undirected questions; manual asks always answered.
-- [ ] Unit: debounce waits 600 ms after segment end and merges split questions.
-- [ ] Component: Auto button and hotkey toggle mode and persist the session setting.
+- [x] Unit: labelled set of 200 utterances: precision 100%, recall 98%. This set was used to write the rules, so it's optimistic.
+- [x] Unit: held-out round 1 (40 lines) scored 69.6% / 80% on the first rules; its mistakes led to general fixes (trust STT punctuation, narrower request patterns, "is there…"), so it's now tuning data (100% / 100%).
+- [x] Unit: held-out round 2 (40 lines, written after the fixes, never tuned on): precision 95.2%, recall 100%.
+- [x] Unit: name matching with misspellings (edit distance scaled to name length) and nicknames, possessives, multi-word names; no false trigger on similar words.
+- [x] Unit: Directed-only answers only directed questions; Auto answers all. Manual asks (Chat) arrive with T-023 and are always answered.
+- [x] Unit: 600 ms debounce; split questions merged; the user speaking or another speaker ends a turn; question at the end of a longer turn found; the user's own questions ignored.
+- [x] Component: Auto button and hotkey toggle the mode and persist the session setting; detection wired to live transcript events.
+- [ ] Real-meeting precision/recall on recorded fixtures (T-039). A small-model classifier stays optional unless that falls short.
 
 ### T-021 Orchestrator: prompts, Skills, two-tier answers
 
@@ -381,12 +398,16 @@ All Phase 0 code and automated tests are done and green on Linux, Windows and ma
 **Scope:** Prompt builder wrapping retrieved content as untrusted data; active Skill instructions; fast cue model and main model in parallel; citation format; "not found in your docs" fallback; at most 2 questions in flight, newest cancels oldest.
 
 **Tests**
-- [ ] Unit: prompt snapshot tests per answer type (detected, chat, screenshot).
-- [ ] Unit: retrieved text is fenced as untrusted data; injection strings in fixtures don't change instructions.
-- [ ] Unit: citations parsed into `sources_json` (doc page, transcript time, URL).
-- [ ] Unit: empty retrieval produces the not-found answer, never a guess.
-- [ ] Unit: third concurrent question cancels the oldest; cancelled streams emit no further tokens.
-- [ ] Unit: LLM failure leaves transcript and notes running (NFR-5).
+- [x] Unit: prompt structure for cue and full variants: rules in the stable system prompt (cache-friendly), numbered transcript-then-document context, Skill section, chat history. Screenshot prompts come with T-025.
+- [x] Unit: retrieved text is fenced inside `<context>` and declared as data; an injection string stays inside the fence and never reaches the system prompt.
+- [x] Unit: citations `[n]` parsed (first-use order, lists like `[2, 3]`, unknown numbers ignored) into `sources_json` entries (doc page or chunk, transcript time).
+- [x] Unit: empty retrieval answers "Not found in your documents or the meeting so far." without calling a model.
+- [x] Unit: cue (fast model, low effort, 80 tokens) and full answer (main model, medium effort) stream in parallel; latency recorded per stage; answer saved with tokens and model.
+- [x] Unit: a third concurrent question cancels the oldest's streams; its late tokens are ignored; manual cancel works.
+- [x] Unit: a stream that fails shows on that answer only and the router keeps working (NFR-5); a failed cue doesn't sink the full answer; refusals show a neutral note.
+- [x] Integration (mocks): transcript line → detection → router → saved answer.
+- [ ] Active Skill selection: with T-028.
+- [ ] Answer quality with live models: T-039.
 
 ### T-022 Live Answers tab
 

@@ -4,8 +4,12 @@ export {
   mockAnswerBus,
   mockCalls,
   mockSessionBus,
+  mockTranscriptLine,
   mockCommands,
+  mockFiles,
+  mockOptions,
   mockProtection,
   mockWindowCalls,
   resetMocks,
+  savedAnswers,
 } from "./mock";

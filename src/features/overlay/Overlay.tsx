@@ -1,7 +1,11 @@
 import { useEffect, useState } from "react";
-import { SessionBar } from "@/features/session";
+import { Library } from "@/features/library";
+import { SessionBar, useSessionStore } from "@/features/session";
+import { TranscriptView } from "@/features/transcript";
 import { commands, type AppInfo } from "@/ipc";
+import { useAnswering, useQuestionDetection } from "@/orchestrator";
 import { ProtectionShield } from "./ProtectionShield";
+import { useHotkeyActions } from "./useHotkeyActions";
 import { MAX_OPACITY, MIN_OPACITY, TABS, useOverlayStore, type Tab } from "./store";
 
 const TAB_LABELS: Record<Tab, string> = {
@@ -15,6 +19,10 @@ const TAB_LABELS: Record<Tab, string> = {
 export function Overlay() {
   const { tab, opacity, setTab, setOpacity } = useOverlayStore();
   const [info, setInfo] = useState<AppInfo | null>(null);
+  useHotkeyActions();
+  const session = useSessionStore((s) => s.session);
+  useQuestionDetection(session);
+  useAnswering(session);
 
   useEffect(() => {
     void commands.appInfo().then((result) => {
@@ -56,6 +64,7 @@ export function Overlay() {
       </header>
 
       <SessionBar />
+      <Library />
 
       <div role="tablist" aria-label="Sidekick views" className="flex border-b border-slate-700">
         {TABS.map((id) => (
@@ -79,7 +88,7 @@ export function Overlay() {
         aria-labelledby={`tab-${tab}`}
         className="flex-1 overflow-auto p-3 text-sm text-slate-300"
       >
-        {TAB_LABELS[tab]} will appear here.
+        {tab === "transcript" ? <TranscriptView /> : `${TAB_LABELS[tab]} will appear here.`}
       </section>
     </div>
   );

@@ -384,3 +384,101 @@ async fn mock_mode_answers_without_keys() {
             .all(|p| p.info.implemented)
     );
 }
+
+mod openai_embeddings {
+    use super::*;
+    use sidekick_core::embed::EmbeddingProvider;
+    use sidekick_gateway::providers::openai::OpenAiEmbedder;
+    use wiremock::matchers::body_partial_json;
+
+    fn vector(n: f32) -> Vec<f32> {
+        vec![n; 1536]
+    }
+
+    #[tokio::test]
+    async fn embeds_in_input_order_with_bearer_auth() {
+        let server = MockServer::start().await;
+        Mock::given(method("POST"))
+            .and(path("/v1/embeddings"))
+            .and(header("authorization", "Bearer sk-openai-1"))
+            .and(body_partial_json(serde_json::json!({ "model": "text-embedding-3-small", "input": ["a", "b"] })))
+            .respond_with(ResponseTemplate::new(200).set_body_json(serde_json::json!({
+                // Out of order on purpose: the adapter must sort by index.
+                "data": [ { "index": 1, "embedding": vector(2.0) }, { "index": 0, "embedding": vector(1.0) } ]
+            })))
+            .mount(&server)
+            .await;
+        let e = OpenAiEmbedder::new(server.uri(), "text-embedding-3-small").unwrap();
+        let out = e
+            .embed(
+                &["a".into(), "b".into()],
+                Some(&SecretString::from("sk-openai-1".to_owned())),
+            )
+            .await
+            .unwrap();
+        assert_eq!(out.len(), 2);
+        assert!((out[0][0] - 1.0).abs() < f32::EPSILON && (out[1][0] - 2.0).abs() < f32::EPSILON);
+        assert_eq!(e.dims(), 1536);
+    }
+
+    #[tokio::test]
+    async fn maps_errors_and_rejects_wrong_counts() {
+        let server = MockServer::start().await;
+        Mock::given(path("/v1/embeddings"))
+            .and(header("authorization", "Bearer bad"))
+            .respond_with(ResponseTemplate::new(401))
+            .mount(&server)
+            .await;
+        Mock::given(path("/v1/embeddings"))
+            .respond_with(ResponseTemplate::new(200).set_body_json(
+                serde_json::json!({ "data": [ { "index": 0, "embedding": [0.1, 0.2] } ] }),
+            ))
+            .mount(&server)
+            .await;
+        let e = OpenAiEmbedder::new(server.uri(), "text-embedding-3-small").unwrap();
+        let bad = e
+            .embed(&["a".into()], Some(&SecretString::from("bad".to_owned())))
+            .await
+            .unwrap_err();
+        assert_eq!(bad.code, ErrorCode::KeyInvalid);
+        let short = e
+            .embed(&["a".into()], Some(&SecretString::from("ok".to_owned())))
+            .await
+            .unwrap_err();
+        assert_eq!(
+            short.code,
+            ErrorCode::ProviderUnavailable,
+            "wrong vector size"
+        );
+        assert_eq!(
+            e.embed(&["a".into()], None).await.unwrap_err().code,
+            ErrorCode::KeyMissing
+        );
+        assert!(
+            e.embed(&[], Some(&SecretString::from("x".to_owned())))
+                .await
+                .unwrap()
+                .is_empty()
+        );
+    }
+
+    #[tokio::test]
+    async fn gateway_picks_the_embedder_and_key() {
+        let keys: Arc<dyn KeyStore> = Arc::new(MemoryStore::default());
+        let gw = Gateway::new(keys.clone(), false);
+        assert_eq!(
+            gw.embedder("openai", None).err().unwrap().code,
+            ErrorCode::KeyMissing
+        );
+        keys.set("openai", &SecretString::from("sk".to_owned()))
+            .unwrap();
+        let (e, key) = gw.embedder("openai", None).unwrap();
+        assert_eq!(
+            (e.id(), e.model(), key.is_some()),
+            ("openai", "text-embedding-3-small", true)
+        );
+        assert!(gw.embedder("voyage", None).is_err(), "not built yet");
+        let (mock, key) = Gateway::new(keys, true).embedder("openai", None).unwrap();
+        assert_eq!((mock.id(), key.is_none()), ("mock", true));
+    }
+}

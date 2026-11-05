@@ -196,6 +196,130 @@ export const commands = {
       else return { status: "error", error: e as any };
     }
   },
+  async getTranscript(sessionId: string): Promise<Result<Transcript, SidekickError>> {
+    try {
+      return { status: "ok", data: await TAURI_INVOKE("get_transcript", { sessionId }) };
+    } catch (e) {
+      if (e instanceof Error) throw e;
+      else return { status: "error", error: e as any };
+    }
+  },
+  /**
+   * Renames (or, if the name exists, merges) a speaker across the session.
+   */
+  async renameSpeaker(
+    sessionId: string,
+    from: string,
+    to: string,
+  ): Promise<Result<number, SidekickError>> {
+    try {
+      return { status: "ok", data: await TAURI_INVOKE("rename_speaker", { sessionId, from, to }) };
+    } catch (e) {
+      if (e instanceof Error) throw e;
+      else return { status: "error", error: e as any };
+    }
+  },
+  /**
+   * Marks a moment; `at_ms` is milliseconds from session start.
+   */
+  async addBookmark(
+    sessionId: string,
+    atMs: number,
+    label: string | null,
+  ): Promise<Result<Bookmark, SidekickError>> {
+    try {
+      return { status: "ok", data: await TAURI_INVOKE("add_bookmark", { sessionId, atMs, label }) };
+    } catch (e) {
+      if (e instanceof Error) throw e;
+      else return { status: "error", error: e as any };
+    }
+  },
+  /**
+   * Auto-answer on/off for the session (PRD QA-3: header button and hotkey).
+   */
+  async setAutoAnswer(sessionId: string, on: boolean): Promise<Result<Session, SidekickError>> {
+    try {
+      return { status: "ok", data: await TAURI_INVOKE("set_auto_answer", { sessionId, on }) };
+    } catch (e) {
+      if (e instanceof Error) throw e;
+      else return { status: "error", error: e as any };
+    }
+  },
+  /**
+   * Saves a finished answer with its question (tech doc 5.1 `save_answer`).
+   */
+  async saveAnswer(answer: NewAnswer): Promise<Result<string, SidekickError>> {
+    try {
+      return { status: "ok", data: await TAURI_INVOKE("save_answer", { answer }) };
+    } catch (e) {
+      if (e instanceof Error) throw e;
+      else return { status: "error", error: e as any };
+    }
+  },
+  /**
+   * Thumbs up (1) / down (-1) / clear (0).
+   */
+  async rateAnswer(answerId: string, rating: number): Promise<Result<null, SidekickError>> {
+    try {
+      return { status: "ok", data: await TAURI_INVOKE("rate_answer", { answerId, rating }) };
+    } catch (e) {
+      if (e instanceof Error) throw e;
+      else return { status: "error", error: e as any };
+    }
+  },
+  /**
+   * Queues a file for parsing and embedding.
+   */
+  async ingestDocument(sessionId: string, path: string): Promise<Result<null, SidekickError>> {
+    try {
+      return { status: "ok", data: await TAURI_INVOKE("ingest_document", { sessionId, path }) };
+    } catch (e) {
+      if (e instanceof Error) throw e;
+      else return { status: "error", error: e as any };
+    }
+  },
+  /**
+   * Queues a web page (http/https) for ingest.
+   */
+  async ingestUrl(sessionId: string, url: string): Promise<Result<null, SidekickError>> {
+    try {
+      return { status: "ok", data: await TAURI_INVOKE("ingest_url", { sessionId, url }) };
+    } catch (e) {
+      if (e instanceof Error) throw e;
+      else return { status: "error", error: e as any };
+    }
+  },
+  async listDocuments(sessionId: string): Promise<Result<DocumentInfo[], SidekickError>> {
+    try {
+      return { status: "ok", data: await TAURI_INVOKE("list_documents", { sessionId }) };
+    } catch (e) {
+      if (e instanceof Error) throw e;
+      else return { status: "error", error: e as any };
+    }
+  },
+  async deleteDocument(documentId: string): Promise<Result<null, SidekickError>> {
+    try {
+      return { status: "ok", data: await TAURI_INVOKE("delete_document", { documentId }) };
+    } catch (e) {
+      if (e instanceof Error) throw e;
+      else return { status: "error", error: e as any };
+    }
+  },
+  async retrieveContext(
+    sessionId: string,
+    query: string,
+    options: ContextOptions | null,
+  ): Promise<Result<ContextPack, SidekickError>> {
+    try {
+      return {
+        status: "ok",
+        data: await TAURI_INVOKE("retrieve_context", { sessionId, query, options }),
+      };
+    } catch (e) {
+      if (e instanceof Error) throw e;
+      else return { status: "error", error: e as any };
+    }
+  },
 };
 
 /** user-defined events **/
@@ -204,6 +328,8 @@ export const events = __makeEvents__<{
   answerDone: AnswerDone;
   answerError: AnswerError;
   answerToken: AnswerToken;
+  hotkeyPressed: HotkeyPressed;
+  ingestProgress: IngestProgress;
   sessionChanged: SessionChanged;
   sttStatusChanged: SttStatusChanged;
   transcriptPartial: TranscriptPartial;
@@ -212,6 +338,8 @@ export const events = __makeEvents__<{
   answerDone: "answer-done",
   answerError: "answer-error",
   answerToken: "answer-token",
+  hotkeyPressed: "hotkey-pressed",
+  ingestProgress: "ingest-progress",
   sessionChanged: "session-changed",
   sttStatusChanged: "stt-status-changed",
   transcriptPartial: "transcript-partial",
@@ -222,6 +350,11 @@ export const events = __makeEvents__<{
 
 /** user-defined types **/
 
+/**
+ * What a shortcut does.
+ */
+export type Action =
+  "show_hide" | "ask" | "screenshot" | "auto_answer" | "pause_resume" | "switch_skill" | "bookmark";
 export type AnswerDone = { requestId: string; usage: Usage; finishReason: FinishReason };
 export type AnswerError = { requestId: string; error: SidekickError };
 export type AnswerToken = { requestId: string; delta: string };
@@ -229,6 +362,14 @@ export type AnswerToken = { requestId: string; delta: string };
  * Basic facts about the running app, shown in the overlay and diagnostics.
  */
 export type AppInfo = { name: string; version: string; os: string };
+/**
+ * One action and its key combination.
+ */
+export type Binding = { action: Action; keys: string };
+/**
+ * A moment the user marked (PRD 5 "Bookmarks").
+ */
+export type Bookmark = { id: string; atMs: number; label: string | null };
 /**
  * One turn of the conversation. Text only for now; images arrive with screenshots (T-025).
  */
@@ -245,11 +386,53 @@ export type ConsentOption =
    * "Transcribe me only": the microphone only, never other participants.
    */
   | "me_only";
+/**
+ * A document passage with what a citation needs.
+ */
+export type ContextChunk = {
+  chunkId: number;
+  documentId: string;
+  documentName: string;
+  page: number | null;
+  text: string;
+};
+/**
+ * How much context to gather (tech doc 13.5: last 3 minutes, top 5 chunks).
+ */
+export type ContextOptions = { windowMs: number; topK: number };
+export type ContextPack = {
+  /**
+   * The most recent `window_ms` of transcript, in time order.
+   */
+  transcript: TranscriptLine[];
+  /**
+   * Rolling notes (filled by T-024).
+   */
+  notes: string | null;
+  /**
+   * Best document passages, best first.
+   */
+  chunks: ContextChunk[];
+};
 export type Diagnostics = {
   appVersion: string;
   os: string;
   protection: ProtectionStatus;
   stages: StageStats[];
+};
+export type DocStatus = "queued" | "parsing" | "embedding" | "ready" | "failed";
+/**
+ * A document as the Library shows it.
+ */
+export type DocumentInfo = {
+  id: string;
+  name: string;
+  status: DocStatus;
+  pageCount: number | null;
+  chunkCount: number;
+  sizeBytes: number;
+  error: string | null;
+  createdAt: number;
 };
 /**
  * How hard the model should think. Lower is faster and cheaper.
@@ -286,6 +469,22 @@ export type FinishReason =
   | "tool_use"
   | "other";
 /**
+ * A global shortcut was pressed (`hotkey.pressed`).
+ */
+export type HotkeyPressed = { action: Action };
+/**
+ * Document ingest progress (`ingest.progress`).
+ */
+export type IngestProgress = {
+  documentId: string;
+  status: DocStatus;
+  /**
+   * 0–100.
+   */
+  percent: number;
+  error: string | null;
+};
+/**
  * Result of saving or testing a key.
  */
 export type KeyCheck = {
@@ -320,6 +519,31 @@ export type LlmRequest = {
  * A model the user can pick.
  */
 export type ModelInfo = { id: string; displayName: string };
+/**
+ * A finished answer to save.
+ */
+export type NewAnswer = {
+  sessionId: string;
+  question: string;
+  source: QuestionSource;
+  directed: boolean;
+  /**
+   * The transcript segment the question came from, if detected.
+   */
+  segmentId: number | null;
+  cue: string | null;
+  bodyMd: string;
+  sources: Source[];
+  provider: string;
+  model: string;
+  latencyMs: number;
+  inputTokens: number | null;
+  outputTokens: number | null;
+};
+/**
+ * Who the user is, for directed questions and STT boosts (PRD QA-2, LIS-5a).
+ */
+export type Profile = { name: string; nicknames: string[] };
 export type ProtectionState =
   /**
    * The OS hides the overlay from screen sharing and recordings (green shield).
@@ -369,6 +593,10 @@ export type ProviderEntry = {
   docsUrl: string;
 } & { key: KeyStatus };
 export type ProviderKind = "stt" | "llm" | "embed" | "search";
+/**
+ * Where a question came from (`questions.source`).
+ */
+export type QuestionSource = "detected" | "chat" | "screenshot";
 /**
  * How long session data is kept after a session ends (tech doc 4.4).
  */
@@ -428,6 +656,11 @@ export type Settings = {
   search: ProviderChoice | null;
   autoAnswer: boolean;
   retention: Retention;
+  /**
+   * Global shortcuts, one per action (tech doc 12.3).
+   */
+  shortcuts: Binding[];
+  profile: Profile;
 };
 /**
  * A partial update. Only the sections present are replaced; unknown fields are
@@ -443,6 +676,11 @@ export type SettingsPatch = {
   search?: ProviderChoice | null;
   autoAnswer?: boolean | null;
   retention?: Retention | null;
+  /**
+   * The full set of shortcuts; validated (every action once, no duplicates).
+   */
+  shortcuts?: Binding[] | null;
+  profile?: Profile | null;
 };
 /**
  * Error returned by every fallible Sidekick function and IPC command.
@@ -450,6 +688,20 @@ export type SettingsPatch = {
  * `message` is user-facing and must never contain API keys or meeting content.
  */
 export type SidekickError = { code: ErrorCode; message: string; retryable: boolean };
+/**
+ * One citation (`answers.sources_json`, tech doc 4.3).
+ */
+export type Source = {
+  /**
+   * `doc`, `transcript`, `url` or `screenshot`.
+   */
+  type: string;
+  /**
+   * e.g. `<document id>#p14`, `t:754000`, a URL.
+   */
+  ref: string;
+  label: string;
+};
 /**
  * Measured stages. Targets come from tech doc 10.1 and 13.1.
  */
@@ -495,6 +747,21 @@ export type SttState = "connecting" | "live" | "reconnecting" | "failed";
  * STT connection changes (`stt.status`).
  */
 export type SttStatusChanged = { sessionId: string; stream: Stream; state: SttState };
+/**
+ * Everything the Transcript tab needs when it opens (T-014).
+ */
+export type Transcript = { lines: TranscriptLine[]; bookmarks: Bookmark[] };
+/**
+ * A saved transcript line, as the UI shows it.
+ */
+export type TranscriptLine = {
+  id: number;
+  speakerLabel: string;
+  isUser: boolean;
+  text: string;
+  startMs: number;
+  endMs: number;
+};
 /**
  * Interim text, replaced by the next partial or a segment (`transcript.partial`).
  */

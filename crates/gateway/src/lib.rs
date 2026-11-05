@@ -13,6 +13,7 @@ use std::collections::HashMap;
 use std::sync::Arc;
 
 use serde::Serialize;
+use sidekick_core::embed::EmbeddingProvider;
 use sidekick_core::keys::KeyVerifier;
 use sidekick_core::llm::{LlmProvider, LlmRequest, ModelInfo};
 use sidekick_core::{ErrorCode, SidekickError, SidekickResult};
@@ -49,6 +50,7 @@ pub struct Gateway {
     /// Key checks for non-LLM providers (STT, embeddings, search).
     verifiers: HashMap<&'static str, Arc<dyn KeyVerifier>>,
     keys: Arc<dyn KeyStore>,
+    openai_base_url: Option<String>,
     policy: RetryPolicy,
     streams: StreamManager,
     mock: bool,
@@ -73,6 +75,7 @@ impl Gateway {
             llms,
             verifiers: HashMap::new(),
             keys,
+            openai_base_url: None,
             policy: RetryPolicy::default(),
             streams: StreamManager::default(),
             mock,
@@ -184,6 +187,50 @@ impl Gateway {
         self.streams
             .start(request_id, llm, req, key, self.policy.clone(), sink);
         Ok(())
+    }
+
+    /// The embedding provider for `provider`/`model` and its key (ADR-013).
+    /// Mock mode always uses the local mock embedder.
+    pub fn embedder(
+        &self,
+        provider: &str,
+        model: Option<&str>,
+    ) -> SidekickResult<(Arc<dyn EmbeddingProvider>, Option<SecretString>)> {
+        if self.mock {
+            return Ok((Arc::new(providers::mock_embed::MockEmbedder), None));
+        }
+        match provider {
+            "openai" => {
+                let model = model.unwrap_or(providers::openai::DEFAULT_EMBED_MODEL);
+                let e = providers::openai::OpenAiEmbedder::new(
+                    self.openai_base_url
+                        .as_deref()
+                        .unwrap_or(providers::openai::DEFAULT_BASE_URL),
+                    model,
+                )?;
+                Ok((
+                    Arc::new(e),
+                    Some(
+                        self.keys
+                            .get("openai")?
+                            .ok_or_else(|| key_missing("openai"))?,
+                    ),
+                ))
+            }
+            other => Err(SidekickError::new(
+                ErrorCode::Internal,
+                format!(
+                    "Document search with {other} isn't available yet. Choose OpenAI under Document search in Settings."
+                ),
+            )),
+        }
+    }
+
+    /// Points OpenAI calls at another URL (tests).
+    #[must_use]
+    pub fn with_openai_base_url(mut self, url: impl Into<String>) -> Self {
+        self.openai_base_url = Some(url.into());
+        self
     }
 
     /// Cancels a stream (`cancel_stream`). Returns false if it had already finished.

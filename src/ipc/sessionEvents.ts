@@ -3,6 +3,8 @@
  * features don't depend on Tauri's event API and tests can emit them directly.
  */
 import type {
+  HotkeyPressed,
+  IngestProgress,
   SessionChanged,
   SttStatusChanged,
   TranscriptPartial,
@@ -15,6 +17,12 @@ export interface SessionEvents {
   onTranscriptPartial(cb: (e: TranscriptPartial) => void): Promise<Unlisten>;
   onTranscriptSegment(cb: (e: TranscriptSegment) => void): Promise<Unlisten>;
   onSttStatus(cb: (e: SttStatusChanged) => void): Promise<Unlisten>;
+  /** A global shortcut was pressed (registered by the Rust shell). */
+  onHotkey(cb: (e: HotkeyPressed) => void): Promise<Unlisten>;
+  /** Document ingest progress (tech doc 5.2 `ingest.progress`). */
+  onIngestProgress(cb: (e: IngestProgress) => void): Promise<Unlisten>;
+  /** Mock only: files dropped onto the window (Tauri uses the webview's drop event). */
+  onFileDrop(cb: (paths: string[]) => void): Promise<Unlisten>;
 }
 
 type Payloads = {
@@ -22,6 +30,9 @@ type Payloads = {
   partial: TranscriptPartial;
   segment: TranscriptSegment;
   stt: SttStatusChanged;
+  hotkey: HotkeyPressed;
+  ingest: IngestProgress;
+  drop: string[];
 };
 
 /** In-memory event bus used by the browser mocks and tests. */
@@ -31,6 +42,9 @@ export function createMockSessionBus() {
     partial: new Set(),
     segment: new Set(),
     stt: new Set(),
+    hotkey: new Set(),
+    ingest: new Set(),
+    drop: new Set(),
   };
   function on<K extends keyof Payloads>(kind: K, cb: (e: Payloads[K]) => void): Promise<Unlisten> {
     handlers[kind].add(cb);
@@ -46,6 +60,9 @@ export function createMockSessionBus() {
     onTranscriptPartial: (cb) => on("partial", cb),
     onTranscriptSegment: (cb) => on("segment", cb),
     onSttStatus: (cb) => on("stt", cb),
+    onHotkey: (cb) => on("hotkey", cb),
+    onIngestProgress: (cb) => on("ingest", cb),
+    onFileDrop: (cb) => on("drop", cb),
   };
   return { events, emit };
 }

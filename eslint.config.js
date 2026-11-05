@@ -12,6 +12,10 @@ const boundaries = {
       message: "Import another feature only through its public index: '@/features/<name>'.",
     },
     {
+      group: ["@/orchestrator/*"],
+      message: "Import the orchestrator only through '@/orchestrator'.",
+    },
+    {
       group: ["@/ipc/*", "!@/ipc/testing", "**/ipc/bindings", "**/ipc/mock"],
       message: "Import IPC only through '@/ipc' (tests may also use '@/ipc/testing').",
     },

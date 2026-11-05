@@ -33,6 +33,17 @@ pub fn builder() -> Builder<tauri::Wry> {
             commands::session::end_session,
             commands::session::delete_session,
             commands::session::list_sessions,
+            commands::session::get_transcript,
+            commands::session::rename_speaker,
+            commands::session::add_bookmark,
+            commands::session::set_auto_answer,
+            commands::session::save_answer,
+            commands::session::rate_answer,
+            commands::documents::ingest_document,
+            commands::documents::ingest_url,
+            commands::documents::list_documents,
+            commands::documents::delete_document,
+            commands::retrieval::retrieve_context,
         ])
         .events(collect_events![
             events::AnswerToken,
@@ -42,6 +53,8 @@ pub fn builder() -> Builder<tauri::Wry> {
             events::TranscriptPartial,
             events::TranscriptSegment,
             events::SttStatusChanged,
+            events::HotkeyPressed,
+            events::IngestProgress,
         ])
 }
 

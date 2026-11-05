@@ -347,3 +347,177 @@ async fn pause_and_resume_reach_the_capture() {
         "gap where the pause was: {segs:?}"
     );
 }
+
+#[test]
+fn transcript_lines_rename_merge_and_bookmarks() {
+    let db = db();
+    let s = repo::create(&db, &new("Design review")).unwrap();
+    let seg = |label: &str, start: u64, text: &str| Segment {
+        speaker_label: label.into(),
+        is_user: label == "me",
+        text: text.into(),
+        start_ms: start,
+        end_ms: start + 500,
+        confidence: None,
+    };
+    repo::insert_segment(&db, &s.id, &seg("speaker_2", 2_000, "Second")).unwrap();
+    repo::insert_segment(&db, &s.id, &seg("speaker_1", 1_000, "First")).unwrap();
+    repo::insert_segment(&db, &s.id, &seg("me", 3_000, "Mine")).unwrap();
+    repo::insert_segment(&db, &s.id, &seg("speaker_1", 4_000, "Again")).unwrap();
+
+    let lines = repo::list_segments(&db, &s.id).unwrap();
+    assert_eq!(
+        lines.iter().map(|l| l.text.as_str()).collect::<Vec<_>>(),
+        ["First", "Second", "Mine", "Again"],
+        "time order"
+    );
+
+    assert_eq!(
+        repo::rename_speaker(&db, &s.id, "speaker_1", "Priya").unwrap(),
+        2
+    );
+    // Merge: speaker_2 was really Priya too.
+    assert_eq!(
+        repo::rename_speaker(&db, &s.id, "speaker_2", "Priya").unwrap(),
+        1
+    );
+    let labels: Vec<String> = repo::list_segments(&db, &s.id)
+        .unwrap()
+        .into_iter()
+        .map(|l| l.speaker_label)
+        .collect();
+    assert_eq!(labels, ["Priya", "Priya", "me", "Priya"]);
+    assert!(repo::rename_speaker(&db, &s.id, "Priya", "  ").is_err());
+
+    repo::add_bookmark(&db, &s.id, 3_500, Some("  pricing  ")).unwrap();
+    repo::add_bookmark(&db, &s.id, 1_200, None).unwrap();
+    let marks = repo::list_bookmarks(&db, &s.id).unwrap();
+    assert_eq!(
+        marks
+            .iter()
+            .map(|b| (b.at_ms, b.label.clone()))
+            .collect::<Vec<_>>(),
+        [(1_200, None), (3_500, Some("pricing".into()))]
+    );
+}
+
+/// Records the config each STT run receives.
+#[derive(Default)]
+struct ConfigSpy(Mutex<Vec<(StreamKind, Vec<String>)>>);
+
+#[async_trait::async_trait]
+impl sidekick_stt::SttProvider for ConfigSpy {
+    fn id(&self) -> &'static str {
+        "spy"
+    }
+    async fn run(
+        &self,
+        config: sidekick_stt::SttConfig,
+        _: Option<SecretString>,
+        mut frames: tokio::sync::mpsc::Receiver<sidekick_audio::AudioFrame>,
+        _: Arc<dyn SttSink>,
+        _: tokio_util::sync::CancellationToken,
+    ) -> SidekickResult<()> {
+        self.0
+            .lock()
+            .unwrap()
+            .push((config.kind, config.keyterms.clone()));
+        while frames.recv().await.is_some() {}
+        Ok(())
+    }
+}
+
+#[tokio::test]
+async fn profile_names_reach_every_stt_stream_as_keyterms() {
+    let dir = tempfile::tempdir().unwrap();
+    let audio = recording(dir.path(), false);
+    let spy = Arc::new(ConfigSpy::default());
+    let plan = SttPlan {
+        provider: spy.clone(),
+        key: None,
+        language: "en".into(),
+        keyterms: vec!["Nitesh".into(), "Nitu".into()],
+    };
+    let kinds = streams_for(Some(ConsentOption::ParticipantsAgreed)).unwrap();
+    let live = LiveSession::start(&kinds, &audio, &plan, Arc::new(Sink::default())).unwrap();
+    tokio::time::sleep(Duration::from_millis(100)).await;
+    live.stop().await;
+    let mut seen = spy.0.lock().unwrap().clone();
+    seen.sort_by_key(|(k, _)| format!("{k:?}"));
+    assert_eq!(
+        seen,
+        [
+            (
+                StreamKind::Mic,
+                vec!["Nitesh".to_owned(), "Nitu".to_owned()]
+            ),
+            (
+                StreamKind::System,
+                vec!["Nitesh".to_owned(), "Nitu".to_owned()]
+            )
+        ]
+    );
+}
+
+#[test]
+fn auto_answer_is_per_session() {
+    let db = db();
+    let a = repo::create(&db, &new("A")).unwrap();
+    let b = repo::create(&db, &new("B")).unwrap();
+    assert!(
+        !repo::set_auto_answer(&db, &a.id, false)
+            .unwrap()
+            .auto_answer
+    );
+    assert!(
+        repo::get(&db, &b.id).unwrap().auto_answer,
+        "other sessions unchanged"
+    );
+    assert!(repo::set_auto_answer(&db, &a.id, true).unwrap().auto_answer);
+}
+
+#[test]
+fn answers_are_saved_with_sources_and_rated() {
+    use sidekick_session::answers::{self, NewAnswer, QuestionSource, Source};
+    let mut db = db();
+    let s = repo::create(&db, &new("Q&A")).unwrap();
+    let a = NewAnswer {
+        session_id: s.id.clone(),
+        question: "What's the rate limit?".into(),
+        source: QuestionSource::Detected,
+        directed: true,
+        segment_id: None,
+        cue: Some("600 requests/min".into()),
+        body_md: "The Pro tier allows 600 requests per minute [1].".into(),
+        sources: vec![Source {
+            kind: "doc".into(),
+            reference: "d1#p14".into(),
+            label: "Spec v2, p.14".into(),
+        }],
+        provider: "anthropic".into(),
+        model: "claude-opus-5-5".into(),
+        latency_ms: 1840,
+        input_tokens: Some(3120),
+        output_tokens: Some(142),
+    };
+    let id = answers::save(&mut db, &a).unwrap();
+    let (json, directed): (String, bool) = db
+        .conn()
+        .query_row("SELECT a.sources_json, q.directed FROM answers a JOIN questions q ON q.id = a.question_id WHERE a.id = ?1", [&id], |r| Ok((r.get(0)?, r.get(1)?)))
+        .unwrap();
+    assert_eq!(
+        json, r#"[{"type":"doc","ref":"d1#p14","label":"Spec v2, p.14"}]"#,
+        "tech doc 4.3 format"
+    );
+    assert!(directed);
+    answers::rate(&db, &id, 1).unwrap();
+    answers::rate(&db, &id, 0).unwrap();
+    assert!(answers::rate(&db, &id, 2).is_err());
+    assert!(answers::rate(&db, "missing", 1).is_err());
+    repo::delete(&db, &s.id).unwrap();
+    let left: i64 = db
+        .conn()
+        .query_row("SELECT count(*) FROM answers", [], |r| r.get(0))
+        .unwrap();
+    assert_eq!(left, 0, "answers go with the session");
+}

@@ -5,7 +5,9 @@
   "windows": ["overlay"],
   "permissions": [
     "core:default",
+    "dialog:allow-open",
     "allow-app-info",
+    "allow-get-settings",
     "allow-open-settings",
     "allow-get-capture-protection",
     "allow-llm-stream",
@@ -19,6 +21,17 @@
     "allow-end-session",
     "allow-delete-session",
     "allow-list-sessions",
+    "allow-get-transcript",
+    "allow-rename-speaker",
+    "allow-add-bookmark",
+    "allow-set-auto-answer",
+    "allow-save-answer",
+    "allow-rate-answer",
+    "allow-ingest-document",
+    "allow-ingest-url",
+    "allow-list-documents",
+    "allow-delete-document",
+    "allow-retrieve-context",
     "core:window:allow-start-dragging",
     "core:window:allow-set-always-on-top"
   ]

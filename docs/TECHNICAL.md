@@ -203,11 +203,11 @@ Each module below is its own crate at `crates/<module>/`, named `sidekick-<modul
 | `stt` | `SttProvider` (one `run` per audio stream), Deepgram Nova-3 WebSocket adapter (interim + final results, diarization for system audio, `keyterm` boosts, keep-alives, silence not sent with a `Timeline` mapping provider time back to meeting time, reconnect with backoff and replay of unfinalised and buffered audio, up to 10 s), `DeepgramVerifier` for key checks, mock provider; speaker labels `me` / `speaker_N` | Done (live latency check pending) |
 | `capture` | Region, window and full-screen screenshots; downscale and encode | Not started |
 | `window` | Capture-exclusion status rules per OS and version (Windows build 19041+ protected; macOS 13–14 protected, 15+ not guaranteed because ScreenCaptureKit can bypass it; Linux unavailable) and the auto-hide rule. Pure logic: the shell applies `set_content_protected(true)` to every window at startup. Transparency, click-through and screen-share detection still to come (T-029) | Started (status done; manual checklist pending) |
-| `hotkeys` | Register and dispatch global shortcuts | Not started |
-| `ingest` | Parse documents, split into chunks, request embeddings, write to store | Not started |
+| `hotkeys` | Actions, defaults (12.3) and validation (normalise, one modifier minimum, no duplicates, every action once). The shell registers them with `tauri-plugin-global-shortcut`, handles show/hide itself, emits `hotkey-pressed`, and only saves a new set after the OS accepts it | Done (Linux verified; Windows/macOS check pending) |
+| `ingest` | Parsers (PDF via pdf-extract, DOCX/PPTX via zip + quick-xml, spreadsheets via calamine, text/Markdown, web pages), chunker (~500 tokens ≈ 2,000 chars, 50 overlap, within a page), SHA-256 duplicate check, batched embeddings (100 per request, retries), progress events; at most 3 documents at once. Owns the SQL for `documents` and `chunks`. Images wait for vision (T-025/T-026) | Done (images pending) |
 | `store` | SQLCipher database (raw 256-bit key from `secrets`), WAL, foreign keys; migrations with pre-migration backups; sqlite-vec registered for every connection; `settings` (raw JSON) and `vectors` (per-model `chunk_vectors`) modules; repository modules added per feature | Done |
 | `settings` | Typed `Settings` (providers and models for STT, LLM, embeddings, search; Auto-answer; retention) with defaults and partial `SettingsPatch` updates; one `settings` row per section; unreadable sections fall back to defaults | Done |
-| `retrieval` | Vector and keyword search over chunks; assemble context packs (transcript window, notes, chunks, screenshot) | Not started |
+| `retrieval` | Vector search (sqlite-vec KNN, partitioned by owner so only the session's vectors are scanned) + keyword search (FTS5, BM25), fused with reciprocal rank fusion (k = 60); context pack = last 3 minutes of transcript + notes + top 5 passages with citation fields. Keyword-only when there's no query vector. Screenshot joins with T-025 | Done (screenshot pending) |
 | `gateway` | Provider catalog (all kinds, for Settings); `LlmProvider` adapters (Anthropic, mock; OpenAI, Gemini, Ollama in T-026); the only place keys are attached; streaming via an `AnswerSink` the shell implements; retries with backoff and `Retry-After`; cancellation; key checks before saving. `SearchProvider` and `EmbeddingProvider` arrive with T-046 and T-017 | Started (LLM done) |
 | `secrets` | `KeyStore` trait with `KeychainStore` (OS keychain, service `sidekick`) and `MemoryStore` (tests, mock mode); keys as `SecretString`; `KeyStatus` exposes only the last 4 characters; account names restricted to `[a-z0-9-]` | Done |
 | `skills` | Load, validate, import and export Skill files | Not started |
@@ -224,12 +224,12 @@ Each module below is its own crate at `crates/<module>/`, named `sidekick-<modul
 | `overlay` | Window chrome: opacity, font size, compact/expanded, protection indicator, tabs |
 | `answers` | Live Answers tab: cue, full answer, sources, follow-up chips, code blocks |
 | `chat` | Chat tab: user questions with session context |
-| `transcript` | Live transcript with speaker names and bookmarks |
+| `transcript` | Transcript tab: loads saved lines, applies live `transcript-partial` / `transcript-segment` events batched every 50 ms (`lib/batcher`), shows partial text until the final line arrives, rename/merge speakers, bookmarks, listening indicator |
 | `notes` | Rolling notes, decisions, action items |
-| `library` | Session documents and screenshot strip |
+| `library` | Collapsible Documents panel under the session bar: add files (native picker via `tauri-plugin-dialog`, or drop onto the window), add links, live indexing progress, failure reason with Retry, remove. Screenshot strip arrives with T-043 |
 | `settings` | Settings window: provider and model dropdowns per kind (STT, LLM, embeddings, web search), masked key field with show/hide, paste, Save and test, Test connection, Remove; Auto-answer and retention. Opened with `open_settings`; Close hides the window |
 | `skills` | Skill builder, templates, import/export |
-| `orchestrator` | Question detection, prompt building, Skill application, notes job, two-tier model routing |
+| `orchestrator` | Question detection (rules + fuzzy name matching, 600 ms debounce, Auto vs directed-only) and answering: `AnswerRouter` builds cue and full prompts (stable system rules; context fenced as untrusted data; numbered sources), streams both in parallel (cue on the fast model at low effort), keeps at most 2 questions in flight, answers "not found" without a model call when there's no context, records latency, saves answers with cited sources. UI updates batched every 50 ms |
 | `ipc` | Generated `bindings.ts` (section 5.6), browser mocks (`mock.ts`) that mirror every command, `answerEvents` for answer streams, and window helpers (`currentWindow`, `hideCurrentWindow`). The only module that imports Tauri |
 
 ### 3.3 Key workflow: answering a question
@@ -414,9 +414,13 @@ CREATE INDEX idx_chunks_document ON chunks(document_id, ord);
 
 -- chunk_vectors is NOT created by this migration: its size depends on the active
 -- embedding model (ADR-013). The store creates it on first use:
---   CREATE VIRTUAL TABLE chunk_vectors USING vec0(chunk_id INTEGER PRIMARY KEY, embedding float[<dims>]);
--- and records the dimension in settings key 'embedding.dims'. Changing model drops
--- and recreates it, then the re-embedding job refills it (section 4.5).
+--   CREATE VIRTUAL TABLE chunk_vectors USING vec0(
+--     chunk_id INTEGER PRIMARY KEY,
+--     owner TEXT PARTITION KEY,            -- 's:<session id>' or 'p:<pack id>'
+--     embedding float[<dims>] distance_metric=cosine);
+-- and records {dims, layout} in settings key 'embedding.index'. A change of model
+-- size or layout drops and recreates it; the re-embedding job refills it (4.5).
+-- The partition key must never be NULL (sqlite-vec misbehaves); upsert rejects it.
 
 CREATE VIRTUAL TABLE chunks_fts USING fts5(text, content='chunks', content_rowid='id');
 
@@ -583,20 +587,26 @@ Commands are request/response calls from the frontend to Rust (`invoke`). All re
 | --- | --- | --- | --- |
 | `create_session` | `title, skill_id?` | `Session` | Create a draft session |
 | `confirm_consent` | `session_id, option` | `()` | Record consent choice; required before `start_session` |
+| `set_auto_answer` | `session_id, on` | `Session` | Auto-answer on/off for the session (QA-3; header button and hotkey) |
 | `start_session` | `session_id` | `SessionStarted` (`session`, `warnings`) | Start audio capture and STT for the streams the consent allows; `CONSENT_REQUIRED` without consent; one live session at a time. With `SIDEKICK_AUDIO_FIXTURE`, the file plays as a single stream |
 | `pause_session` / `resume_session` | `session_id` | `Session` | Pause or resume listening (paused audio is dropped, never sent) |
 | `end_session` | `session_id` | `Session` | Stop capture and let STT flush; the summary arrives with T-024 |
 | `delete_session` | `session_id` | `()` | Delete all session data (the consent record is kept, 4.4) |
 | `list_sessions` | `cursor?, limit?` | `SessionPage` (`items`, `nextCursor`) | Session history, newest first |
-| `ingest_document` | `session_id or pack_id, file_path` | `DocumentId` | Queue a document for parsing and embedding |
+| `get_transcript` | `session_id` | `Transcript` (`lines`, `bookmarks`) | Saved transcript in time order, for opening the Transcript tab |
+| `rename_speaker` | `session_id, from, to` | `u32` (lines changed) | Rename a speaker in every line; renaming to an existing name merges (LIS-3) |
+| `add_bookmark` | `session_id, at_ms, label?` | `Bookmark` | Mark a moment (ms from session start) |
+| `ingest_document` | `session_id, path` | `()` | Queue a file for parsing and embedding; progress arrives as `ingest-progress` events. A missing embeddings key fails immediately |
+| `ingest_url` | `session_id, url` | `()` | Queue a web page (http/https only) |
+| `list_documents` | `session_id` | `DocumentInfo[]` | Session documents with status, pages, chunk count and error |
 | `delete_document` | `document_id` | `()` | Remove document and its chunks |
 | `capture_screenshot` | `mode: region / window / screen` | `Screenshot` | Capture and store a screenshot |
-| `retrieve_context` | `session_id, query, opts` | `ContextPack` | Transcript window, notes, top chunks, screenshot |
+| `retrieve_context` | `session_id, query, options?` (`windowMs`, `topK`) | `ContextPack` (`transcript`, `notes`, `chunks`) | Transcript window, notes and top passages; embeds the query (keyword-only if no embeddings key); records retrieval latency. Screenshot arrives with T-025 |
 | `llm_stream` | `request_id, provider?, model?, messages, tools?` | `()` (tokens arrive as events) | Start a streaming LLM call |
 | `cancel_stream` | `request_id` | `()` | Abort an in-flight LLM call |
 | `web_search` | `request_id, query, max_results?` | `SearchResult[]` | Run a web search for a model tool call; the orchestrator sends results back to the model |
-| `save_answer` | `Answer` | `AnswerId` | Persist a completed answer |
-| `rate_answer` | `answer_id, rating` | `()` | Thumbs up/down |
+| `save_answer` | `NewAnswer` (session, question, source, directed, segment, cue, body, sources, provider, model, latency, tokens) | `String` (answer id) | Persist a question and its answer in one transaction |
+| `rate_answer` | `answer_id, rating` (1, -1, or 0 to clear) | `()` | Thumbs up/down |
 | `save_notes` | `session_id, content_md, version` | `NotesVersion` | Update rolling notes (optimistic version check) |
 | `list_providers` | `kind: stt / llm / embed / search` | `ProviderInfo[]` | Dropdown options, with key status |
 | `set_api_key` | `provider, key` | `KeyStatus` | Test and store a key (key never returned) |
@@ -604,7 +614,7 @@ Commands are request/response calls from the frontend to Rust (`invoke`). All re
 | `delete_api_key` | `provider` | `()` | Remove a key from the keychain |
 | `list_models` | `provider` | `ModelInfo[]` | Models for the model dropdown |
 | `open_settings` | none | `()` | Show and focus the Settings window (overlay only) |
-| `get_settings` / `update_settings` | `patch?` | `Settings` | Read or change preferences. A patch replaces only the sections it names; unknown fields are rejected; `search: null` disables web search |
+| `get_settings` / `update_settings` | `patch?` | `Settings` | Read or change preferences. A patch replaces only the sections it names; unknown fields are rejected; `search: null` disables web search; `shortcuts` (the full set) is validated and registered with the OS before it is saved |
 | `list_skills` / `save_skill` / `delete_skill` | `skill?` | `Skill[]` / `Skill` / `()` | Manage Skills |
 | `import_skill` / `export_skill` | `file_path` / `skill_id, file_path` | `Skill` / `()` | Share Skills as files |
 | `set_overlay` | `opacity?, click_through?, compact?` | `OverlayState` | Overlay appearance |
@@ -616,7 +626,7 @@ Commands are request/response calls from the frontend to Rust (`invoke`). All re
 
 ### 5.2 Events
 
-Events are pushed from Rust to the frontend. Payloads are typed and versioned with the app. Tauri event names can't contain dots, so the wire names use a dash (`answer-token`); the table keeps the dotted names for readability. In TypeScript, features subscribe through `answerEvents` from `@/ipc`, which also works with the browser mocks. Status: `answer.*`, `session.state` (`session-changed`, payload `{ session }`), `transcript.partial`, `transcript.segment` (already saved, with its row `id`) and `stt.status` (`stt-status-changed`) are implemented. Features subscribe through `answerEvents` and `sessionEvents` from `@/ipc`.
+Events are pushed from Rust to the frontend. Payloads are typed and versioned with the app. Tauri event names can't contain dots, so the wire names use a dash (`answer-token`); the table keeps the dotted names for readability. In TypeScript, features subscribe through `answerEvents` from `@/ipc`, which also works with the browser mocks. Status: `answer.*`, `session.state` (`session-changed`, payload `{ session }`), `transcript.partial`, `transcript.segment` (already saved, with its row `id`) and `stt.status` (`stt-status-changed`) `hotkey.pressed` (`hotkey-pressed`, payload `{ action }`) and `ingest.progress` (`ingest-progress`, payload `{ documentId, status, percent, error }`) are implemented. Features subscribe through `answerEvents` and `sessionEvents` from `@/ipc`.
 
 | Event | Payload | When |
 | --- | --- | --- |
@@ -753,7 +763,7 @@ There are no users or roles; access control is about which window may call which
 
 | Window | Allowed commands |
 | --- | --- |
-| Overlay | Session, capture, retrieval, LLM, web search, answers, notes, overlay, protection status |
+| Overlay | Session, capture, retrieval, LLM, web search, answers, notes, overlay, protection status, and read-only `get_settings` (profile names for detection) |
 | Settings | Providers, keys, models, settings, skills, usage, diagnostics, backup |
 
 Key commands (`set_api_key`, `delete_api_key`) are only exposed to the Settings window. No window gets filesystem or shell access beyond the dialogs it needs.
@@ -1407,7 +1417,7 @@ All shortcuts can be changed in Settings → Shortcuts.
 | Change providers, keys or models | Settings → Providers |
 | Set how long sessions are kept | Settings → Data → Retention |
 | Export or restore all data | Settings → Data → Export / Restore |
-| Add your name and nicknames for directed questions | Settings → Profile |
+| Add your name and nicknames for directed questions (also sent to speech-to-text as words to expect) | Settings → Profile |
 | Add custom vocabulary (product names, people) | Settings → Transcription |
 | Turn on auto-hide when screen sharing | Settings → Privacy |
 | Switch to beta updates | Settings → About → Update channel |
@@ -1460,7 +1470,7 @@ Targets are set now; measured baselines are filled in after the Phase 0 prototyp
 | CPU while listening (cloud STT) | Under 10% | To be measured |
 | RAM while listening | Under 800 MB | To be measured |
 | Ingest a 50-page PDF (parse + embed) | Under 30 s | To be measured |
-| Vector search over 20k chunks | Under 50 ms | To be measured |
+| Vector search over 20k chunks | Under 50 ms | 8 ms (release, 256-dim mock vectors, Linux CI container); 23 ms for the whole context pack |
 | Cold start to usable overlay | Under 3 s | To be measured |
 | Installer size | Under 30 MB | To be measured |
 

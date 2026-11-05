@@ -24,6 +24,17 @@ const COMMANDS: &[&str] = &[
     "end_session",
     "delete_session",
     "list_sessions",
+    "get_transcript",
+    "rename_speaker",
+    "add_bookmark",
+    "set_auto_answer",
+    "save_answer",
+    "rate_answer",
+    "ingest_document",
+    "ingest_url",
+    "list_documents",
+    "delete_document",
+    "retrieve_context",
 ];
 
 fn main() {

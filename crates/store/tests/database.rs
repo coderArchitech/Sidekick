@@ -175,29 +175,50 @@ fn vector_search_returns_nearest_chunks() {
         !vectors::ensure_table(&mut db, 3).unwrap(),
         "unchanged when dims match"
     );
-    vectors::upsert(&db, 1, &[1.0, 0.0, 0.0]).unwrap();
-    vectors::upsert(&db, 2, &[0.0, 1.0, 0.0]).unwrap();
-    vectors::upsert(&db, 3, &[0.9, 0.1, 0.0]).unwrap();
-    let hits = vectors::nearest(&db, &[1.0, 0.0, 0.0], 2).unwrap();
+    vectors::upsert(&db, 1, "s:one", &[1.0, 0.0, 0.0]).unwrap();
+    vectors::upsert(&db, 2, "s:one", &[0.0, 1.0, 0.0]).unwrap();
+    vectors::upsert(&db, 3, "s:one", &[0.9, 0.1, 0.0]).unwrap();
+    let hits = vectors::nearest(&db, "s:one", &[1.0, 0.0, 0.0], 2).unwrap();
     let ids: Vec<i64> = hits.iter().map(|h| h.0).collect();
     assert_eq!(ids, vec![1, 3]);
+    // Another owner's vectors never show up.
+    vectors::upsert(&db, 9, "s:two", &[1.0, 0.0, 0.0]).unwrap();
+    assert!(
+        !vectors::nearest(&db, "s:one", &[1.0, 0.0, 0.0], 5)
+            .unwrap()
+            .iter()
+            .any(|(id, _)| *id == 9)
+    );
+    assert_eq!(
+        vectors::nearest(&db, "s:two", &[1.0, 0.0, 0.0], 5).unwrap(),
+        vec![(9, 0.0)]
+    );
+    assert!(
+        vectors::upsert(&db, 10, "", &[1.0, 0.0, 0.0]).is_err(),
+        "owner required"
+    );
     // Upsert replaces.
-    vectors::upsert(&db, 2, &[1.0, 0.0, 0.0]).unwrap();
-    assert_eq!(vectors::nearest(&db, &[1.0, 0.0, 0.0], 3).unwrap().len(), 3);
+    vectors::upsert(&db, 2, "s:one", &[1.0, 0.0, 0.0]).unwrap();
+    assert_eq!(
+        vectors::nearest(&db, "s:one", &[1.0, 0.0, 0.0], 3)
+            .unwrap()
+            .len(),
+        3
+    );
 }
 
 #[test]
 fn changing_embedding_size_recreates_the_vector_table() {
     let mut db = Database::open_in_memory(&key('a')).unwrap();
     vectors::ensure_table(&mut db, 3).unwrap();
-    vectors::upsert(&db, 1, &[1.0, 0.0, 0.0]).unwrap();
+    vectors::upsert(&db, 1, "s:one", &[1.0, 0.0, 0.0]).unwrap();
     assert!(vectors::ensure_table(&mut db, 4).unwrap());
     assert_eq!(
         count(&db, "chunk_vectors"),
         0,
         "old vectors dropped for re-embedding"
     );
-    vectors::upsert(&db, 1, &[1.0, 0.0, 0.0, 0.0]).unwrap();
+    vectors::upsert(&db, 1, "s:one", &[1.0, 0.0, 0.0, 0.0]).unwrap();
     assert!(vectors::ensure_table(&mut db, 0).is_err());
 }
 

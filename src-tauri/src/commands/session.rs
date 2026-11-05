@@ -112,7 +112,9 @@ pub async fn start_session(
         }
         None => Box::new(DeviceAudio),
     };
-    let plan = stt_plan(&state, &settings.stt.provider)?;
+    let mut plan = stt_plan(&state, &settings.stt.provider)?;
+    // Boost the user's name and nicknames so directed questions are heard (PRD LIS-5a).
+    plan.keyterms = settings.profile.names();
     let sink = Arc::new(TauriSttSink::new(app.clone(), session_id.clone()));
     let runner = LiveSession::start(&kinds, audio.as_ref(), &plan, sink)?;
     let warnings = runner.warnings.clone();
@@ -146,7 +148,6 @@ fn stt_plan(state: &AppState, provider: &str) -> SidekickResult<SttPlan> {
             }
         }
     };
-    // Name and nickname boosts arrive with the profile (T-016).
     Ok(SttPlan {
         provider,
         key,
@@ -239,4 +240,85 @@ async fn stop_if_live(state: &AppState, session_id: &str) {
         drop(live);
         runner.stop().await;
     }
+}
+
+/// Everything the Transcript tab needs when it opens (T-014).
+#[derive(Debug, Clone, Serialize, specta::Type)]
+#[serde(rename_all = "camelCase")]
+pub struct Transcript {
+    pub lines: Vec<repo::TranscriptLine>,
+    pub bookmarks: Vec<repo::Bookmark>,
+}
+
+#[tauri::command]
+#[specta::specta]
+pub fn get_transcript(
+    state: State<'_, AppState>,
+    session_id: String,
+) -> SidekickResult<Transcript> {
+    let db = state.db();
+    Ok(Transcript {
+        lines: repo::list_segments(&db, &session_id)?,
+        bookmarks: repo::list_bookmarks(&db, &session_id)?,
+    })
+}
+
+/// Renames (or, if the name exists, merges) a speaker across the session.
+#[tauri::command]
+#[specta::specta]
+pub fn rename_speaker(
+    state: State<'_, AppState>,
+    session_id: String,
+    from: String,
+    to: String,
+) -> SidekickResult<u32> {
+    repo::rename_speaker(&state.db(), &session_id, &from, &to)
+        .map(|n| u32::try_from(n).unwrap_or(u32::MAX))
+}
+
+/// Marks a moment; `at_ms` is milliseconds from session start.
+#[tauri::command]
+#[specta::specta]
+pub fn add_bookmark(
+    state: State<'_, AppState>,
+    session_id: String,
+    at_ms: u32,
+    label: Option<String>,
+) -> SidekickResult<repo::Bookmark> {
+    repo::add_bookmark(&state.db(), &session_id, at_ms, label.as_deref())
+}
+
+/// Auto-answer on/off for the session (PRD QA-3: header button and hotkey).
+#[tauri::command]
+#[specta::specta]
+pub fn set_auto_answer(
+    app: AppHandle,
+    state: State<'_, AppState>,
+    session_id: String,
+    on: bool,
+) -> SidekickResult<Session> {
+    let session = repo::set_auto_answer(&state.db(), &session_id, on)?;
+    changed(&app, &session);
+    Ok(session)
+}
+
+/// Saves a finished answer with its question (tech doc 5.1 `save_answer`).
+#[tauri::command]
+#[specta::specta]
+pub fn save_answer(
+    state: State<'_, AppState>,
+    answer: sidekick_session::answers::NewAnswer,
+) -> SidekickResult<String> {
+    sidekick_session::answers::save(&mut state.db(), &answer)
+}
+
+/// Thumbs up (1) / down (-1) / clear (0).
+#[tauri::command]
+#[specta::specta]
+pub fn rate_answer(
+    state: State<'_, AppState>,
+    answer_id: String,
+    rating: i8,
+) -> SidekickResult<()> {
+    sidekick_session::answers::rate(&state.db(), &answer_id, rating)
 }

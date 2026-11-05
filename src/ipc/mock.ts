@@ -2,8 +2,12 @@ import { createMockAnswerBus } from "./answerEvents";
 import { createMockSessionBus } from "./sessionEvents";
 import type {
   commands as tauriCommands,
+  Bookmark,
   ConsentOption,
+  DocumentInfo,
+  NewAnswer,
   Session,
+  TranscriptLine,
   SidekickError,
   Stage,
   StageStats,
@@ -25,6 +29,16 @@ export const DEFAULT_SETTINGS: Settings = {
   search: null,
   autoAnswer: true,
   retention: "30d",
+  shortcuts: [
+    { action: "show_hide", keys: "CmdOrCtrl+Shift+H" },
+    { action: "ask", keys: "CmdOrCtrl+Shift+Space" },
+    { action: "screenshot", keys: "CmdOrCtrl+Shift+S" },
+    { action: "auto_answer", keys: "CmdOrCtrl+Shift+A" },
+    { action: "pause_resume", keys: "CmdOrCtrl+Shift+P" },
+    { action: "switch_skill", keys: "CmdOrCtrl+Shift+K" },
+    { action: "bookmark", keys: "CmdOrCtrl+Shift+B" },
+  ],
+  profile: { name: "", nicknames: [] },
 };
 
 type CatalogRow = [id: string, kind: ProviderKind, displayName: string, keyRequired: boolean];
@@ -56,6 +70,73 @@ export const mockSessionBus = createMockSessionBus();
 // ---- Sessions (mirrors crates/session: lifecycle and consent rules) ----------
 
 const sessions = new Map<string, Session>();
+const transcripts = new Map<string, TranscriptLine[]>();
+const bookmarks = new Map<string, Bookmark[]>();
+const documents = new Map<string, DocumentInfo[]>();
+/** Answers saved through `saveAnswer`, for assertions. */
+export const savedAnswers: { id: string; answer: NewAnswer; rating: number | null }[] = [];
+
+/** Simulates ingest like the Rust pipeline: queued → parsing → embedding → ready (or failed). */
+function mockIngest(sessionId: string, name: string, sizeBytes: number) {
+  const supported =
+    /\.(pdf|docx|pptx|xlsx|xls|ods|txt|md|markdown|csv|json)$/i.test(name) || /^https?:/.test(name);
+  if (!supported) {
+    return err(
+      "UNSUPPORTED_FILE",
+      `Sidekick can't read ${name}. Supported: PDF, Word (.docx), PowerPoint (.pptx), Excel, text and Markdown.`,
+    );
+  }
+  const doc: DocumentInfo = {
+    id: `mock-doc-${nextLineId++}`,
+    name,
+    status: "queued",
+    pageCount: null,
+    chunkCount: 0,
+    sizeBytes,
+    error: null,
+    createdAt: Date.now(),
+  };
+  documents.set(sessionId, [...(documents.get(sessionId) ?? []), doc]);
+  const failing = name.includes("broken");
+  const steps: [DocumentInfo["status"], number][] = failing
+    ? [
+        ["parsing", 5],
+        ["failed", 100],
+      ]
+    : [
+        ["parsing", 5],
+        ["embedding", 10],
+        ["embedding", 60],
+        ["ready", 100],
+      ];
+  steps.forEach(([status, percent], i) =>
+    setTimeout(
+      () => {
+        doc.status = status;
+        if (status === "ready") {
+          doc.pageCount = 3;
+          doc.chunkCount = 3;
+        }
+        if (status === "failed") doc.error = `Couldn't read ${name}: the PDF is damaged.`;
+        mockSessionBus.emit("ingest", { documentId: doc.id, status, percent, error: doc.error });
+      },
+      (i + 1) * mockOptions.ingestStepMs,
+    ),
+  );
+  return { status: "ok" as const, data: null };
+}
+let nextLineId = 1;
+
+/** Adds a final transcript line and emits it, like the Rust STT sink does. Tests use it. */
+export function mockTranscriptLine(
+  sessionId: string,
+  line: Omit<TranscriptLine, "id">,
+): TranscriptLine {
+  const full = { ...line, id: nextLineId++ };
+  transcripts.set(sessionId, [...(transcripts.get(sessionId) ?? []), full]);
+  mockSessionBus.emit("segment", { sessionId, ...full });
+  return full;
+}
 let liveSessionId: string | null = null;
 let nextId = 1;
 
@@ -125,6 +206,10 @@ function stageStats(): StageStats[] {
 export const mockProtection: { status: ProtectionStatus } = {
   status: { state: "unavailable", reason: "Running in a browser: no screen-share protection." },
 };
+/** Paths the mock file picker returns next (tests set them). */
+export const mockFiles: { picked: string[] } = { picked: [] };
+/** Browser-demo switches; tests leave them off. */
+export const mockOptions = { demoTranscript: false, ingestStepMs: 5 };
 /** What the mocks were asked to do, for assertions. */
 export const mockCalls: { streams: ("mic" | "system")[] } = { streams: [] };
 /** Counts window actions so tests can assert them. */
@@ -139,6 +224,16 @@ export function applyPatch(current: Settings, patch: SettingsPatch): Settings {
   if ("search" in patch) next.search = patch.search ?? null;
   if (patch.autoAnswer != null) next.autoAnswer = patch.autoAnswer;
   if (patch.retention) next.retention = patch.retention;
+  if (patch.shortcuts) next.shortcuts = patch.shortcuts;
+  if (patch.profile) {
+    // Mirrors Profile::names: trimmed, no blanks, no duplicates of the name.
+    const name = patch.profile.name.trim();
+    const seen = new Set(name ? [name.toLowerCase()] : []);
+    const nicknames = patch.profile.nicknames
+      .map((n) => n.trim())
+      .filter((n) => n && !seen.has(n.toLowerCase()) && seen.add(n.toLowerCase()));
+    next.profile = { name, nicknames };
+  }
   return next;
 }
 
@@ -163,6 +258,12 @@ export function resetMocks(): void {
   activeStreams.clear();
   latencySamples.clear();
   sessions.clear();
+  transcripts.clear();
+  documents.clear();
+  savedAnswers.length = 0;
+  mockFiles.picked = [];
+  bookmarks.clear();
+  nextLineId = 1;
   liveSessionId = null;
   nextId = 1;
   mockCalls.streams = [];
@@ -192,6 +293,18 @@ export const mockCommands: Commands = {
   getCaptureProtection: () => Promise.resolve(structuredClone(mockProtection.status)),
   getSettings: () => Promise.resolve({ status: "ok", data: structuredClone(settings) }),
   updateSettings: (patch) => {
+    if (patch.shortcuts) {
+      // Mirrors sidekick_hotkeys::validate for the cases the UI can produce.
+      const norm = patch.shortcuts.map((b) => b.keys.replace(/\s+/g, "").toLowerCase());
+      const dup = norm.findIndex((k, i) => norm.indexOf(k) !== i);
+      if (dup >= 0)
+        return Promise.resolve(err("INTERNAL", `${patch.shortcuts[dup]?.keys} is used twice.`));
+      if (norm.some((k) => !k.includes("+"))) {
+        return Promise.resolve(
+          err("INTERNAL", "Each shortcut needs at least one modifier (Ctrl, Cmd, Alt or Shift)."),
+        );
+      }
+    }
     settings = applyPatch(settings, patch);
     return Promise.resolve({ status: "ok", data: structuredClone(settings) });
   },
@@ -328,6 +441,24 @@ export const mockCommands: Commands = {
     if (result.status === "error") return Promise.resolve(result);
     liveSessionId = sessionId;
     mockCalls.streams = s.consent === "me_only" ? ["mic"] : ["mic", "system"];
+    if (mockOptions.demoTranscript) {
+      // Browser demo (pnpm dev:web): a partial, then a final line.
+      setTimeout(
+        () => mockSessionBus.emit("partial", { sessionId, stream: "system", text: "What is the" }),
+        300,
+      );
+      setTimeout(
+        () =>
+          mockTranscriptLine(sessionId, {
+            speakerLabel: "speaker_1",
+            isUser: false,
+            text: "What is the API rate limit for the Pro tier?",
+            startMs: 500,
+            endMs: 2600,
+          }),
+        900,
+      );
+    }
     return Promise.resolve({ status: "ok", data: { session: result.data, warnings: [] } });
   },
   pauseSession: (sessionId) => Promise.resolve(move(sessionId, "pause")),
@@ -339,6 +470,101 @@ export const mockCommands: Commands = {
   deleteSession: (sessionId) => {
     if (liveSessionId === sessionId) liveSessionId = null;
     sessions.delete(sessionId);
+    return Promise.resolve({ status: "ok", data: null });
+  },
+  setAutoAnswer: (sessionId, on) => {
+    const s = sessions.get(sessionId);
+    if (!s) return Promise.resolve(err("INTERNAL", "That session no longer exists."));
+    return Promise.resolve(save({ ...s, autoAnswer: on }));
+  },
+  saveAnswer: (answer) => {
+    const id = `mock-answer-${nextLineId++}`;
+    savedAnswers.push({ id, answer: structuredClone(answer), rating: null });
+    return Promise.resolve({ status: "ok", data: id });
+  },
+  rateAnswer: (answerId, rating) => {
+    const a = savedAnswers.find((x) => x.id === answerId);
+    if (!a) return Promise.resolve(err("INTERNAL", "That answer no longer exists."));
+    a.rating = rating === 0 ? null : rating;
+    return Promise.resolve({ status: "ok", data: null });
+  },
+  getTranscript: (sessionId) =>
+    Promise.resolve({
+      status: "ok",
+      data: {
+        lines: structuredClone(transcripts.get(sessionId) ?? []).sort(
+          (a, b) => a.startMs - b.startMs || a.id - b.id,
+        ),
+        bookmarks: structuredClone(bookmarks.get(sessionId) ?? []).sort((a, b) => a.atMs - b.atMs),
+      },
+    }),
+  renameSpeaker: (sessionId, from, to) => {
+    const name = to.trim();
+    if (!name || name.length > 60)
+      return Promise.resolve(err("INTERNAL", "Speaker names need 1 to 60 characters."));
+    let changed = 0;
+    for (const line of transcripts.get(sessionId) ?? []) {
+      if (line.speakerLabel === from) {
+        line.speakerLabel = name;
+        changed++;
+      }
+    }
+    return Promise.resolve({ status: "ok", data: changed });
+  },
+  addBookmark: (sessionId, atMs, label) => {
+    const mark: Bookmark = {
+      id: `mock-bookmark-${nextLineId++}`,
+      atMs,
+      label: label?.trim() || null,
+    };
+    bookmarks.set(sessionId, [...(bookmarks.get(sessionId) ?? []), mark]);
+    return Promise.resolve({ status: "ok", data: structuredClone(mark) });
+  },
+  ingestDocument: (sessionId, path) => {
+    const name = path.split(/[\\/]/).pop() ?? path;
+    return Promise.resolve(mockIngest(sessionId, name, 1000));
+  },
+  ingestUrl: (sessionId, url) =>
+    Promise.resolve(
+      /^https?:\/\//.test(url)
+        ? mockIngest(sessionId, url, 1000)
+        : err("UNSUPPORTED_FILE", "Only http and https links can be added."),
+    ),
+  retrieveContext: (sessionId, query, options) => {
+    const windowMs = options?.windowMs ?? 180_000;
+    const lines = transcripts.get(sessionId) ?? [];
+    const end = Math.max(0, ...lines.map((l) => l.endMs));
+    const words = query
+      .toLowerCase()
+      .split(/\W+/)
+      .filter((w) => w.length > 2);
+    const chunks = (documents.get(sessionId) ?? [])
+      .filter((d) => d.status === "ready")
+      .map((d, i) => ({
+        chunkId: i + 1,
+        documentId: d.id,
+        documentName: d.name,
+        page: 1,
+        text: `Mock passage from ${d.name} about ${words.join(" ")}`,
+      }))
+      .slice(0, options?.topK ?? 5);
+    return Promise.resolve({
+      status: "ok",
+      data: {
+        transcript: structuredClone(lines.filter((l) => l.endMs >= end - windowMs)),
+        notes: null,
+        chunks,
+      },
+    });
+  },
+  listDocuments: (sessionId) =>
+    Promise.resolve({ status: "ok", data: structuredClone(documents.get(sessionId) ?? []) }),
+  deleteDocument: (documentId) => {
+    for (const [k, list] of documents)
+      documents.set(
+        k,
+        list.filter((d) => d.id !== documentId),
+      );
     return Promise.resolve({ status: "ok", data: null });
   },
   listSessions: (_cursor, limit) => {

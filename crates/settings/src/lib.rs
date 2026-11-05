@@ -6,6 +6,7 @@
 
 use serde::{Deserialize, Serialize, de::DeserializeOwned};
 use sidekick_core::{ErrorCode, SidekickError, SidekickResult};
+use sidekick_hotkeys::Binding;
 use sidekick_store::{Database, settings as raw};
 
 /// The active provider and model for one kind of service.
@@ -33,6 +34,40 @@ pub enum Retention {
     Forever,
 }
 
+/// Who the user is, for directed questions and STT boosts (PRD QA-2, LIS-5a).
+#[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
+#[cfg_attr(feature = "specta", derive(specta::Type))]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub struct Profile {
+    pub name: String,
+    pub nicknames: Vec<String>,
+}
+
+impl Profile {
+    /// Name and nicknames, trimmed, without blanks or duplicates (case-insensitive).
+    #[must_use]
+    pub fn names(&self) -> Vec<String> {
+        let mut out: Vec<String> = Vec::new();
+        for n in std::iter::once(&self.name).chain(&self.nicknames) {
+            let n = n.trim();
+            if !n.is_empty() && !out.iter().any(|o| o.eq_ignore_ascii_case(n)) {
+                out.push(n.to_owned());
+            }
+        }
+        out
+    }
+
+    fn validate(&self) -> SidekickResult<()> {
+        if self.nicknames.len() > 10 || self.names().iter().any(|n| n.chars().count() > 40) {
+            return Err(SidekickError::new(
+                ErrorCode::Internal,
+                "Use up to 10 nicknames of up to 40 characters.",
+            ));
+        }
+        Ok(())
+    }
+}
+
 /// All user settings.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[cfg_attr(feature = "specta", derive(specta::Type))]
@@ -45,6 +80,9 @@ pub struct Settings {
     pub search: Option<ProviderChoice>,
     pub auto_answer: bool,
     pub retention: Retention,
+    /// Global shortcuts, one per action (tech doc 12.3).
+    pub shortcuts: Vec<Binding>,
+    pub profile: Profile,
 }
 
 impl Default for Settings {
@@ -66,6 +104,8 @@ impl Default for Settings {
             search: None,
             auto_answer: true,
             retention: Retention::ThirtyDays,
+            shortcuts: sidekick_hotkeys::defaults(),
+            profile: Profile::default(),
         }
     }
 }
@@ -90,6 +130,11 @@ pub struct SettingsPatch {
     pub auto_answer: Option<bool>,
     #[serde(default)]
     pub retention: Option<Retention>,
+    /// The full set of shortcuts; validated (every action once, no duplicates).
+    #[serde(default)]
+    pub shortcuts: Option<Vec<Binding>>,
+    #[serde(default)]
+    pub profile: Option<Profile>,
 }
 
 impl Settings {
@@ -112,6 +157,20 @@ impl Settings {
         }
         if let Some(v) = patch.retention {
             self.retention = v;
+        }
+        if let Some(v) = patch.shortcuts {
+            self.shortcuts = sidekick_hotkeys::validate(&v)?;
+        }
+        if let Some(v) = patch.profile {
+            v.validate()?;
+            self.profile = Profile {
+                name: v.name.trim().to_owned(),
+                nicknames: v
+                    .names()
+                    .into_iter()
+                    .skip(usize::from(!v.name.trim().is_empty()))
+                    .collect(),
+            };
         }
         self.validate()?;
         Ok(self)
@@ -152,6 +211,10 @@ pub fn load(db: &Database) -> SidekickResult<Settings> {
         search: section(db, "search")?.unwrap_or(d.search),
         auto_answer: section(db, "autoAnswer")?.unwrap_or(d.auto_answer),
         retention: section(db, "retention")?.unwrap_or(d.retention),
+        shortcuts: section::<Vec<Binding>>(db, "shortcuts")?
+            .and_then(|b| sidekick_hotkeys::validate(&b).ok())
+            .unwrap_or(d.shortcuts),
+        profile: section(db, "profile")?.unwrap_or(d.profile),
     })
 }
 
@@ -175,6 +238,12 @@ pub fn update(db: &Database, patch: SettingsPatch) -> SidekickResult<Settings> {
     }
     if patch.retention.is_some() {
         raw::set(db, "retention", &to_json(&updated.retention)?)?;
+    }
+    if patch.shortcuts.is_some() {
+        raw::set(db, "shortcuts", &to_json(&updated.shortcuts)?)?;
+    }
+    if patch.profile.is_some() {
+        raw::set(db, "profile", &to_json(&updated.profile)?)?;
     }
     Ok(updated)
 }
@@ -273,6 +342,96 @@ mod tests {
         assert!(
             update(&db, clear).unwrap().search.is_none(),
             "null clears it"
+        );
+    }
+
+    #[test]
+    fn shortcuts_default_validate_and_persist() {
+        let db = db();
+        assert_eq!(load(&db).unwrap().shortcuts, sidekick_hotkeys::defaults());
+        let mut keys = sidekick_hotkeys::defaults();
+        keys[0].keys = "alt+shift+o".into();
+        let updated = update(
+            &db,
+            SettingsPatch {
+                shortcuts: Some(keys),
+                ..SettingsPatch::default()
+            },
+        )
+        .unwrap();
+        assert_eq!(updated.shortcuts[0].keys, "Alt+Shift+O", "normalised");
+        assert_eq!(load(&db).unwrap().shortcuts[0].keys, "Alt+Shift+O");
+
+        let mut dup = sidekick_hotkeys::defaults();
+        dup[1].keys = dup[0].keys.clone();
+        assert!(
+            update(
+                &db,
+                SettingsPatch {
+                    shortcuts: Some(dup),
+                    ..SettingsPatch::default()
+                }
+            )
+            .is_err()
+        );
+        assert_eq!(
+            load(&db).unwrap().shortcuts[0].keys,
+            "Alt+Shift+O",
+            "invalid patch changes nothing"
+        );
+    }
+
+    #[test]
+    fn profile_names_are_cleaned_and_persisted() {
+        let db = db();
+        assert!(load(&db).unwrap().profile.names().is_empty());
+        let patch = SettingsPatch {
+            profile: Some(Profile {
+                name: "  Nitesh ".into(),
+                nicknames: vec!["Nitu".into(), " ".into(), "nitesh".into(), "NK".into()],
+            }),
+            ..SettingsPatch::default()
+        };
+        let p = update(&db, patch).unwrap().profile;
+        assert_eq!(p.name, "Nitesh");
+        assert_eq!(
+            p.nicknames,
+            ["Nitu", "NK"],
+            "blank and duplicate of the name removed"
+        );
+        assert_eq!(p.names(), ["Nitesh", "Nitu", "NK"]);
+        assert_eq!(load(&db).unwrap().profile, p);
+    }
+
+    #[test]
+    fn profile_limits() {
+        let too_many = Profile {
+            name: "A".into(),
+            nicknames: (0..11).map(|i| format!("n{i}")).collect(),
+        };
+        assert!(
+            update(
+                &db(),
+                SettingsPatch {
+                    profile: Some(too_many),
+                    ..SettingsPatch::default()
+                }
+            )
+            .is_err()
+        );
+        let too_long = Profile {
+            name: "x".repeat(41),
+            nicknames: vec![],
+        };
+        assert!(
+            update(
+                &db(),
+                SettingsPatch {
+                    profile: Some(too_long),
+                    ..SettingsPatch::default()
+                }
+            )
+            .is_err()
         );
     }
 
