@@ -42,6 +42,7 @@ export const DEFAULT_SETTINGS: Settings = {
     { action: "bookmark", keys: "CmdOrCtrl+Shift+B" },
   ],
   profile: { name: "", nicknames: [] },
+  overlay: { opacity: 90, fontSize: 14, compact: false, positions: [] },
 };
 
 type CatalogRow = [id: string, kind: ProviderKind, displayName: string, keyRequired: boolean];
@@ -692,6 +693,21 @@ export const mockCommands: Commands = {
     if (skillId !== null && !mockSkills.has(skillId))
       return Promise.resolve(err("INTERNAL", "That Skill no longer exists."));
     return Promise.resolve(save({ ...s, skillId }));
+  },
+  setOverlay: (patch) => {
+    const o = settings.overlay;
+    const next = {
+      ...o,
+      opacity: patch.opacity ?? o.opacity,
+      fontSize: patch.fontSize ?? o.fontSize,
+      compact: patch.compact ?? o.compact,
+    };
+    if (next.opacity < 20 || next.opacity > 100 || next.fontSize < 12 || next.fontSize > 20)
+      return Promise.resolve(
+        err("INTERNAL", "Opacity must be 20 to 100% and text size 12 to 20 px."),
+      );
+    settings = { ...settings, overlay: next };
+    return Promise.resolve({ status: "ok", data: structuredClone(next) });
   },
   rateAnswer: (answerId, rating) => {
     const a = savedAnswers.find((x) => x.id === answerId);

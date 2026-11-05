@@ -10,6 +10,7 @@ mod commands;
 mod events;
 mod ipc;
 mod logging;
+mod placement;
 mod protection;
 mod shortcuts;
 mod state;
@@ -42,6 +43,19 @@ pub fn run() {
             app.manage(state);
             app.manage(protection::apply(app.handle()));
             app.manage(shortcuts::Registered::default());
+            app.manage(placement::Generation::default());
+            placement::restore(app.handle());
+            if let Some(w) = app.get_webview_window("overlay") {
+                let handle = app.handle().clone();
+                w.on_window_event(move |e| {
+                    if matches!(
+                        e,
+                        tauri::WindowEvent::Moved(_) | tauri::WindowEvent::Resized(_)
+                    ) {
+                        placement::on_changed(&handle);
+                    }
+                });
+            }
             // A shortcut another app already owns shouldn't stop Sidekick from starting.
             if let Err(e) = shortcuts::apply(app.handle(), &bindings, &[]) {
                 tracing::warn!(message = %e.message, "some shortcuts could not be registered");

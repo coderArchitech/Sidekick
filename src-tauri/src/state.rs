@@ -26,14 +26,29 @@ pub struct AppState {
     pub mock: bool,
 }
 
+/// Mock mode only (see `AppState::init`).
+const MOCK_DB_KEY: &str = "6d6f636b2d6d6f64652d6f6e6c792d6e6f742d612d7265616c2d6b6579212121";
+
+/// The in-memory key store for mock mode, with the fixed database key.
+fn mock_keys() -> SidekickResult<Arc<dyn KeyStore>> {
+    let keys = MemoryStore::default();
+    keys.set(
+        sidekick_secrets::DB_KEY_ACCOUNT,
+        &sidekick_secrets::SecretString::from(MOCK_DB_KEY.to_owned()),
+    )?;
+    Ok(Arc::new(keys))
+}
+
 impl AppState {
     /// Opens the key store and database for this run.
     ///
     /// `SIDEKICK_MOCK_PROVIDERS=1` uses an in-memory key store so tests and demos
-    /// never touch the real keychain (tech doc 6.4).
+    /// never touch the real keychain (tech doc 6.4). Its database key is a
+    /// fixed test value, so a mock data folder can be reopened after a restart
+    /// (restart and E2E tests); mock data is never real meeting data.
     pub fn init(data_dir: PathBuf) -> SidekickResult<Self> {
         let keys: Arc<dyn KeyStore> = if mock_providers() {
-            Arc::new(MemoryStore::default())
+            mock_keys()?
         } else {
             Arc::new(KeychainStore::default())
         };
@@ -171,6 +186,30 @@ mod tests {
                 }
             }
         }
+    }
+
+    #[test]
+    fn mock_data_survives_a_restart() {
+        let dir = tempfile::tempdir().unwrap();
+        let first =
+            AppState::init_with(mock_keys().unwrap(), dir.path().to_path_buf(), true).unwrap();
+        first
+            .db()
+            .conn()
+            .execute(
+                "INSERT INTO sessions (id, title, status, stt_provider, llm_provider, llm_model, created_at) VALUES ('s', 't', 'draft', 'mock', 'mock', 'm', 0)",
+                [],
+            )
+            .unwrap();
+        drop(first);
+        let second =
+            AppState::init_with(mock_keys().unwrap(), dir.path().to_path_buf(), true).unwrap();
+        let n: i64 = second
+            .db()
+            .conn()
+            .query_row("SELECT count(*) FROM sessions", [], |r| r.get(0))
+            .unwrap();
+        assert_eq!(n, 1);
     }
 
     #[test]

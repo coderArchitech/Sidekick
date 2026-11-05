@@ -506,6 +506,14 @@ export const commands = {
       else return { status: "error", error: e as any };
     }
   },
+  async setOverlay(patch: OverlayPatch): Promise<Result<OverlayPrefs, SidekickError>> {
+    try {
+      return { status: "ok", data: await TAURI_INVOKE("set_overlay", { patch }) };
+    } catch (e) {
+      if (e instanceof Error) throw e;
+      else return { status: "error", error: e as any };
+    }
+  },
   /**
    * Queues a file for parsing and embedding.
    */
@@ -876,6 +884,32 @@ export type Notes = {
   actionItems: ActionItem[];
 };
 /**
+ * Fields to change; omitted ones stay as they are.
+ */
+export type OverlayPatch = {
+  opacity?: number | null;
+  fontSize?: number | null;
+  compact?: boolean | null;
+};
+/**
+ * How the overlay looks and where it sits (PRD UI-1 to UI-3).
+ */
+export type OverlayPrefs = {
+  /**
+   * Percent, 20 to 100.
+   */
+  opacity: number;
+  /**
+   * Text size in px, 12 to 20.
+   */
+  fontSize: number;
+  compact: boolean;
+  /**
+   * One per monitor, most recent first (managed by the app shell).
+   */
+  positions: SavedPosition[];
+};
+/**
  * Who the user is, for directed questions and STT boosts (PRD QA-2, LIS-5a).
  */
 export type Profile = { name: string; nicknames: string[] };
@@ -963,6 +997,19 @@ export type SavedAnswer = {
   createdAt: number;
 };
 /**
+ * A remembered overlay position on one monitor.
+ */
+export type SavedPosition = {
+  /**
+   * [`monitor_key`] of the monitor it was on.
+   */
+  monitor: string;
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+};
+/**
  * A stored screenshot, without its pixels.
  */
 export type Screenshot = {
@@ -1040,6 +1087,7 @@ export type Settings = {
    */
   shortcuts: Binding[];
   profile: Profile;
+  overlay: OverlayPrefs;
 };
 /**
  * A partial update. Only the sections present are replaced; unknown fields are
@@ -1060,6 +1108,7 @@ export type SettingsPatch = {
    */
   shortcuts?: Binding[] | null;
   profile?: Profile | null;
+  overlay?: OverlayPrefs | null;
 };
 /**
  * Error returned by every fallible Sidekick function and IPC command.

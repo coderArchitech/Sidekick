@@ -50,6 +50,7 @@ const COMMANDS: &[&str] = &[
     "import_skill",
     "export_skill",
     "set_session_skill",
+    "set_overlay",
     "ingest_document",
     "ingest_url",
     "list_documents",

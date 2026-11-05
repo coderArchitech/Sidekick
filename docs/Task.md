@@ -68,7 +68,7 @@ All Phase 0 code and automated tests are done and green on Linux, Windows and ma
 | T-026 | More LLM providers: OpenAI, Gemini, Ollama | ✅ Done | Default model names may need refreshing as providers release new ones; live-key check in T-039 |
 | T-027 | More STT providers: AssemblyAI, Soniox, local Whisper | 🟡 In progress: testing | Code and automated tests done. Waiting on: Whisper accuracy run with a real model (Hugging Face is blocked in the cloud dev environment), live AssemblyAI/Soniox checks, Hinglish comparison (PRD open question). Whisper ships behind the `local-whisper` cargo feature |
 | T-028 | `skills` crate and Skill builder | ✅ Done | Golden cases run against live models in T-039; tool use itself comes with Agents (T-045) |
-| T-029 | Overlay controls and private display | ⬜ To do | 🖥️ |
+| T-029 | Overlay controls and private display | 🟡 In progress: testing | 🖥️ Waiting on hardware: multi-monitor restore on Windows/macOS. Snap and restore verified in the real app on Linux (Xvfb, one monitor) |
 | T-030 | Data control: retention, delete session | ⬜ To do | |
 | T-031 | Logging to file and log export | ⬜ To do | |
 | T-032 | UI test suite (Playwright) | ⬜ To do | |
@@ -495,10 +495,10 @@ All Phase 0 code and automated tests are done and green on Linux, Windows and ma
 **Scope:** Opacity slider (done in T-001), resize, drag, snap to edges, remember position per monitor, font size, compact/expanded, shield indicator wired to T-011, show/hide.
 
 **Tests**
-- [ ] Unit: snapping and per-monitor position persistence logic.
-- [ ] Component: font size and compact mode change layout; shield colour follows protection status.
-- [ ] Accessibility (axe): overlay has no violations.
-- [ ] Manual: position restored across restarts on multi-monitor setups.
+- [x] Unit: snapping and per-monitor position persistence logic (`sidekick_window::placement`, settings validation).
+- [x] Component: font size and compact mode change layout and are saved; shield colour follows protection status (T-011 tests).
+- [x] Accessibility (axe): overlay has no violations.
+- [ ] Manual: position restored across restarts on multi-monitor setups. (Linux, one monitor: moved to 1490,15 → snapped to 1500,0; moved to 700,250, restarted → restored at 700,250.)
 
 ### T-030 Data control: retention, delete session
 

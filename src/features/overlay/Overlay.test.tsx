@@ -1,8 +1,9 @@
-import { render, screen } from "@testing-library/react";
+import { fireEvent, render, screen, waitFor } from "@testing-library/react";
+import axe from "axe-core";
 import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it } from "vitest";
 import { Overlay } from "./Overlay";
-import { mockWindowCalls, resetMocks } from "@/ipc/testing";
+import { mockCommands, mockWindowCalls, resetMocks } from "@/ipc/testing";
 import { useOverlayStore } from "./store";
 
 describe("Overlay", () => {
@@ -46,5 +47,68 @@ describe("overlay store", () => {
     expect(useOverlayStore.getState().opacity).toBe(0.2);
     useOverlayStore.getState().setOpacity(3);
     expect(useOverlayStore.getState().opacity).toBe(1);
+  });
+});
+
+describe("Overlay appearance (PRD UI-1, UI-3)", () => {
+  beforeEach(() => {
+    resetMocks();
+    useOverlayStore.setState({ tab: "answers", opacity: 0.9, fontSize: 14, compact: false });
+    document.documentElement.style.fontSize = "";
+  });
+
+  const savedOverlay = async () => {
+    await new Promise((r) => setTimeout(r, 350)); // opacity saves after it settles
+    const s = await mockCommands.getSettings();
+    if (s.status !== "ok") throw new Error("settings");
+    return s.data.overlay;
+  };
+
+  it("loads the saved appearance", async () => {
+    await mockCommands.setOverlay({ opacity: 55, fontSize: 18, compact: true });
+    render(<Overlay />);
+    await waitFor(() => expect(useOverlayStore.getState().fontSize).toBe(18));
+    expect(useOverlayStore.getState().opacity).toBe(0.55);
+    expect(screen.getByRole("button", { name: "Compact" })).toHaveAttribute("aria-pressed", "true");
+  });
+
+  it("text size buttons scale the text and are saved", async () => {
+    const user = userEvent.setup();
+    render(<Overlay />);
+    await waitFor(() => expect(document.documentElement.style.fontSize).toBe("16px"));
+    await user.click(screen.getByRole("button", { name: "Larger text" }));
+    await user.click(screen.getByRole("button", { name: "Larger text" }));
+    expect(document.documentElement.style.fontSize).toBe(`${(16 * 16) / 14}px`);
+    expect((await savedOverlay()).fontSize).toBe(16);
+    for (let i = 0; i < 10; i++)
+      await user.click(screen.getByRole("button", { name: "Smaller text" }));
+    expect(useOverlayStore.getState().fontSize).toBe(12);
+    expect(screen.getByRole("button", { name: "Smaller text" })).toBeDisabled();
+  });
+
+  it("compact mode hides the session bar and documents, and is saved", async () => {
+    const user = userEvent.setup();
+    render(<Overlay />);
+    expect(screen.getByRole("button", { name: "New session" })).toBeInTheDocument();
+    await user.click(screen.getByRole("button", { name: "Compact" }));
+    expect(screen.queryByRole("button", { name: "New session" })).not.toBeInTheDocument();
+    expect(screen.queryByText(/Documents/)).not.toBeInTheDocument();
+    expect(screen.getAllByRole("tab")).toHaveLength(4);
+    expect((await savedOverlay()).compact).toBe(true);
+  });
+
+  it("opacity is saved as a percentage once it settles", async () => {
+    render(<Overlay />);
+    const slider = screen.getByRole("slider", { name: "Panel opacity" });
+    fireEvent.change(slider, { target: { value: "0.5" } });
+    fireEvent.change(slider, { target: { value: "0.45" } });
+    expect((await savedOverlay()).opacity).toBe(45);
+  });
+
+  it("has no accessibility violations (axe)", async () => {
+    const { container } = render(<Overlay />);
+    await screen.findByText("v0.0.0-mock");
+    const results = await axe.run(container, { rules: { "color-contrast": { enabled: false } } });
+    expect(results.violations.map((v) => `${v.id}: ${v.help}`)).toEqual([]);
   });
 });

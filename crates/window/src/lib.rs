@@ -11,6 +11,8 @@
 //! These rules come from OS documentation and reports; the manual checklist
 //! (Task T-011) confirms them per OS and meeting app and may tighten them.
 
+pub mod placement;
+
 use serde::Serialize;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]

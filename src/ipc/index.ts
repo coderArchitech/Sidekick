@@ -66,6 +66,8 @@ export type {
   ModelInfo,
   NewActionItem,
   NewAnswer,
+  OverlayPatch,
+  OverlayPrefs,
   Notes,
   Profile,
   QuestionSource,
