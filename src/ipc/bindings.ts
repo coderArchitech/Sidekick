@@ -30,18 +30,100 @@ export const commands = {
       else return { status: "error", error: e as any };
     }
   },
+  async listProviders(kind: ProviderKind): Promise<Result<ProviderEntry[], SidekickError>> {
+    try {
+      return { status: "ok", data: await TAURI_INVOKE("list_providers", { kind }) };
+    } catch (e) {
+      if (e instanceof Error) throw e;
+      else return { status: "error", error: e as any };
+    }
+  },
+  async setApiKey(provider: string, key: string): Promise<Result<KeyCheck, SidekickError>> {
+    try {
+      return { status: "ok", data: await TAURI_INVOKE("set_api_key", { provider, key }) };
+    } catch (e) {
+      if (e instanceof Error) throw e;
+      else return { status: "error", error: e as any };
+    }
+  },
+  async testApiKey(provider: string): Promise<Result<KeyCheck, SidekickError>> {
+    try {
+      return { status: "ok", data: await TAURI_INVOKE("test_api_key", { provider }) };
+    } catch (e) {
+      if (e instanceof Error) throw e;
+      else return { status: "error", error: e as any };
+    }
+  },
+  async deleteApiKey(provider: string): Promise<Result<null, SidekickError>> {
+    try {
+      return { status: "ok", data: await TAURI_INVOKE("delete_api_key", { provider }) };
+    } catch (e) {
+      if (e instanceof Error) throw e;
+      else return { status: "error", error: e as any };
+    }
+  },
+  async listModels(provider: string): Promise<Result<ModelInfo[], SidekickError>> {
+    try {
+      return { status: "ok", data: await TAURI_INVOKE("list_models", { provider }) };
+    } catch (e) {
+      if (e instanceof Error) throw e;
+      else return { status: "error", error: e as any };
+    }
+  },
+  async llmStream(
+    requestId: string,
+    provider: string,
+    request: LlmRequest,
+  ): Promise<Result<null, SidekickError>> {
+    try {
+      return {
+        status: "ok",
+        data: await TAURI_INVOKE("llm_stream", { requestId, provider, request }),
+      };
+    } catch (e) {
+      if (e instanceof Error) throw e;
+      else return { status: "error", error: e as any };
+    }
+  },
+  /**
+   * Returns false if the stream had already finished.
+   */
+  async cancelStream(requestId: string): Promise<boolean> {
+    return await TAURI_INVOKE("cancel_stream", { requestId });
+  },
 };
 
 /** user-defined events **/
+
+export const events = __makeEvents__<{
+  answerDone: AnswerDone;
+  answerError: AnswerError;
+  answerToken: AnswerToken;
+}>({
+  answerDone: "answer-done",
+  answerError: "answer-error",
+  answerToken: "answer-token",
+});
 
 /** user-defined constants **/
 
 /** user-defined types **/
 
+export type AnswerDone = { requestId: string; usage: Usage; finishReason: FinishReason };
+export type AnswerError = { requestId: string; error: SidekickError };
+export type AnswerToken = { requestId: string; delta: string };
 /**
  * Basic facts about the running app, shown in the overlay and diagnostics.
  */
 export type AppInfo = { name: string; version: string; os: string };
+/**
+ * One turn of the conversation. Text only for now; images arrive with screenshots (T-025).
+ */
+export type ChatMessage = { role: Role; content: string };
+/**
+ * How hard the model should think. Lower is faster and cheaper.
+ */
+export type Effort = "low" | "medium" | "high";
 /**
  * Stable error codes. The UI decides what to show from the code, never the message.
  */
@@ -61,6 +143,53 @@ export type ErrorCode =
   | "CANCELLED"
   | "INTERNAL";
 /**
+ * Why generation stopped.
+ */
+export type FinishReason =
+  | "end_turn"
+  | "max_tokens"
+  /**
+   * The provider declined to answer; show a neutral notice, not partial text.
+   */
+  | "refusal"
+  | "tool_use"
+  | "other";
+/**
+ * Result of saving or testing a key.
+ */
+export type KeyCheck = {
+  key: KeyStatus;
+  /**
+   * True if the provider accepted the key. False means it was saved without
+   * a live check because this provider's adapter isn't built yet.
+   */
+  verified: boolean;
+};
+/**
+ * What the UI may know about a saved key.
+ */
+export type KeyStatus = {
+  saved: boolean;
+  /**
+   * Last 4 characters, or fewer if the key is shorter. Never more.
+   */
+  last4: string | null;
+};
+/**
+ * A provider-neutral request.
+ */
+export type LlmRequest = {
+  model: string;
+  system: string | null;
+  messages: ChatMessage[];
+  maxTokens: number;
+  effort: Effort | null;
+};
+/**
+ * A model the user can pick.
+ */
+export type ModelInfo = { id: string; displayName: string };
+/**
  * The active provider and model for one kind of service.
  */
 export type ProviderChoice = {
@@ -74,9 +203,25 @@ export type ProviderChoice = {
   model: string | null;
 };
 /**
+ * A catalog entry with the state of its saved key.
+ */
+export type ProviderEntry = {
+  id: string;
+  kind: ProviderKind;
+  displayName: string;
+  keyRequired: boolean;
+  implemented: boolean;
+  docsUrl: string;
+} & { key: KeyStatus };
+export type ProviderKind = "stt" | "llm" | "embed" | "search";
+/**
  * How long session data is kept after a session ends (tech doc 4.4).
  */
 export type Retention = "session" | "7d" | "30d" | "forever";
+/**
+ * Who wrote a message.
+ */
+export type Role = "user" | "assistant";
 /**
  * All user settings.
  */
@@ -112,6 +257,10 @@ export type SettingsPatch = {
  * `message` is user-facing and must never contain API keys or meeting content.
  */
 export type SidekickError = { code: ErrorCode; message: string; retryable: boolean };
+/**
+ * Token counts reported by the provider.
+ */
+export type Usage = { inputTokens: number; outputTokens: number };
 
 /** tauri-specta globals **/
 

@@ -4,5 +4,6 @@
 //! Tauri code, so every domain crate can depend on it without cycles.
 
 pub mod error;
+pub mod llm;
 
 pub use error::{ErrorCode, SidekickError, SidekickResult};

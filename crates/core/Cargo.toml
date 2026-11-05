@@ -12,6 +12,9 @@ specta = ["dep:specta"]
 
 [dependencies]
 serde.workspace = true
+async-trait.workspace = true
+futures.workspace = true
+secrecy.workspace = true
 thiserror.workspace = true
 specta = { workspace = true, optional = true }
 

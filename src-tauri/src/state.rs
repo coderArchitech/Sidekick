@@ -4,14 +4,14 @@ use std::path::PathBuf;
 use std::sync::{Arc, Mutex, MutexGuard, PoisonError};
 
 use sidekick_core::{SidekickError, SidekickResult};
+use sidekick_gateway::Gateway;
 use sidekick_secrets::{KeyStore, KeychainStore, MemoryStore};
 use sidekick_store::{DB_FILE_NAME, Database, database_key};
 
 /// Everything commands need. Crates receive only the parts they use.
 pub struct AppState {
     db: Mutex<Database>,
-    #[allow(dead_code)] // Read by the key commands (Task T-007).
-    pub keys: Arc<dyn KeyStore>,
+    pub gateway: Gateway,
 }
 
 impl AppState {
@@ -25,18 +25,23 @@ impl AppState {
         } else {
             Arc::new(KeychainStore::default())
         };
-        Self::init_with(keys, data_dir)
+        Self::init_with(keys, data_dir, mock_providers())
     }
 
     /// Opens the database in `data_dir` using the given key store.
-    pub fn init_with(keys: Arc<dyn KeyStore>, data_dir: PathBuf) -> SidekickResult<Self> {
+    pub fn init_with(
+        keys: Arc<dyn KeyStore>,
+        data_dir: PathBuf,
+        mock: bool,
+    ) -> SidekickResult<Self> {
         std::fs::create_dir_all(&data_dir)
             .map_err(|_| SidekickError::internal("Couldn't create the app data folder."))?;
         let key = database_key(keys.as_ref())?;
         let db = Database::open(&data_dir.join(DB_FILE_NAME), &key)?;
+        let gateway = Gateway::new(Arc::clone(&keys), mock);
         Ok(Self {
             db: Mutex::new(db),
-            keys,
+            gateway,
         })
     }
 
@@ -64,12 +69,56 @@ mod tests {
     fn first_run_creates_key_and_database_then_reopens() {
         let dir = tempfile::tempdir().unwrap();
         let keys: Arc<dyn KeyStore> = Arc::new(MemoryStore::default());
-        drop(AppState::init_with(keys.clone(), dir.path().join("data")).unwrap());
+        drop(AppState::init_with(keys.clone(), dir.path().join("data"), true).unwrap());
         assert!(dir.path().join("data").join(DB_FILE_NAME).exists());
         assert!(keys.status(DB_KEY_ACCOUNT).unwrap().saved);
         // Second start reuses the same key.
-        let state = AppState::init_with(keys, dir.path().join("data")).unwrap();
+        let state = AppState::init_with(keys, dir.path().join("data"), true).unwrap();
         assert!(sidekick_settings::load(&state.db()).unwrap().auto_answer);
+    }
+
+    #[tokio::test]
+    async fn api_keys_never_reach_the_database() {
+        let dir = tempfile::tempdir().unwrap();
+        let keys: Arc<dyn KeyStore> = Arc::new(MemoryStore::default());
+        let state = AppState::init_with(keys, dir.path().to_path_buf(), true).unwrap();
+        let secret = "sk-ant-NEVER-IN-DB-424242";
+        state
+            .gateway
+            .set_key(
+                "anthropic",
+                sidekick_secrets::SecretString::from(secret.to_owned()),
+            )
+            .await
+            .unwrap();
+        sidekick_settings::update(&state.db(), sidekick_settings::SettingsPatch::default())
+            .unwrap();
+
+        // Read every row of every table as text and search for the key.
+        let db = state.db();
+        let conn = db.conn();
+        let tables: Vec<String> = conn
+            .prepare("SELECT name FROM sqlite_master WHERE type='table' AND name NOT LIKE '%fts%' AND name NOT LIKE 'chunk_vectors%'")
+            .unwrap()
+            .query_map([], |r| r.get(0))
+            .unwrap()
+            .map(Result::unwrap)
+            .collect();
+        assert!(tables.len() > 10, "{tables:?}");
+        for table in tables {
+            let mut stmt = conn.prepare(&format!("SELECT * FROM {table}")).unwrap();
+            let cols = stmt.column_count();
+            let mut rows = stmt.query([]).unwrap();
+            while let Some(row) = rows.next().unwrap() {
+                for i in 0..cols {
+                    let v: rusqlite::types::Value = row.get(i).unwrap();
+                    assert!(
+                        !format!("{v:?}").contains("NEVER-IN-DB"),
+                        "key found in {table}"
+                    );
+                }
+            }
+        }
     }
 
     #[test]

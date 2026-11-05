@@ -1,0 +1,31 @@
+[package]
+name = "sidekick-gateway"
+description = "Calls LLM providers with the user's keys: provider catalog, adapters (Anthropic, mock), streaming, retries, cancellation and key checks."
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+publish.workspace = true
+
+[features]
+specta = ["dep:specta", "sidekick-core/specta"]
+
+[dependencies]
+sidekick-core.workspace = true
+sidekick-secrets.workspace = true
+async-trait.workspace = true
+futures.workspace = true
+reqwest.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+tokio.workspace = true
+tokio-util.workspace = true
+tracing.workspace = true
+fastrand.workspace = true
+specta = { workspace = true, optional = true }
+
+[dev-dependencies]
+wiremock.workspace = true
+tokio = { workspace = true, features = ["test-util"] }
+
+[lints]
+workspace = true

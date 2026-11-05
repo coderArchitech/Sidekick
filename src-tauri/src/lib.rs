@@ -7,6 +7,7 @@
 use tauri::Manager;
 
 mod commands;
+mod events;
 mod ipc;
 mod logging;
 mod state;

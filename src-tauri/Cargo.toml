@@ -18,6 +18,8 @@ sidekick-core = { workspace = true, features = ["specta"] }
 sidekick-secrets = { workspace = true, features = ["specta"] }
 sidekick-store.workspace = true
 sidekick-settings = { workspace = true, features = ["specta"] }
+sidekick-gateway = { workspace = true, features = ["specta"] }
+tokio.workspace = true
 tauri = { version = "2", features = ["macos-private-api"] }
 serde.workspace = true
 serde_json.workspace = true
@@ -29,6 +31,7 @@ tauri-specta.workspace = true
 
 [dev-dependencies]
 tempfile.workspace = true
+rusqlite.workspace = true
 
 [lints]
 workspace = true

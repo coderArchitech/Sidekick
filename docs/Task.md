@@ -34,12 +34,12 @@ The working task list for building Sidekick end to end, derived from the [techni
 | ID | Task | Status | Notes |
 | --- | --- | --- | --- |
 | T-001 | Project scaffold | ✅ Done | Branch `chore/scaffold` |
-| T-002 | CI green on Windows and macOS | 🟡 In progress: testing | [PR #1](https://github.com/coderArchitech/Sidekick/pull/1): Linux and macOS green; Windows test crash fixed (manifest), re-running |
+| T-002 | CI green on Windows and macOS | ✅ Done | [PR #1](https://github.com/coderArchitech/Sidekick/pull/1) green on Linux, Windows, macOS |
 | T-003 | Apply doc fixes P1–P5 | ✅ Done | Applied with recommended defaults; ADR-013 |
 | T-004 | `secrets` crate: OS keychain | 🟡 In progress: testing | Passes locally (incl. real keychain on Linux); waiting for Windows/macOS CI |
 | T-005 | `store` crate: encrypted database and migrations | 🟡 In progress: testing | Passes locally; waiting for Windows/macOS CI |
 | T-006 | Settings storage and commands | 🟡 In progress: testing | Passes locally; waiting for Windows/macOS CI |
-| T-007 | `gateway` crate: LLM provider trait, mock and Anthropic | ⬜ To do | |
+| T-007 | `gateway` crate: LLM provider trait, mock and Anthropic | 🟡 In progress: testing | Passes locally; waiting for Windows/macOS CI |
 | T-008 | Settings window: providers and API keys | ⬜ To do | |
 | T-009 | `audio` crate: microphone and system audio capture | ⬜ To do | 🖥️ |
 | T-010 | `stt` crate: Deepgram streaming | ⬜ To do | |
@@ -182,13 +182,18 @@ The working task list for building Sidekick end to end, derived from the [techni
 **Scope:** `LlmProvider` trait in `sidekick-core`; provider registry with `ProviderInfo`; mock provider (`SIDEKICK_MOCK_PROVIDERS=1`); Anthropic adapter with streaming; retries with backoff and `Retry-After`; cancellation; key commands that test then store keys.
 
 **Tests**
-- [ ] Unit: Anthropic request building (system prompt, messages, model, tools).
-- [ ] Unit: SSE stream parsing into token deltas, usage and finish reason (recorded fixtures).
-- [ ] Unit: error mapping 401/403 → `KEY_INVALID`, 429 → `RATE_LIMITED`, 5xx → `PROVIDER_UNAVAILABLE`.
-- [ ] Integration (wiremock): retries 3 times with backoff, honours `Retry-After`, then fails.
-- [ ] Integration: `cancel_stream` stops token events and returns `CANCELLED`.
-- [ ] Integration: `set_api_key` stores only after a successful test; IPC responses never include the key.
-- [ ] Unit: mock provider is deterministic.
+- [x] Unit: Anthropic request building (system prompt, messages, model, effort); no sampling parameters; refusal fallback only on supported models. Tools move to T-021/T-046.
+- [x] Unit: SSE parser handles split chunks, CRLF, multi-line data, comments.
+- [x] Unit: stream parsing into token deltas, usage and finish reason; thinking blocks skipped; `refusal` surfaced; in-stream errors mapped without echoing provider text.
+- [x] Unit: error mapping 401/403 → `KEY_INVALID`, 429 → `RATE_LIMITED`, 5xx/529 → `PROVIDER_UNAVAILABLE`; `Retry-After` parsed.
+- [x] Unit: retries 3 times with ±20% jitter, honours `Retry-After`, gives up when it's too long, never retries non-retryable errors.
+- [x] Integration (wiremock): correct headers; 429 twice then success; 500 four times then `PROVIDER_UNAVAILABLE`.
+- [x] Integration: `cancel_stream` stops token events and reports `CANCELLED`; no tokens after cancel.
+- [x] Integration: `set_api_key` stores only after a successful test (401 not saved, not retried); responses and provider lists never include the key; providers without an adapter save unverified.
+- [x] Integration: missing key reported before streaming; mock mode answers without keys.
+- [x] Integration: no API key in any database table after saving one (moved from T-005).
+- [x] Unit: capability files give key commands to the Settings window only, streaming to the overlay.
+- [x] Component: browser mocks stream tokens, cancel, and mirror key rules.
 
 ### T-008 Settings window: providers and API keys
 

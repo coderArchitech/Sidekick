@@ -1,7 +1,17 @@
 {
   "$schema": "../gen/schemas/desktop-schema.json",
   "identifier": "settings",
-  "description": "Settings window: providers, keys, models, settings, skills, usage, diagnostics, backup (tech doc 5.8).",
+  "description": "Settings window: providers, keys, models, settings, skills, usage, diagnostics, backup (tech doc 5.8). The only window that can touch API keys.",
   "windows": ["settings"],
-  "permissions": ["core:default", "allow-app-info", "allow-get-settings", "allow-update-settings"]
+  "permissions": [
+    "core:default",
+    "allow-app-info",
+    "allow-get-settings",
+    "allow-update-settings",
+    "allow-list-providers",
+    "allow-set-api-key",
+    "allow-test-api-key",
+    "allow-delete-api-key",
+    "allow-list-models"
+  ]
 }

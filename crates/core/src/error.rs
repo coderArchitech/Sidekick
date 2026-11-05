@@ -46,6 +46,10 @@ pub struct SidekickError {
     pub code: ErrorCode,
     pub message: String,
     pub retryable: bool,
+    /// How long the provider asked us to wait (`Retry-After`). Internal only.
+    #[serde(skip)]
+    #[cfg_attr(feature = "specta", specta(skip))]
+    pub retry_after: Option<std::time::Duration>,
 }
 
 impl SidekickError {
@@ -54,11 +58,19 @@ impl SidekickError {
             code,
             message: message.into(),
             retryable: code.retryable(),
+            retry_after: None,
         }
     }
 
     pub fn internal(message: impl Into<String>) -> Self {
         Self::new(ErrorCode::Internal, message)
+    }
+
+    /// Records the provider's requested wait before a retry.
+    #[must_use]
+    pub fn with_retry_after(mut self, wait: Option<std::time::Duration>) -> Self {
+        self.retry_after = wait;
+        self
     }
 }
 

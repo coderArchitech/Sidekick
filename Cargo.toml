@@ -16,6 +16,7 @@ sidekick-core = { path = "crates/core" }
 sidekick-secrets = { path = "crates/secrets" }
 sidekick-store = { path = "crates/store" }
 sidekick-settings = { path = "crates/settings" }
+sidekick-gateway = { path = "crates/gateway" }
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
 thiserror = "2"
@@ -26,6 +27,13 @@ sqlite-vec = "0.1.6"
 getrandom = "0.3"
 hex = "0.4"
 tempfile = "3"
+async-trait = "0.1"
+futures = "0.3"
+tokio = { version = "1", features = ["rt-multi-thread", "macros", "time", "sync"] }
+tokio-util = "0.7"
+reqwest = { version = "0.12", default-features = false, features = ["json", "stream", "rustls-tls"] }
+fastrand = "2"
+wiremock = "0.6"
 tracing = "0.1"
 tracing-subscriber = { version = "0.3", features = ["env-filter", "json"] }
 specta = { version = "=2.0.0-rc.22", features = ["derive"] }

@@ -207,7 +207,7 @@ Each module below is its own crate at `crates/<module>/`, named `sidekick-<modul
 | `store` | SQLCipher database (raw 256-bit key from `secrets`), WAL, foreign keys; migrations with pre-migration backups; sqlite-vec registered for every connection; `settings` (raw JSON) and `vectors` (per-model `chunk_vectors`) modules; repository modules added per feature | Done |
 | `settings` | Typed `Settings` (providers and models for STT, LLM, embeddings, search; Auto-answer; retention) with defaults and partial `SettingsPatch` updates; one `settings` row per section; unreadable sections fall back to defaults | Done |
 | `retrieval` | Vector and keyword search over chunks; assemble context packs (transcript window, notes, chunks, screenshot) | Not started |
-| `gateway` | `LlmProvider` and `SearchProvider` traits plus adapters; attach keys; stream tokens; retries and backoff | Not started |
+| `gateway` | Provider catalog (all kinds, for Settings); `LlmProvider` adapters (Anthropic, mock; OpenAI, Gemini, Ollama in T-026); the only place keys are attached; streaming via an `AnswerSink` the shell implements; retries with backoff and `Retry-After`; cancellation; key checks before saving. `SearchProvider` and `EmbeddingProvider` arrive with T-046 and T-017 | Started (LLM done) |
 | `secrets` | `KeyStore` trait with `KeychainStore` (OS keychain, service `sidekick`) and `MemoryStore` (tests, mock mode); keys as `SecretString`; `KeyStatus` exposes only the last 4 characters; account names restricted to `[a-z0-9-]` | Done |
 | `skills` | Load, validate, import and export Skill files | Not started |
 | `session` | Session lifecycle: create, start, pause, stop, delete | Not started |
@@ -318,7 +318,7 @@ Each decision has its own file in [`docs/adr/`](adr/README.md). New decisions ge
 | Deepgram | WebSocket (streaming) | API key in header | Default live STT |
 | AssemblyAI | WebSocket (streaming) | API key in header | Alternative STT |
 | Soniox | WebSocket (streaming) | API key | Alternative STT, multilingual |
-| Anthropic | HTTPS + server-sent events | API key header | LLM answers, vision |
+| Anthropic | HTTPS + server-sent events (`anthropic-version: 2026-10-21`, so no sampling parameters) | `x-api-key` header | LLM answers, vision. Defaults: `claude-opus-5-5` for full answers, `claude-haiku-5-5` for cues (MOD-3). Server-side refusal fallback (`fallbacks: "default"`, beta `server-side-fallback-2026-07-01`) is on for models that support it; a final `refusal` stop reason is shown as a neutral notice |
 | OpenAI | HTTPS + server-sent events | Bearer token | LLM answers, vision, embeddings (default: `text-embedding-3-small`, 1536 dims) |
 | Voyage AI | HTTPS | Bearer token | Embeddings (Anthropic's recommended partner; Anthropic has no embeddings API) |
 | Google Gemini | HTTPS streaming | API key header | LLM answers, vision, embeddings |
@@ -607,7 +607,7 @@ Commands are request/response calls from the frontend to Rust (`invoke`). All re
 
 ### 5.2 Events
 
-Events are pushed from Rust to the frontend. Payloads are typed and versioned with the app.
+Events are pushed from Rust to the frontend. Payloads are typed and versioned with the app. Tauri event names can't contain dots, so the wire names use a dash (`answer-token`); the table keeps the dotted names for readability. In TypeScript, features subscribe through `answerEvents` from `@/ipc`, which also works with the browser mocks. Status: `answer.token`, `answer.done` and `answer.error` are implemented.
 
 | Event | Payload | When |
 | --- | --- | --- |
@@ -926,7 +926,7 @@ Folders are created when their first file lands; the tree shows where things go,
 - Tailwind for styling; no inline style objects except dynamic values like opacity.
 - Accessible by default: every interactive element has a label and keyboard support.
 
-**Naming:** Rust `snake_case`, TypeScript `camelCase`, React components `PascalCase`, events `domain.action` (e.g. `answer.token`).
+**Naming:** Rust `snake_case`, TypeScript `camelCase`, React components `PascalCase`, events `domain-action` on the wire (e.g. `answer-token`; Tauri rejects dots), generated from Rust structs named `DomainAction` (e.g. `AnswerToken`).
 
 ### 7.3 Branching and commits
 

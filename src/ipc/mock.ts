@@ -1,4 +1,12 @@
-import type { commands as tauriCommands, Settings, SettingsPatch } from "./bindings";
+import { createMockAnswerBus } from "./answerEvents";
+import type {
+  commands as tauriCommands,
+  KeyStatus,
+  ProviderEntry,
+  ProviderKind,
+  Settings,
+  SettingsPatch,
+} from "./bindings";
 
 type Commands = typeof tauriCommands;
 
@@ -12,7 +20,30 @@ export const DEFAULT_SETTINGS: Settings = {
   retention: "30d",
 };
 
+type CatalogRow = [id: string, kind: ProviderKind, displayName: string, keyRequired: boolean];
+
+/** Mirrors crates/gateway/src/catalog.rs. In mock mode every provider counts as implemented. */
+const CATALOG: CatalogRow[] = [
+  ["deepgram", "stt", "Deepgram", true],
+  ["assemblyai", "stt", "AssemblyAI", true],
+  ["soniox", "stt", "Soniox", true],
+  ["whisper-local", "stt", "Local Whisper", false],
+  ["anthropic", "llm", "Anthropic (Claude)", true],
+  ["openai", "llm", "OpenAI", true],
+  ["gemini", "llm", "Google Gemini", true],
+  ["ollama", "llm", "Ollama (local)", false],
+  ["openai", "embed", "OpenAI", true],
+  ["gemini", "embed", "Google Gemini", true],
+  ["voyage", "embed", "Voyage AI", true],
+  ["ollama", "embed", "Ollama (local)", false],
+  ["tavily", "search", "Tavily", true],
+  ["brave", "search", "Brave Search", true],
+];
+
 let settings: Settings = structuredClone(DEFAULT_SETTINGS);
+const savedKeys = new Map<string, string>();
+const activeStreams = new Map<string, { cancelled: boolean }>();
+export const mockAnswerBus = createMockAnswerBus();
 
 /** Applies a patch the way the Rust side does: absent fields are unchanged. */
 export function applyPatch(current: Settings, patch: SettingsPatch): Settings {
@@ -26,9 +57,25 @@ export function applyPatch(current: Settings, patch: SettingsPatch): Settings {
   return next;
 }
 
+function keyStatus(provider: string): KeyStatus {
+  const key = savedKeys.get(provider);
+  return key ? { saved: true, last4: key.slice(-4) } : { saved: false, last4: null };
+}
+
+function isKnown(provider: string) {
+  return CATALOG.some(([id]) => id === provider);
+}
+
+const unknownProvider = {
+  status: "error" as const,
+  error: { code: "INTERNAL" as const, message: "Unknown provider.", retryable: false },
+};
+
 /** Resets mock state between tests. */
 export function resetMocks(): void {
   settings = structuredClone(DEFAULT_SETTINGS);
+  savedKeys.clear();
+  activeStreams.clear();
 }
 
 /**
@@ -46,5 +93,98 @@ export const mockCommands: Commands = {
   updateSettings: (patch) => {
     settings = applyPatch(settings, patch);
     return Promise.resolve({ status: "ok", data: structuredClone(settings) });
+  },
+  listProviders: (kind) => {
+    const data: ProviderEntry[] = CATALOG.filter(([, k]) => k === kind).map(
+      ([id, k, displayName, keyRequired]) => ({
+        id,
+        kind: k,
+        displayName,
+        keyRequired,
+        implemented: true,
+        docsUrl: "https://example.com",
+        key: keyStatus(id),
+      }),
+    );
+    return Promise.resolve({ status: "ok", data });
+  },
+  setApiKey: (provider, key) => {
+    if (!isKnown(provider)) return Promise.resolve(unknownProvider);
+    if (!key.trim()) {
+      return Promise.resolve({
+        status: "error",
+        error: { code: "KEY_MISSING", message: "Paste a key first.", retryable: false },
+      });
+    }
+    // Convention for UI tests: keys containing "invalid" are rejected.
+    if (key.includes("invalid")) {
+      return Promise.resolve({
+        status: "error",
+        error: {
+          code: "KEY_INVALID",
+          message: `${provider} rejected the API key.`,
+          retryable: false,
+        },
+      });
+    }
+    savedKeys.set(provider, key);
+    return Promise.resolve({ status: "ok", data: { key: keyStatus(provider), verified: true } });
+  },
+  testApiKey: (provider) => {
+    if (!savedKeys.has(provider)) {
+      return Promise.resolve({
+        status: "error",
+        error: {
+          code: "KEY_MISSING",
+          message: `Add your ${provider} API key in Settings.`,
+          retryable: false,
+        },
+      });
+    }
+    return Promise.resolve({ status: "ok", data: { key: keyStatus(provider), verified: true } });
+  },
+  deleteApiKey: (provider) => {
+    if (!isKnown(provider)) return Promise.resolve(unknownProvider);
+    savedKeys.delete(provider);
+    return Promise.resolve({ status: "ok", data: null });
+  },
+  listModels: () =>
+    Promise.resolve({
+      status: "ok",
+      data: [
+        { id: "mock-fast", displayName: "Mock (fast)" },
+        { id: "mock-large", displayName: "Mock (large)" },
+      ],
+    }),
+  llmStream: (requestId, _provider, request) => {
+    const question = [...request.messages].reverse().find((m) => m.role === "user")?.content ?? "";
+    const words = `Mock answer to: ${question}`.split(/(?<= )/);
+    const handle = { cancelled: false };
+    activeStreams.set(requestId, handle);
+    void (async () => {
+      for (const delta of words) {
+        await Promise.resolve();
+        if (handle.cancelled) return;
+        mockAnswerBus.emitToken({ requestId, delta });
+      }
+      activeStreams.delete(requestId);
+      mockAnswerBus.emitDone({
+        requestId,
+        usage: { inputTokens: 10, outputTokens: words.length },
+        finishReason: "end_turn",
+      });
+    })();
+    return Promise.resolve({ status: "ok", data: null });
+  },
+  cancelStream: (requestId) => {
+    const handle = activeStreams.get(requestId);
+    if (!handle) return Promise.resolve(false);
+    handle.cancelled = true;
+    activeStreams.delete(requestId);
+    mockAnswerBus.emitError({
+      requestId,
+      error: { code: "CANCELLED", message: "Cancelled.", retryable: false },
+    });
+    return Promise.resolve(true);
   },
 };

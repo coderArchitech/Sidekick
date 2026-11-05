@@ -23,7 +23,15 @@ fn permissions() -> HashMap<String, Vec<String>> {
 }
 
 /// Commands only the Settings window may call.
-const SETTINGS_ONLY: &[&str] = &["allow-get-settings", "allow-update-settings"];
+const SETTINGS_ONLY: &[&str] = &[
+    "allow-get-settings",
+    "allow-update-settings",
+    "allow-list-providers",
+    "allow-set-api-key",
+    "allow-test-api-key",
+    "allow-delete-api-key",
+    "allow-list-models",
+];
 
 #[test]
 fn settings_commands_are_granted_to_the_settings_window_only() {
@@ -47,17 +55,16 @@ fn settings_commands_are_granted_to_the_settings_window_only() {
 #[test]
 fn every_declared_command_is_granted_somewhere() {
     let build_rs = include_str!("../build.rs");
-    let start = build_rs.find("&[\"").unwrap();
+    let start = build_rs.find("const COMMANDS").unwrap();
     let end = build_rs[start..].find("];").unwrap() + start;
-    let declared: Vec<String> = build_rs[start + 1..end]
-        .split(',')
-        .map(|s| {
-            s.trim()
-                .trim_matches(|c| c == '[' || c == '"' || c == ']')
-                .to_owned()
-        })
-        .filter(|s| !s.is_empty())
+    // Every double-quoted string inside the COMMANDS array.
+    let declared: Vec<String> = build_rs[start..end]
+        .split('"')
+        .skip(1)
+        .step_by(2)
+        .map(str::to_owned)
         .collect();
+    assert!(declared.len() >= 10, "parsed {declared:?}");
     let all: Vec<String> = permissions().into_values().flatten().collect();
     for cmd in declared {
         let perm = format!("allow-{}", cmd.replace('_', "-"));
