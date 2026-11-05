@@ -38,6 +38,7 @@ export type {
   KeyStatus,
   LlmRequest,
   ModelInfo,
+  Profile,
   ProtectionState,
   ProtectionStatus,
   ProviderChoice,

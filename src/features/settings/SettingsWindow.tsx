@@ -7,6 +7,7 @@ import {
   type SettingsPatch,
 } from "@/ipc";
 import { DiagnosticsPanel } from "./DiagnosticsPanel";
+import { ProfileSection } from "./ProfileSection";
 import { ProviderSection } from "./ProviderSection";
 import { ShortcutsSection } from "./ShortcutsSection";
 
@@ -65,6 +66,17 @@ export function SettingsWindow() {
               Keys are stored in your operating system&apos;s keychain and only sent to the provider
               they belong to.
             </p>
+            <ProfileSection
+              profile={settings.profile}
+              onSave={async (profile) => {
+                const result = await commands.updateSettings({ profile });
+                if (result.status === "ok") {
+                  setSettings(result.data);
+                  return { saved: result.data.profile };
+                }
+                return { error: result.error.message };
+              }}
+            />
             <ProviderSection
               kind="stt"
               title="Speech-to-text"

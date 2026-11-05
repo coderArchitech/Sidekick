@@ -377,6 +377,10 @@ export type LlmRequest = {
  * A model the user can pick.
  */
 export type ModelInfo = { id: string; displayName: string };
+/**
+ * Who the user is, for directed questions and STT boosts (PRD QA-2, LIS-5a).
+ */
+export type Profile = { name: string; nicknames: string[] };
 export type ProtectionState =
   /**
    * The OS hides the overlay from screen sharing and recordings (green shield).
@@ -489,6 +493,7 @@ export type Settings = {
    * Global shortcuts, one per action (tech doc 12.3).
    */
   shortcuts: Binding[];
+  profile: Profile;
 };
 /**
  * A partial update. Only the sections present are replaced; unknown fields are
@@ -508,6 +513,7 @@ export type SettingsPatch = {
    * The full set of shortcuts; validated (every action once, no duplicates).
    */
   shortcuts?: Binding[] | null;
+  profile?: Profile | null;
 };
 /**
  * Error returned by every fallible Sidekick function and IPC command.

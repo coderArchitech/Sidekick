@@ -55,7 +55,7 @@ All Phase 0 code and automated tests are done and green on Linux, Windows and ma
 | T-013 | Sessions and consent | 🟡 In progress: testing | Waiting on dependency: E2E needs the WebdriverIO harness (T-033). Everything else done, including a real-app run |
 | T-014 | Live transcript tab | ✅ Done | Verified in the real app with fixture audio |
 | T-015 | `hotkeys` crate: global shortcuts | 🟡 In progress: testing | 🖥️ Waiting on hardware: verified on Linux (X11); needs a check on Windows and macOS. Ask/Screenshot/Auto/Skill actions hook in with T-023/T-025/T-020/T-028 |
-| T-016 | Profile: name and nicknames | ⬜ To do | |
+| T-016 | Profile: name and nicknames | ✅ Done | Detection use lands in T-020 |
 | T-017 | `ingest` crate: parse, chunk, embed | ⬜ To do | |
 | T-018 | `retrieval` crate: hybrid search and context packs | ⬜ To do | |
 | T-019 | Library feature: documents in a session | ⬜ To do | |
@@ -328,8 +328,9 @@ All Phase 0 code and automated tests are done and green on Linux, Windows and ma
 **Scope:** Settings → Profile; names and nicknames stored in settings; passed to STT as vocabulary boost and to detection.
 
 **Tests**
-- [ ] Component: add, edit and remove nicknames.
-- [ ] Unit: STT config includes the names as keywords.
+- [x] Component: set the name, add (Enter or button), ignore duplicates, remove and save nicknames.
+- [x] Unit: names trimmed, blanks and duplicates removed, limits (10 nicknames, 40 characters), persisted.
+- [x] Integration: every STT stream of a session gets the names as keyterms; Deepgram adds them as `keyterm` parameters (T-010 test).
 
 ### T-017 `ingest` crate: parse, chunk, embed
 

@@ -1410,7 +1410,7 @@ All shortcuts can be changed in Settings → Shortcuts.
 | Change providers, keys or models | Settings → Providers |
 | Set how long sessions are kept | Settings → Data → Retention |
 | Export or restore all data | Settings → Data → Export / Restore |
-| Add your name and nicknames for directed questions | Settings → Profile |
+| Add your name and nicknames for directed questions (also sent to speech-to-text as words to expect) | Settings → Profile |
 | Add custom vocabulary (product names, people) | Settings → Transcription |
 | Turn on auto-hide when screen sharing | Settings → Privacy |
 | Switch to beta updates | Settings → About → Update channel |

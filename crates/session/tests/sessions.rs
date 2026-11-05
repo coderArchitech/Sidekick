@@ -400,3 +400,61 @@ fn transcript_lines_rename_merge_and_bookmarks() {
         [(1_200, None), (3_500, Some("pricing".into()))]
     );
 }
+
+/// Records the config each STT run receives.
+#[derive(Default)]
+struct ConfigSpy(Mutex<Vec<(StreamKind, Vec<String>)>>);
+
+#[async_trait::async_trait]
+impl sidekick_stt::SttProvider for ConfigSpy {
+    fn id(&self) -> &'static str {
+        "spy"
+    }
+    async fn run(
+        &self,
+        config: sidekick_stt::SttConfig,
+        _: Option<SecretString>,
+        mut frames: tokio::sync::mpsc::Receiver<sidekick_audio::AudioFrame>,
+        _: Arc<dyn SttSink>,
+        _: tokio_util::sync::CancellationToken,
+    ) -> SidekickResult<()> {
+        self.0
+            .lock()
+            .unwrap()
+            .push((config.kind, config.keyterms.clone()));
+        while frames.recv().await.is_some() {}
+        Ok(())
+    }
+}
+
+#[tokio::test]
+async fn profile_names_reach_every_stt_stream_as_keyterms() {
+    let dir = tempfile::tempdir().unwrap();
+    let audio = recording(dir.path(), false);
+    let spy = Arc::new(ConfigSpy::default());
+    let plan = SttPlan {
+        provider: spy.clone(),
+        key: None,
+        language: "en".into(),
+        keyterms: vec!["Nitesh".into(), "Nitu".into()],
+    };
+    let kinds = streams_for(Some(ConsentOption::ParticipantsAgreed)).unwrap();
+    let live = LiveSession::start(&kinds, &audio, &plan, Arc::new(Sink::default())).unwrap();
+    tokio::time::sleep(Duration::from_millis(100)).await;
+    live.stop().await;
+    let mut seen = spy.0.lock().unwrap().clone();
+    seen.sort_by_key(|(k, _)| format!("{k:?}"));
+    assert_eq!(
+        seen,
+        [
+            (
+                StreamKind::Mic,
+                vec!["Nitesh".to_owned(), "Nitu".to_owned()]
+            ),
+            (
+                StreamKind::System,
+                vec!["Nitesh".to_owned(), "Nitu".to_owned()]
+            )
+        ]
+    );
+}

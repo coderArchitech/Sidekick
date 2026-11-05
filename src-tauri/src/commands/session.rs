@@ -112,7 +112,9 @@ pub async fn start_session(
         }
         None => Box::new(DeviceAudio),
     };
-    let plan = stt_plan(&state, &settings.stt.provider)?;
+    let mut plan = stt_plan(&state, &settings.stt.provider)?;
+    // Boost the user's name and nicknames so directed questions are heard (PRD LIS-5a).
+    plan.keyterms = settings.profile.names();
     let sink = Arc::new(TauriSttSink::new(app.clone(), session_id.clone()));
     let runner = LiveSession::start(&kinds, audio.as_ref(), &plan, sink)?;
     let warnings = runner.warnings.clone();
@@ -146,7 +148,6 @@ fn stt_plan(state: &AppState, provider: &str) -> SidekickResult<SttPlan> {
             }
         }
     };
-    // Name and nickname boosts arrive with the profile (T-016).
     Ok(SttPlan {
         provider,
         key,

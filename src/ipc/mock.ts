@@ -36,6 +36,7 @@ export const DEFAULT_SETTINGS: Settings = {
     { action: "switch_skill", keys: "CmdOrCtrl+Shift+K" },
     { action: "bookmark", keys: "CmdOrCtrl+Shift+B" },
   ],
+  profile: { name: "", nicknames: [] },
 };
 
 type CatalogRow = [id: string, kind: ProviderKind, displayName: string, keyRequired: boolean];
@@ -167,6 +168,15 @@ export function applyPatch(current: Settings, patch: SettingsPatch): Settings {
   if (patch.autoAnswer != null) next.autoAnswer = patch.autoAnswer;
   if (patch.retention) next.retention = patch.retention;
   if (patch.shortcuts) next.shortcuts = patch.shortcuts;
+  if (patch.profile) {
+    // Mirrors Profile::names: trimmed, no blanks, no duplicates of the name.
+    const name = patch.profile.name.trim();
+    const seen = new Set(name ? [name.toLowerCase()] : []);
+    const nicknames = patch.profile.nicknames
+      .map((n) => n.trim())
+      .filter((n) => n && !seen.has(n.toLowerCase()) && seen.add(n.toLowerCase()));
+    next.profile = { name, nicknames };
+  }
   return next;
 }
 
