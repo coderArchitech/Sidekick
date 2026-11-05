@@ -63,6 +63,7 @@ export function ConsentDialog({ onConfirm, onCancel }: Props) {
                 value={o.value}
                 checked={choice === o.value}
                 aria-describedby={`${titleId}-${o.value}-detail`}
+                className="mt-1 h-4 w-4 shrink-0 accent-blue-500"
                 onChange={() => setChoice(o.value)}
               />
               <div>

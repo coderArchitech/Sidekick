@@ -52,7 +52,7 @@ All Phase 0 code and automated tests are done and green on Linux, Windows and ma
 
 | ID | Task | Status | Notes |
 | --- | --- | --- | --- |
-| T-013 | Sessions and consent | 🟡 In progress: testing | Automated tests pass; real-app run and E2E (T-033) pending |
+| T-013 | Sessions and consent | 🟡 In progress: testing | Waiting on dependency: E2E needs the WebdriverIO harness (T-033). Everything else done, including a real-app run |
 | T-014 | Live transcript tab | ⬜ To do | |
 | T-015 | `hotkeys` crate: global shortcuts | ⬜ To do | 🖥️ |
 | T-016 | Profile: name and nicknames | ⬜ To do | |
@@ -291,7 +291,7 @@ All Phase 0 code and automated tests are done and green on Linux, Windows and ma
 - [x] Integration: lifecycle timestamps (first start kept, end recorded); segments saved and deleted with the session.
 - [x] Integration: pause drops audio and splits the transcript; stop flushes STT.
 - [x] Component: session bar creates, starts, pauses, resumes and ends; consent dialog needs a choice, Cancel/Escape start nothing, focus starts on the first option; errors shown; axe passes.
-- [ ] Manual: real app with `SIDEKICK_MOCK_PROVIDERS=1` and `SIDEKICK_AUDIO_FIXTURE`: start a session, see it go live, end it (transcript UI is T-014).
+- [x] Manual: real app (Linux, Xvfb, driven with xdotool) with `SIDEKICK_MOCK_PROVIDERS=1` and `SIDEKICK_AUDIO_FIXTURE`: created a session, consent dialog shown, went live ("Listening"), ended cleanly; no errors in the log.
 - [ ] E2E: create session → consent → start with fixture audio → transcript appears → end (needs the WebdriverIO harness, T-033).
 
 ### T-014 Live transcript tab
