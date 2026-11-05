@@ -3,7 +3,10 @@ use rusqlite_migration::{M, Migrations};
 use sidekick_core::{ErrorCode, SidekickError, SidekickResult};
 
 /// Ordered, forward-only migrations (tech doc 4.5). Append; never edit a released one.
-const MIGRATIONS: &[&str] = &[include_str!("../migrations/0001_init.sql")];
+const MIGRATIONS: &[&str] = &[
+    include_str!("../migrations/0001_init.sql"),
+    include_str!("../migrations/0002_consent_log_outlives_sessions.sql"),
+];
 
 /// Schema version after all migrations (`PRAGMA user_version`).
 #[allow(clippy::cast_possible_wrap, clippy::cast_possible_truncation)]

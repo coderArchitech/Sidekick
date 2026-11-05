@@ -120,6 +120,82 @@ export const commands = {
   async recordLatency(stage: Stage, ms: number): Promise<void> {
     await TAURI_INVOKE("record_latency", { stage, ms });
   },
+  async createSession(title: string): Promise<Result<Session, SidekickError>> {
+    try {
+      return { status: "ok", data: await TAURI_INVOKE("create_session", { title }) };
+    } catch (e) {
+      if (e instanceof Error) throw e;
+      else return { status: "error", error: e as any };
+    }
+  },
+  async confirmConsent(
+    sessionId: string,
+    option: ConsentOption,
+  ): Promise<Result<Session, SidekickError>> {
+    try {
+      return { status: "ok", data: await TAURI_INVOKE("confirm_consent", { sessionId, option }) };
+    } catch (e) {
+      if (e instanceof Error) throw e;
+      else return { status: "error", error: e as any };
+    }
+  },
+  async startSession(sessionId: string): Promise<Result<SessionStarted, SidekickError>> {
+    try {
+      return { status: "ok", data: await TAURI_INVOKE("start_session", { sessionId }) };
+    } catch (e) {
+      if (e instanceof Error) throw e;
+      else return { status: "error", error: e as any };
+    }
+  },
+  async pauseSession(sessionId: string): Promise<Result<Session, SidekickError>> {
+    try {
+      return { status: "ok", data: await TAURI_INVOKE("pause_session", { sessionId }) };
+    } catch (e) {
+      if (e instanceof Error) throw e;
+      else return { status: "error", error: e as any };
+    }
+  },
+  async resumeSession(sessionId: string): Promise<Result<Session, SidekickError>> {
+    try {
+      return { status: "ok", data: await TAURI_INVOKE("resume_session", { sessionId }) };
+    } catch (e) {
+      if (e instanceof Error) throw e;
+      else return { status: "error", error: e as any };
+    }
+  },
+  /**
+   * Stops listening and lets the transcript finish. The summary arrives with T-024.
+   */
+  async endSession(sessionId: string): Promise<Result<Session, SidekickError>> {
+    try {
+      return { status: "ok", data: await TAURI_INVOKE("end_session", { sessionId }) };
+    } catch (e) {
+      if (e instanceof Error) throw e;
+      else return { status: "error", error: e as any };
+    }
+  },
+  /**
+   * Deletes everything in the session (the consent record is kept, tech doc 4.4).
+   */
+  async deleteSession(sessionId: string): Promise<Result<null, SidekickError>> {
+    try {
+      return { status: "ok", data: await TAURI_INVOKE("delete_session", { sessionId }) };
+    } catch (e) {
+      if (e instanceof Error) throw e;
+      else return { status: "error", error: e as any };
+    }
+  },
+  async listSessions(
+    cursor: string | null,
+    limit: number | null,
+  ): Promise<Result<SessionPage, SidekickError>> {
+    try {
+      return { status: "ok", data: await TAURI_INVOKE("list_sessions", { cursor, limit }) };
+    } catch (e) {
+      if (e instanceof Error) throw e;
+      else return { status: "error", error: e as any };
+    }
+  },
 };
 
 /** user-defined events **/
@@ -128,10 +204,18 @@ export const events = __makeEvents__<{
   answerDone: AnswerDone;
   answerError: AnswerError;
   answerToken: AnswerToken;
+  sessionChanged: SessionChanged;
+  sttStatusChanged: SttStatusChanged;
+  transcriptPartial: TranscriptPartial;
+  transcriptSegment: TranscriptSegment;
 }>({
   answerDone: "answer-done",
   answerError: "answer-error",
   answerToken: "answer-token",
+  sessionChanged: "session-changed",
+  sttStatusChanged: "stt-status-changed",
+  transcriptPartial: "transcript-partial",
+  transcriptSegment: "transcript-segment",
 });
 
 /** user-defined constants **/
@@ -149,6 +233,18 @@ export type AppInfo = { name: string; version: string; os: string };
  * One turn of the conversation. Text only for now; images arrive with screenshots (T-025).
  */
 export type ChatMessage = { role: Role; content: string };
+/**
+ * What the user confirmed before listening started (PRD 8, "Session start confirmation").
+ */
+export type ConsentOption =
+  /**
+   * Participants are aware of and agree to transcription: mic and system audio.
+   */
+  | "participants_agreed"
+  /**
+   * "Transcribe me only": the microphone only, never other participants.
+   */
+  | "me_only";
 export type Diagnostics = {
   appVersion: string;
   os: string;
@@ -282,6 +378,44 @@ export type Retention = "session" | "7d" | "30d" | "forever";
  */
 export type Role = "user" | "assistant";
 /**
+ * A session as the UI sees it.
+ */
+export type Session = {
+  id: string;
+  title: string;
+  status: SessionStatus;
+  autoAnswer: boolean;
+  /**
+   * Unix ms.
+   */
+  createdAt: number;
+  startedAt: number | null;
+  endedAt: number | null;
+  /**
+   * The consent recorded for this session, if any.
+   */
+  consent: ConsentOption | null;
+};
+/**
+ * A session was created or changed status (`session.state`).
+ */
+export type SessionChanged = { session: Session };
+/**
+ * One page of sessions, newest first.
+ */
+export type SessionPage = {
+  items: Session[];
+  /**
+   * Pass back to get the next page; `None` on the last page.
+   */
+  nextCursor: string | null;
+};
+/**
+ * Result of starting a session: the session plus non-fatal warnings to show.
+ */
+export type SessionStarted = { session: Session; warnings: string[] };
+export type SessionStatus = "draft" | "live" | "paused" | "ended";
+/**
  * All user settings.
  */
 export type Settings = {
@@ -351,6 +485,31 @@ export type StageStats = {
    * `None` until there are samples.
    */
   healthy: boolean | null;
+};
+/**
+ * Which audio stream a transcript event belongs to.
+ */
+export type Stream = "mic" | "system";
+export type SttState = "connecting" | "live" | "reconnecting" | "failed";
+/**
+ * STT connection changes (`stt.status`).
+ */
+export type SttStatusChanged = { sessionId: string; stream: Stream; state: SttState };
+/**
+ * Interim text, replaced by the next partial or a segment (`transcript.partial`).
+ */
+export type TranscriptPartial = { sessionId: string; stream: Stream; text: string };
+/**
+ * A finalised segment, already saved (`transcript.segment`).
+ */
+export type TranscriptSegment = {
+  sessionId: string;
+  id: number;
+  speakerLabel: string;
+  isUser: boolean;
+  text: string;
+  startMs: number;
+  endMs: number;
 };
 /**
  * Token counts reported by the provider.

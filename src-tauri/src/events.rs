@@ -2,10 +2,13 @@
 //! contain dots, so `answer.token` is emitted as `answer-token`, and so on.
 
 use serde::Serialize;
+use sidekick_audio::StreamKind;
 use sidekick_core::SidekickError;
 use sidekick_core::llm::{FinishReason, Usage};
 use sidekick_gateway::streams::AnswerSink;
-use tauri::AppHandle;
+use sidekick_session::Session;
+use sidekick_stt::{Partial, Segment, SttSink, SttStatus};
+use tauri::{AppHandle, Manager};
 use tauri_specta::Event;
 
 #[derive(Debug, Clone, Serialize, specta::Type, Event)]
@@ -55,5 +58,128 @@ impl AnswerSink for TauriAnswerSink {
             error: error.clone(),
         }
         .emit(&self.0);
+    }
+}
+
+/// A session was created or changed status (`session.state`).
+#[derive(Debug, Clone, Serialize, specta::Type, Event)]
+#[serde(rename_all = "camelCase")]
+pub struct SessionChanged {
+    pub session: Session,
+}
+
+/// Which audio stream a transcript event belongs to.
+#[derive(Debug, Clone, Copy, Serialize, specta::Type)]
+#[serde(rename_all = "lowercase")]
+pub enum Stream {
+    Mic,
+    System,
+}
+
+impl From<StreamKind> for Stream {
+    fn from(k: StreamKind) -> Self {
+        match k {
+            StreamKind::Mic => Self::Mic,
+            StreamKind::System => Self::System,
+        }
+    }
+}
+
+/// Interim text, replaced by the next partial or a segment (`transcript.partial`).
+#[derive(Debug, Clone, Serialize, specta::Type, Event)]
+#[serde(rename_all = "camelCase")]
+pub struct TranscriptPartial {
+    pub session_id: String,
+    pub stream: Stream,
+    pub text: String,
+}
+
+/// A finalised segment, already saved (`transcript.segment`).
+#[derive(Debug, Clone, Serialize, specta::Type, Event)]
+#[serde(rename_all = "camelCase")]
+pub struct TranscriptSegment {
+    pub session_id: String,
+    pub id: i64,
+    pub speaker_label: String,
+    pub is_user: bool,
+    pub text: String,
+    pub start_ms: u32,
+    pub end_ms: u32,
+}
+
+#[derive(Debug, Clone, Copy, Serialize, specta::Type)]
+#[serde(rename_all = "snake_case")]
+pub enum SttState {
+    Connecting,
+    Live,
+    Reconnecting,
+    Failed,
+}
+
+/// STT connection changes (`stt.status`).
+#[derive(Debug, Clone, Serialize, specta::Type, Event)]
+#[serde(rename_all = "camelCase")]
+pub struct SttStatusChanged {
+    pub session_id: String,
+    pub stream: Stream,
+    pub state: SttState,
+}
+
+/// Saves segments and forwards transcription to the frontend.
+pub struct TauriSttSink {
+    app: AppHandle,
+    session_id: String,
+}
+
+impl TauriSttSink {
+    pub fn new(app: AppHandle, session_id: String) -> Self {
+        Self { app, session_id }
+    }
+}
+
+impl SttSink for TauriSttSink {
+    fn partial(&self, p: Partial) {
+        let _ = TranscriptPartial {
+            session_id: self.session_id.clone(),
+            stream: p.kind.into(),
+            text: p.text,
+        }
+        .emit(&self.app);
+    }
+
+    fn segment(&self, s: Segment) {
+        let state = self.app.state::<crate::state::AppState>();
+        let id = match sidekick_session::repo::insert_segment(&state.db(), &self.session_id, &s) {
+            Ok(id) => id,
+            Err(e) => {
+                tracing::error!(code = ?e.code, "couldn't save a transcript segment");
+                return;
+            }
+        };
+        let _ = TranscriptSegment {
+            session_id: self.session_id.clone(),
+            id,
+            speaker_label: s.speaker_label,
+            is_user: s.is_user,
+            text: s.text,
+            start_ms: u32::try_from(s.start_ms).unwrap_or(u32::MAX),
+            end_ms: u32::try_from(s.end_ms).unwrap_or(u32::MAX),
+        }
+        .emit(&self.app);
+    }
+
+    fn status(&self, kind: StreamKind, status: SttStatus) {
+        let state = match status {
+            SttStatus::Connecting => SttState::Connecting,
+            SttStatus::Live => SttState::Live,
+            SttStatus::Reconnecting => SttState::Reconnecting,
+            SttStatus::Failed => SttState::Failed,
+        };
+        let _ = SttStatusChanged {
+            session_id: self.session_id.clone(),
+            stream: kind.into(),
+            state,
+        }
+        .emit(&self.app);
     }
 }

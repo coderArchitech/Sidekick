@@ -16,6 +16,14 @@ const COMMANDS: &[&str] = &[
     "cancel_stream",
     "get_diagnostics",
     "record_latency",
+    "create_session",
+    "confirm_consent",
+    "start_session",
+    "pause_session",
+    "resume_session",
+    "end_session",
+    "delete_session",
+    "list_sessions",
 ];
 
 fn main() {

@@ -2,6 +2,8 @@
 export {
   DEFAULT_SETTINGS,
   mockAnswerBus,
+  mockCalls,
+  mockSessionBus,
   mockCommands,
   mockProtection,
   mockWindowCalls,

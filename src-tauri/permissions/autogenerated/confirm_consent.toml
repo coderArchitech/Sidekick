@@ -1,0 +1,11 @@
+# Automatically generated - DO NOT EDIT!
+
+[[permission]]
+identifier = "allow-confirm-consent"
+description = "Enables the confirm_consent command without any pre-configured scope."
+commands.allow = ["confirm_consent"]
+
+[[permission]]
+identifier = "deny-confirm-consent"
+description = "Denies the confirm_consent command without any pre-configured scope."
+commands.deny = ["confirm_consent"]

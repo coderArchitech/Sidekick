@@ -11,6 +11,14 @@
     "allow-llm-stream",
     "allow-cancel-stream",
     "allow-record-latency",
+    "allow-create-session",
+    "allow-confirm-consent",
+    "allow-start-session",
+    "allow-pause-session",
+    "allow-resume-session",
+    "allow-end-session",
+    "allow-delete-session",
+    "allow-list-sessions",
     "core:window:allow-start-dragging",
     "core:window:allow-set-always-on-top"
   ]

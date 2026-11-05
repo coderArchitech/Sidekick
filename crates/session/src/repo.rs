@@ -1,0 +1,230 @@
+//! SQL for `sessions`, `consent_log` and `transcript_segments` (tech doc 4.2).
+
+use rusqlite::{OptionalExtension, Row, params};
+use serde::Serialize;
+use sidekick_core::{ErrorCode, SidekickError, SidekickResult};
+use sidekick_store::Database;
+use sidekick_stt::Segment;
+
+use crate::model::{ConsentOption, Session, SessionStatus};
+
+const DEFAULT_LIMIT: u32 = 50;
+const MAX_LIMIT: u32 = 200;
+
+fn db_err(context: &str, e: &rusqlite::Error) -> SidekickError {
+    tracing::error!(target: "session", context, error = %e, "database error");
+    SidekickError::new(
+        ErrorCode::DbError,
+        format!("Database error while {context}."),
+    )
+}
+
+#[must_use]
+pub fn now_ms() -> i64 {
+    std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .map_or(0, |d| i64::try_from(d.as_millis()).unwrap_or(i64::MAX))
+}
+
+/// Providers recorded with the session, so history shows what produced it.
+#[derive(Debug, Clone)]
+pub struct NewSession<'a> {
+    pub title: &'a str,
+    pub stt_provider: &'a str,
+    pub llm_provider: &'a str,
+    pub llm_model: &'a str,
+    pub auto_answer: bool,
+}
+
+pub fn create(db: &Database, new: &NewSession<'_>) -> SidekickResult<Session> {
+    let title = new.title.trim();
+    if title.is_empty() || title.chars().count() > 200 {
+        return Err(SidekickError::new(
+            ErrorCode::Internal,
+            "Give the session a name (up to 200 characters).",
+        ));
+    }
+    let id = uuid::Uuid::now_v7().to_string();
+    db.conn()
+        .execute(
+            "INSERT INTO sessions (id, title, status, stt_provider, llm_provider, llm_model, auto_answer, created_at)
+             VALUES (?1, ?2, 'draft', ?3, ?4, ?5, ?6, ?7)",
+            params![id, title, new.stt_provider, new.llm_provider, new.llm_model, new.auto_answer, now_ms()],
+        )
+        .map_err(|e| db_err("creating a session", &e))?;
+    get(db, &id)
+}
+
+const SELECT: &str = "SELECT s.id, s.title, s.status, s.auto_answer, s.created_at, s.started_at, s.ended_at,
+    (SELECT c.option FROM consent_log c WHERE c.session_id = s.id ORDER BY c.confirmed_at DESC, c.rowid DESC LIMIT 1)
+    FROM sessions s";
+
+fn from_row(r: &Row<'_>) -> rusqlite::Result<(Session, String, Option<String>)> {
+    Ok((
+        Session {
+            id: r.get(0)?,
+            title: r.get(1)?,
+            status: SessionStatus::Draft, // replaced below
+            auto_answer: r.get(3)?,
+            created_at: r.get(4)?,
+            started_at: r.get(5)?,
+            ended_at: r.get(6)?,
+            consent: None,
+        },
+        r.get(2)?,
+        r.get(7)?,
+    ))
+}
+
+fn finish((mut s, status, consent): (Session, String, Option<String>)) -> SidekickResult<Session> {
+    s.status = SessionStatus::parse(&status)?;
+    s.consent = consent.as_deref().map(ConsentOption::parse).transpose()?;
+    Ok(s)
+}
+
+pub fn get(db: &Database, id: &str) -> SidekickResult<Session> {
+    let row = db
+        .conn()
+        .query_row(&format!("{SELECT} WHERE s.id = ?1"), [id], from_row)
+        .optional()
+        .map_err(|e| db_err("reading a session", &e))?
+        .ok_or_else(|| SidekickError::new(ErrorCode::Internal, "That session no longer exists."))?;
+    finish(row)
+}
+
+/// One page of sessions, newest first.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
+#[cfg_attr(feature = "specta", derive(specta::Type))]
+#[serde(rename_all = "camelCase")]
+pub struct SessionPage {
+    pub items: Vec<Session>,
+    /// Pass back to get the next page; `None` on the last page.
+    pub next_cursor: Option<String>,
+}
+
+/// Lists sessions newest first. `cursor` is opaque; `limit` defaults to 50, max 200 (tech doc 5.5).
+pub fn list(
+    db: &Database,
+    cursor: Option<&str>,
+    limit: Option<u32>,
+) -> SidekickResult<SessionPage> {
+    let limit = limit.unwrap_or(DEFAULT_LIMIT).clamp(1, MAX_LIMIT);
+    let (after_ts, after_id) = match cursor {
+        Some(c) => {
+            let (ts, id) = c
+                .split_once('|')
+                .ok_or_else(|| SidekickError::internal("Invalid page cursor."))?;
+            (
+                ts.parse::<i64>()
+                    .map_err(|_| SidekickError::internal("Invalid page cursor."))?,
+                id.to_owned(),
+            )
+        }
+        None => (i64::MAX, String::new()),
+    };
+    let mut stmt = db
+        .conn()
+        .prepare(&format!(
+            "{SELECT} WHERE (s.created_at < ?1 OR (s.created_at = ?1 AND s.id < ?2) OR ?2 = '')
+             ORDER BY s.created_at DESC, s.id DESC LIMIT ?3"
+        ))
+        .map_err(|e| db_err("listing sessions", &e))?;
+    // With no cursor, ?2 = '' disables the id comparison and ?1 = MAX includes everything.
+    let rows = stmt
+        .query_map(params![after_ts, after_id, i64::from(limit) + 1], from_row)
+        .map_err(|e| db_err("listing sessions", &e))?;
+    let mut items = Vec::new();
+    for row in rows {
+        items.push(finish(row.map_err(|e| db_err("listing sessions", &e))?)?);
+    }
+    let next_cursor = if items.len() > limit as usize {
+        items.truncate(limit as usize);
+        items.last().map(|s| format!("{}|{}", s.created_at, s.id))
+    } else {
+        None
+    };
+    Ok(SessionPage { items, next_cursor })
+}
+
+/// Saves a status change with its timestamps (first start, end).
+pub fn set_status(db: &Database, id: &str, status: SessionStatus) -> SidekickResult<Session> {
+    let now = now_ms();
+    db.conn()
+        .execute(
+            "UPDATE sessions SET status = ?2,
+                 started_at = CASE WHEN ?2 = 'live' AND started_at IS NULL THEN ?3 ELSE started_at END,
+                 ended_at   = CASE WHEN ?2 = 'ended' THEN ?3 ELSE ended_at END
+             WHERE id = ?1",
+            params![id, status.as_str(), now],
+        )
+        .map_err(|e| db_err("updating a session", &e))?;
+    get(db, id)
+}
+
+/// Records the consent choice (PRD 8, "Local consent log").
+pub fn record_consent(
+    db: &Database,
+    session_id: &str,
+    option: ConsentOption,
+) -> SidekickResult<Session> {
+    let session = get(db, session_id)?;
+    if session.status != SessionStatus::Draft {
+        return Err(SidekickError::internal(
+            "Consent is confirmed before the session starts.",
+        ));
+    }
+    db.conn()
+        .execute(
+            "INSERT INTO consent_log (id, session_id, session_title, option, confirmed_at) VALUES (?1, ?2, ?3, ?4, ?5)",
+            params![uuid::Uuid::now_v7().to_string(), session_id, session.title, option.as_str(), now_ms()],
+        )
+        .map_err(|e| db_err("recording consent", &e))?;
+    get(db, session_id)
+}
+
+/// Deletes a session and everything in it. The consent log is kept (tech doc 4.4).
+pub fn delete(db: &Database, id: &str) -> SidekickResult<()> {
+    db.conn()
+        .execute("DELETE FROM sessions WHERE id = ?1", [id])
+        .map_err(|e| db_err("deleting a session", &e))?;
+    Ok(())
+}
+
+/// Stores a finalised transcript segment and returns its row id.
+pub fn insert_segment(db: &Database, session_id: &str, seg: &Segment) -> SidekickResult<i64> {
+    db.conn()
+        .execute(
+            "INSERT INTO transcript_segments (session_id, speaker_label, is_user, text, start_ms, end_ms, confidence)
+             VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7)",
+            params![
+                session_id,
+                seg.speaker_label,
+                seg.is_user,
+                seg.text,
+                i64::try_from(seg.start_ms).unwrap_or(i64::MAX),
+                i64::try_from(seg.end_ms).unwrap_or(i64::MAX),
+                seg.confidence.map(f64::from)
+            ],
+        )
+        .map_err(|e| db_err("saving transcript", &e))?;
+    Ok(db.conn().last_insert_rowid())
+}
+
+/// All consent records for a session (they survive deletion).
+pub fn consent_log(db: &Database, session_id: &str) -> SidekickResult<Vec<(ConsentOption, i64)>> {
+    let mut stmt = db
+        .conn()
+        .prepare("SELECT option, confirmed_at FROM consent_log WHERE session_id = ?1 ORDER BY confirmed_at")
+        .map_err(|e| db_err("reading consent", &e))?;
+    let rows = stmt
+        .query_map([session_id], |r| {
+            Ok((r.get::<_, String>(0)?, r.get::<_, i64>(1)?))
+        })
+        .map_err(|e| db_err("reading consent", &e))?;
+    let mut out = Vec::new();
+    for row in rows {
+        let (opt, at) = row.map_err(|e| db_err("reading consent", &e))?;
+        out.push((ConsentOption::parse(&opt)?, at));
+    }
+    Ok(out)
+}

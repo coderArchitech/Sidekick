@@ -1,6 +1,10 @@
 import { createMockAnswerBus } from "./answerEvents";
+import { createMockSessionBus } from "./sessionEvents";
 import type {
   commands as tauriCommands,
+  ConsentOption,
+  Session,
+  SidekickError,
   Stage,
   StageStats,
   KeyStatus,
@@ -47,6 +51,45 @@ let settings: Settings = structuredClone(DEFAULT_SETTINGS);
 const savedKeys = new Map<string, string>();
 const activeStreams = new Map<string, { cancelled: boolean }>();
 export const mockAnswerBus = createMockAnswerBus();
+export const mockSessionBus = createMockSessionBus();
+
+// ---- Sessions (mirrors crates/session: lifecycle and consent rules) ----------
+
+const sessions = new Map<string, Session>();
+let liveSessionId: string | null = null;
+let nextId = 1;
+
+const err = (code: SidekickError["code"], message: string) => ({
+  status: "error" as const,
+  error: { code, message, retryable: false },
+});
+
+function save(session: Session) {
+  sessions.set(session.id, session);
+  mockSessionBus.emit("session", { session: structuredClone(session) });
+  return { status: "ok" as const, data: structuredClone(session) };
+}
+
+const TRANSITIONS: Record<string, Record<string, Session["status"]>> = {
+  start: { draft: "live" },
+  pause: { live: "paused" },
+  resume: { paused: "live" },
+  end: { draft: "ended", live: "ended", paused: "ended" },
+};
+
+function move(id: string, action: keyof typeof TRANSITIONS) {
+  const s = sessions.get(id);
+  if (!s) return err("INTERNAL", "That session no longer exists.");
+  const next = TRANSITIONS[action]?.[s.status];
+  if (!next) return err("INTERNAL", `Can't ${action} a session that is ${s.status}.`);
+  const now = Date.now();
+  return save({
+    ...s,
+    status: next,
+    startedAt: next === "live" ? (s.startedAt ?? now) : s.startedAt,
+    endedAt: next === "ended" ? now : s.endedAt,
+  });
+}
 const STAGE_TARGETS: Record<Stage, [number, number]> = {
   transcript_lag: [1000, 1500],
   question_to_cue: [2000, 3000],
@@ -82,6 +125,8 @@ function stageStats(): StageStats[] {
 export const mockProtection: { status: ProtectionStatus } = {
   status: { state: "unavailable", reason: "Running in a browser: no screen-share protection." },
 };
+/** What the mocks were asked to do, for assertions. */
+export const mockCalls: { streams: ("mic" | "system")[] } = { streams: [] };
 /** Counts window actions so tests can assert them. */
 export const mockWindowCalls = { openSettings: 0, hide: 0 };
 
@@ -117,6 +162,10 @@ export function resetMocks(): void {
   savedKeys.clear();
   activeStreams.clear();
   latencySamples.clear();
+  sessions.clear();
+  liveSessionId = null;
+  nextId = 1;
+  mockCalls.streams = [];
   mockWindowCalls.openSettings = 0;
   mockWindowCalls.hide = 0;
   mockProtection.status = {
@@ -238,6 +287,66 @@ export const mockCommands: Commands = {
   recordLatency: (stage, ms) => {
     latencySamples.set(stage, [...(latencySamples.get(stage) ?? []), ms]);
     return Promise.resolve();
+  },
+  createSession: (title) => {
+    const t = title.trim();
+    if (!t || t.length > 200)
+      return Promise.resolve(err("INTERNAL", "Give the session a name (up to 200 characters)."));
+    const session: Session = {
+      id: `mock-session-${nextId++}`,
+      title: t,
+      status: "draft",
+      autoAnswer: settings.autoAnswer,
+      createdAt: Date.now(),
+      startedAt: null,
+      endedAt: null,
+      consent: null,
+    };
+    return Promise.resolve(save(session));
+  },
+  confirmConsent: (sessionId, option: ConsentOption) => {
+    const s = sessions.get(sessionId);
+    if (!s) return Promise.resolve(err("INTERNAL", "That session no longer exists."));
+    if (s.status !== "draft")
+      return Promise.resolve(err("INTERNAL", "Consent is confirmed before the session starts."));
+    return Promise.resolve(save({ ...s, consent: option }));
+  },
+  startSession: (sessionId) => {
+    const s = sessions.get(sessionId);
+    if (!s) return Promise.resolve(err("INTERNAL", "That session no longer exists."));
+    if (liveSessionId)
+      return Promise.resolve(err("INTERNAL", "End the current session before starting another."));
+    if (!s.consent) {
+      return Promise.resolve(
+        err(
+          "CONSENT_REQUIRED",
+          'Confirm that participants agree to transcription, or choose "Transcribe me only".',
+        ),
+      );
+    }
+    const result = move(sessionId, "start");
+    if (result.status === "error") return Promise.resolve(result);
+    liveSessionId = sessionId;
+    mockCalls.streams = s.consent === "me_only" ? ["mic"] : ["mic", "system"];
+    return Promise.resolve({ status: "ok", data: { session: result.data, warnings: [] } });
+  },
+  pauseSession: (sessionId) => Promise.resolve(move(sessionId, "pause")),
+  resumeSession: (sessionId) => Promise.resolve(move(sessionId, "resume")),
+  endSession: (sessionId) => {
+    if (liveSessionId === sessionId) liveSessionId = null;
+    return Promise.resolve(move(sessionId, "end"));
+  },
+  deleteSession: (sessionId) => {
+    if (liveSessionId === sessionId) liveSessionId = null;
+    sessions.delete(sessionId);
+    return Promise.resolve({ status: "ok", data: null });
+  },
+  listSessions: (_cursor, limit) => {
+    const items = [...sessions.values()]
+      .sort((a, b) => b.createdAt - a.createdAt || b.id.localeCompare(a.id))
+      .slice(0, Math.min(limit ?? 50, 200))
+      .map((s) => structuredClone(s));
+    return Promise.resolve({ status: "ok", data: { items, nextCursor: null } });
   },
   cancelStream: (requestId) => {
     const handle = activeStreams.get(requestId);

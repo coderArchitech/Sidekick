@@ -6,15 +6,18 @@
 import type { AnswerEvents } from "./answerEvents";
 import { commands as tauriCommands, events as tauriEvents } from "./bindings";
 import { getCurrentWindow } from "@tauri-apps/api/window";
-import { mockAnswerBus, mockCommands, mockWindowCalls } from "./mock";
+import { mockAnswerBus, mockCommands, mockSessionBus, mockWindowCalls } from "./mock";
+import type { SessionEvents } from "./sessionEvents";
 
 export type { AnswerEvents, Unlisten } from "./answerEvents";
+export type { SessionEvents } from "./sessionEvents";
 export type {
   AnswerDone,
   AnswerError,
   AnswerToken,
   AppInfo,
   ChatMessage,
+  ConsentOption,
   Diagnostics,
   Effort,
   ErrorCode,
@@ -30,11 +33,17 @@ export type {
   ProviderKind,
   Result,
   Retention,
+  Session,
+  SessionStarted,
+  SessionStatus,
   Settings,
   SettingsPatch,
   SidekickError,
   Stage,
   StageStats,
+  SttStatusChanged,
+  TranscriptPartial,
+  TranscriptSegment,
   Usage,
 } from "./bindings";
 
@@ -49,6 +58,15 @@ const tauriAnswerEvents: AnswerEvents = {
 };
 
 export const answerEvents: AnswerEvents = isTauri ? tauriAnswerEvents : mockAnswerBus.events;
+
+const tauriSessionEvents: SessionEvents = {
+  onSessionChanged: (cb) => tauriEvents.sessionChanged.listen((e) => cb(e.payload)),
+  onTranscriptPartial: (cb) => tauriEvents.transcriptPartial.listen((e) => cb(e.payload)),
+  onTranscriptSegment: (cb) => tauriEvents.transcriptSegment.listen((e) => cb(e.payload)),
+  onSttStatus: (cb) => tauriEvents.sttStatusChanged.listen((e) => cb(e.payload)),
+};
+
+export const sessionEvents: SessionEvents = isTauri ? tauriSessionEvents : mockSessionBus.events;
 
 /** Which window this page is rendering, from the `?window=` query (tech doc 3.7). */
 export type WindowKind = "overlay" | "settings";

@@ -3658,10 +3658,12 @@ dependencies = [
  "rusqlite",
  "serde",
  "serde_json",
+ "sidekick-audio",
  "sidekick-core",
  "sidekick-diagnostics",
  "sidekick-gateway",
  "sidekick-secrets",
+ "sidekick-session",
  "sidekick-settings",
  "sidekick-store",
  "sidekick-stt",
@@ -3741,6 +3743,26 @@ dependencies = [
  "serde_json",
  "sidekick-core",
  "specta",
+]
+
+[[package]]
+name = "sidekick-session"
+version = "0.1.0"
+dependencies = [
+ "hound",
+ "rusqlite",
+ "serde",
+ "sidekick-audio",
+ "sidekick-core",
+ "sidekick-secrets",
+ "sidekick-store",
+ "sidekick-stt",
+ "specta",
+ "tempfile",
+ "tokio",
+ "tokio-util",
+ "tracing",
+ "uuid",
 ]
 
 [[package]]

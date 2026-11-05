@@ -1,0 +1,32 @@
+[package]
+name = "sidekick-session"
+description = "Session lifecycle and consent (draft → live → paused → ended), their database rows, and the live runner that connects audio capture to speech-to-text."
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+publish.workspace = true
+
+[features]
+specta = ["dep:specta", "sidekick-core/specta"]
+
+[dependencies]
+sidekick-core.workspace = true
+sidekick-store.workspace = true
+sidekick-audio.workspace = true
+sidekick-stt.workspace = true
+sidekick-secrets.workspace = true
+rusqlite.workspace = true
+serde.workspace = true
+tokio.workspace = true
+tokio-util.workspace = true
+tracing.workspace = true
+uuid.workspace = true
+specta = { workspace = true, optional = true }
+
+[dev-dependencies]
+hound.workspace = true
+tempfile.workspace = true
+tokio = { workspace = true, features = ["test-util"] }
+
+[lints]
+workspace = true

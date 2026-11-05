@@ -25,11 +25,23 @@ pub fn builder() -> Builder<tauri::Wry> {
             commands::llm::cancel_stream,
             commands::diagnostics::get_diagnostics,
             commands::diagnostics::record_latency,
+            commands::session::create_session,
+            commands::session::confirm_consent,
+            commands::session::start_session,
+            commands::session::pause_session,
+            commands::session::resume_session,
+            commands::session::end_session,
+            commands::session::delete_session,
+            commands::session::list_sessions,
         ])
         .events(collect_events![
             events::AnswerToken,
             events::AnswerDone,
             events::AnswerError,
+            events::SessionChanged,
+            events::TranscriptPartial,
+            events::TranscriptSegment,
+            events::SttStatusChanged,
         ])
 }
 
