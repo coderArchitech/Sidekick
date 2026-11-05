@@ -223,6 +223,33 @@ async fn empty_session_gives_an_empty_pack() {
     )
     .unwrap();
     assert!(pack.transcript.is_empty() && pack.chunks.is_empty() && pack.notes.is_none());
+    assert!(pack.screenshot.is_none());
+}
+
+#[tokio::test]
+async fn pack_has_the_latest_recent_screenshot_of_this_session_only() {
+    use sidekick_capture::{CaptureTarget, Capturer, MockCapturer, prepare, repo};
+    let db = db();
+    let img = prepare(MockCapturer.capture(CaptureTarget::Window(1)).unwrap()).unwrap();
+    let pack = |s: &str| {
+        build_pack(&db.lock().unwrap(), s, "q", None, ContextOptions::default())
+            .unwrap()
+            .screenshot
+    };
+    repo::save(&db.lock().unwrap(), "s1", &img).unwrap();
+    let second = repo::save(&db.lock().unwrap(), "s1", &img).unwrap();
+    assert_eq!(pack("s1").map(|s| s.id), Some(second.id.clone()));
+    assert_eq!(pack("s2"), None, "other sessions' screenshots never leak");
+    // Older than 10 minutes: no longer on screen.
+    db.lock()
+        .unwrap()
+        .conn()
+        .execute(
+            "UPDATE screenshots SET created_at = created_at - 700000",
+            [],
+        )
+        .unwrap();
+    assert_eq!(pack("s1"), None);
 }
 
 /// Tech doc 13.2 target: vector search over 20k chunks under 50 ms (release

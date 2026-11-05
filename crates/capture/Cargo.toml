@@ -1,0 +1,33 @@
+[package]
+name = "sidekick-capture"
+description = "Screenshots: full screen, one window or a region; downscaled to 1568 px and stored encrypted with the session (PRD SCR-1 to SCR-4)."
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+publish.workspace = true
+
+[features]
+specta = ["dep:specta"]
+
+[dependencies]
+sidekick-core.workspace = true
+sidekick-store.workspace = true
+image = { version = "0.25", default-features = false, features = ["png", "jpeg"] }
+base64 = "0.22"
+rusqlite.workspace = true
+serde.workspace = true
+tracing.workspace = true
+uuid.workspace = true
+specta = { workspace = true, optional = true }
+
+# Real capture on the shipped platforms only. On Linux it needs PipeWire and
+# is only used for development and CI, where the mock capturer runs.
+[target.'cfg(any(windows, target_os = "macos"))'.dependencies]
+xcap = { version = "0.9", default-features = false }
+
+[dev-dependencies]
+secrecy.workspace = true
+tempfile.workspace = true
+
+[lints]
+workspace = true

@@ -49,7 +49,13 @@ pub struct ContextPack {
     pub notes: Option<String>,
     /// Best document passages, best first.
     pub chunks: Vec<ContextChunk>,
+    /// The latest screenshot from the last 10 minutes, shown to the model
+    /// with the full answer and cited as a source (PRD SCR-3).
+    pub screenshot: Option<sidekick_capture::Screenshot>,
 }
+
+/// Screenshots older than this are no longer "on screen" (PRD SCR-3).
+pub const SCREENSHOT_MAX_AGE_MS: i64 = 10 * 60 * 1000;
 
 /// How many candidates each search contributes before fusion.
 const CANDIDATES: usize = 20;
@@ -132,10 +138,16 @@ pub fn build_pack(
             .map_err(|e| db_err("reading passages", &e))?;
         chunks.push(chunk);
     }
+    let now = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .map_or(0, |d| i64::try_from(d.as_millis()).unwrap_or(i64::MAX));
+    let screenshot =
+        sidekick_capture::repo::latest(db, session_id, now.saturating_sub(SCREENSHOT_MAX_AGE_MS))?;
     Ok(ContextPack {
         transcript,
         notes: notes.filter(|n| !n.trim().is_empty()),
         chunks,
+        screenshot,
     })
 }
 

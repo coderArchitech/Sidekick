@@ -90,4 +90,25 @@ describe("auto-answer shortcut", () => {
     expect(useOverlayStore.getState().tab).toBe("chat");
     expect(useChatStore.getState().focusTick).toBe(before + 1);
   });
+
+  it("Screenshot captures the screen and opens Chat to ask about it", async () => {
+    useOverlayStore.setState({ tab: "answers" });
+    useChatStore.setState({ pending: null, captureError: null });
+    await liveSession();
+    render(<Harness />);
+    await tick();
+    mockSessionBus.emit("hotkey", { action: "screenshot" });
+    await tick();
+    expect(useOverlayStore.getState().tab).toBe("chat");
+    expect(useChatStore.getState().pending).toMatchObject({ width: 1568, height: 882 });
+  });
+
+  it("Screenshot does nothing without a session", async () => {
+    useChatStore.setState({ pending: null });
+    render(<Harness />);
+    await tick();
+    mockSessionBus.emit("hotkey", { action: "screenshot" });
+    await tick();
+    expect(useChatStore.getState().pending).toBeNull();
+  });
 });

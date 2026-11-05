@@ -1,5 +1,11 @@
 import { create } from "zustand";
-import { commands, type ChatMessage, type SavedAnswer } from "@/ipc";
+import {
+  commands,
+  type CaptureRequest,
+  type ChatMessage,
+  type SavedAnswer,
+  type Screenshot,
+} from "@/ipc";
 import type { AnswerView } from "./answerer";
 
 /** Turns of history sent with a follow-up (about 3 exchanges keeps prompts small). */
@@ -15,6 +21,13 @@ interface ChatState {
   /** Loads saved chat for a session (PRD QA-8: history per session). */
   load: (sessionId: string | null) => Promise<void>;
   requestFocus: () => void;
+  /** Screenshot taken for the next question (capture-and-ask, PRD SCR-4). */
+  pending: Screenshot | null;
+  capturing: boolean;
+  captureError: string | null;
+  /** Captures for `sessionId`, attaches it to the next question and focuses Chat. */
+  capture: (sessionId: string, request: CaptureRequest) => Promise<Screenshot | null>;
+  clearPending: () => void;
 }
 
 function fromSaved(a: SavedAnswer): AnswerView {
@@ -27,7 +40,7 @@ function fromSaved(a: SavedAnswer): AnswerView {
     body: a.bodyMd,
     sources: a.sources.map((s, i) => ({
       n: i + 1,
-      type: s.type === "transcript" ? "transcript" : "doc",
+      type: s.type === "transcript" || s.type === "screenshot" ? s.type : "doc",
       ref: s.ref,
       label: s.label,
     })),
@@ -50,14 +63,29 @@ export const useChatStore = create<ChatState>((set, get) => ({
       return { turns };
     }),
   load: async (sessionId) => {
-    set({ sessionId, turns: [] });
+    set({ sessionId, turns: [], pending: null, captureError: null });
     if (!sessionId) return;
-    const r = await commands.listAnswers(sessionId, "chat");
+    const r = await commands.listAnswers(sessionId, null);
     if (r.status !== "ok" || get().sessionId !== sessionId) return;
+    const mine = r.data.filter((a) => a.source !== "detected").map(fromSaved);
     // Keep anything asked while loading.
-    set((s) => ({ turns: [...r.data.map(fromSaved), ...s.turns] }));
+    set((s) => ({ turns: [...mine, ...s.turns] }));
   },
   requestFocus: () => set((s) => ({ focusTick: s.focusTick + 1 })),
+  pending: null,
+  capturing: false,
+  captureError: null,
+  capture: async (sessionId, request) => {
+    set({ capturing: true, captureError: null });
+    const r = await commands.captureScreenshot(sessionId, request);
+    if (r.status === "error") {
+      set({ capturing: false, captureError: r.error.message });
+      return null;
+    }
+    set((s) => ({ capturing: false, pending: r.data, focusTick: s.focusTick + 1 }));
+    return r.data;
+  },
+  clearPending: () => set({ pending: null }),
 }));
 
 /**

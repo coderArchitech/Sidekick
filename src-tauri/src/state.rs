@@ -19,6 +19,8 @@ pub struct AppState {
     pub keys: Arc<dyn KeyStore>,
     /// The one live (or paused) session, if any: its id and runner.
     pub live: tokio::sync::Mutex<Option<(String, sidekick_session::LiveSession)>>,
+    /// Screenshots: the OS, or a synthetic screen in mock mode.
+    pub capturer: Arc<dyn sidekick_capture::Capturer>,
     pub mock: bool,
 }
 
@@ -62,6 +64,11 @@ impl AppState {
             diagnostics,
             keys,
             live: tokio::sync::Mutex::new(None),
+            capturer: if mock {
+                Arc::new(sidekick_capture::MockCapturer)
+            } else {
+                Arc::new(sidekick_capture::OsCapturer)
+            },
             mock,
         })
     }

@@ -81,7 +81,15 @@ pub fn build_body(req: &LlmRequest) -> Value {
                 Role::User => "user",
                 Role::Assistant => "assistant",
             };
-            json!({ "role": role, "content": m.content })
+            match &m.image {
+                // Image first, then the question about it (vision best practice).
+                Some(img) => json!({ "role": role, "content": [
+                    { "type": "image", "source": {
+                        "type": "base64", "media_type": img.mime_type, "data": img.base64 } },
+                    { "type": "text", "text": m.content }
+                ] }),
+                None => json!({ "role": role, "content": m.content }),
+            }
         })
         .collect();
     let mut body = json!({
@@ -329,18 +337,9 @@ mod tests {
             model: model.into(),
             system: Some("Be brief.".into()),
             messages: vec![
-                ChatMessage {
-                    role: Role::User,
-                    content: "Rate limit?".into(),
-                },
-                ChatMessage {
-                    role: Role::Assistant,
-                    content: "Which tier?".into(),
-                },
-                ChatMessage {
-                    role: Role::User,
-                    content: "Pro".into(),
-                },
+                ChatMessage::text(Role::User, "Rate limit?"),
+                ChatMessage::text(Role::Assistant, "Which tier?"),
+                ChatMessage::text(Role::User, "Pro"),
             ],
             max_tokens: 1024,
             effort: Some(Effort::Low),
@@ -364,6 +363,26 @@ mod tests {
                     { "role": "user", "content": "Pro" }
                 ]
             })
+        );
+    }
+
+    #[test]
+    fn sends_a_screenshot_as_an_image_block_before_the_text() {
+        let mut req = request(DEFAULT_ANSWER_MODEL);
+        req.messages = vec![ChatMessage {
+            image: Some(sidekick_core::llm::ImageData {
+                mime_type: "image/jpeg".into(),
+                base64: "AAAA".into(),
+            }),
+            ..ChatMessage::text(Role::User, "What does this error mean?")
+        }];
+        let body = build_body(&req);
+        assert_eq!(
+            body["messages"][0]["content"],
+            json!([
+                { "type": "image", "source": { "type": "base64", "media_type": "image/jpeg", "data": "AAAA" } },
+                { "type": "text", "text": "What does this error mean?" }
+            ])
         );
     }
 

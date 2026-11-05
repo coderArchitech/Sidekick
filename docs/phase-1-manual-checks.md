@@ -1,0 +1,23 @@
+# Phase 1 manual checks
+
+These checks need real hardware or a real meeting and can't run in CI. Each one closes an open box of a task in [Task.md](Task.md). Setup is the same as in [Phase 0 manual checks](phase-0-manual-checks.md#setup-both-machines). Record results by ticking the box in Task.md with a note (OS version, meeting app, result).
+
+## T-015: Shortcuts while a meeting app has focus (5 minutes per OS)
+
+```bash
+pnpm tauri dev
+```
+
+Start a session, click into Teams, Zoom or Meet so it has focus, then press each shortcut in [TECHNICAL.md 12.3](TECHNICAL.md#123-keyboard-shortcuts). Each one acts in Sidekick (pause, bookmark, Auto, Ask focuses Chat, Screenshot opens Chat with an attached screenshot) and the meeting app doesn't react.
+
+## T-025: Screenshots during a live call (10 minutes per OS)
+
+```bash
+pnpm tauri dev
+```
+
+1. Start a session, then join a call in Teams, Zoom or Meet (share your screen if you can).
+2. Press `Ctrl/Cmd+Shift+S`. Chat opens with "Screenshot attached". The meeting app shows no notification, and the call isn't interrupted.
+3. Use **Screenshot → A window…** and pick the meeting window, then **An area…** and drag over part of the preview. Each attaches a screenshot of what you chose.
+4. On macOS, the first capture asks for Screen Recording. Deny it once: Sidekick shows "Couldn't capture the screen…" with the System Settings path. Allow it and try again.
+5. With an Anthropic key set, ask "What's on my screen?" after a capture. The answer describes the screen and cites "Screenshot hh:mm".

@@ -330,6 +330,67 @@ export const commands = {
     }
   },
   /**
+   * Captures, downscales to 1568 px and stores the screenshot with the session.
+   */
+  async captureScreenshot(
+    sessionId: string,
+    request: CaptureRequest,
+  ): Promise<Result<Screenshot, SidekickError>> {
+    try {
+      return {
+        status: "ok",
+        data: await TAURI_INVOKE("capture_screenshot", { sessionId, request }),
+      };
+    } catch (e) {
+      if (e instanceof Error) throw e;
+      else return { status: "error", error: e as any };
+    }
+  },
+  /**
+   * Windows the user can capture (other apps only, not minimised).
+   */
+  async listWindows(): Promise<Result<WindowInfo[], SidekickError>> {
+    try {
+      return { status: "ok", data: await TAURI_INVOKE("list_windows") };
+    } catch (e) {
+      if (e instanceof Error) throw e;
+      else return { status: "error", error: e as any };
+    }
+  },
+  /**
+   * A small, unsaved picture of the main display for selecting a region.
+   */
+  async previewScreen(): Promise<Result<string, SidekickError>> {
+    try {
+      return { status: "ok", data: await TAURI_INVOKE("preview_screen") };
+    } catch (e) {
+      if (e instanceof Error) throw e;
+      else return { status: "error", error: e as any };
+    }
+  },
+  /**
+   * The session's screenshots, oldest first.
+   */
+  async listScreenshots(sessionId: string): Promise<Result<Screenshot[], SidekickError>> {
+    try {
+      return { status: "ok", data: await TAURI_INVOKE("list_screenshots", { sessionId }) };
+    } catch (e) {
+      if (e instanceof Error) throw e;
+      else return { status: "error", error: e as any };
+    }
+  },
+  /**
+   * A screenshot as a `data:` URL, for thumbnails in the overlay.
+   */
+  async screenshotImage(screenshotId: string): Promise<Result<string, SidekickError>> {
+    try {
+      return { status: "ok", data: await TAURI_INVOKE("screenshot_image", { screenshotId }) };
+    } catch (e) {
+      if (e instanceof Error) throw e;
+      else return { status: "error", error: e as any };
+    }
+  },
+  /**
    * Queues a file for parsing and embedding.
    */
   async ingestDocument(sessionId: string, path: string): Promise<Result<null, SidekickError>> {
@@ -392,6 +453,7 @@ export const events = __makeEvents__<{
   answerToken: AnswerToken;
   hotkeyPressed: HotkeyPressed;
   ingestProgress: IngestProgress;
+  screenshotCaptured: ScreenshotCaptured;
   sessionChanged: SessionChanged;
   sttStatusChanged: SttStatusChanged;
   transcriptPartial: TranscriptPartial;
@@ -402,6 +464,7 @@ export const events = __makeEvents__<{
   answerToken: "answer-token",
   hotkeyPressed: "hotkey-pressed",
   ingestProgress: "ingest-progress",
+  screenshotCaptured: "screenshot-captured",
   sessionChanged: "session-changed",
   sttStatusChanged: "stt-status-changed",
   transcriptPartial: "transcript-partial",
@@ -443,9 +506,33 @@ export type Binding = { action: Action; keys: string };
  */
 export type Bookmark = { id: string; atMs: number; label: string | null };
 /**
- * One turn of the conversation. Text only for now; images arrive with screenshots (T-025).
+ * What to capture.
  */
-export type ChatMessage = { role: Role; content: string };
+export type CaptureRequest =
+  /**
+   * The main display.
+   */
+  | { mode: "screen" }
+  /**
+   * One window from `list_windows`.
+   */
+  | { mode: "window"; windowId: number }
+  /**
+   * Part of the main display, as fractions of its size.
+   */
+  | { mode: "region"; region: Region };
+/**
+ * One turn of the conversation: text, plus optionally one screenshot (PRD SCR-3).
+ */
+export type ChatMessage = {
+  role: Role;
+  content: string;
+  /**
+   * A stored screenshot to show the model with this message. The app
+   * loads it from the encrypted database into `image`; pixels never cross IPC.
+   */
+  screenshotId?: string | null;
+};
 /**
  * What the user confirmed before listening started (PRD 8, "Session start confirmation").
  */
@@ -485,6 +572,11 @@ export type ContextPack = {
    * Best document passages, best first.
    */
   chunks: ContextChunk[];
+  /**
+   * The latest screenshot from the last 10 minutes, shown to the model
+   * with the full answer and cited as a source (PRD SCR-3).
+   */
+  screenshot: Screenshot | null;
 };
 export type Diagnostics = {
   appVersion: string;
@@ -694,6 +786,11 @@ export type ProviderKind = "stt" | "llm" | "embed" | "search";
  */
 export type QuestionSource = "detected" | "chat" | "screenshot";
 /**
+ * Part of the screen, as fractions (0 to 1) of the main display, so the UI
+ * can select on a small preview without knowing the display's pixel size.
+ */
+export type Region = { x: number; y: number; width: number; height: number };
+/**
  * How long session data is kept after a session ends (tech doc 4.4).
  */
 export type Retention = "session" | "7d" | "30d" | "forever";
@@ -718,6 +815,24 @@ export type SavedAnswer = {
    */
   createdAt: number;
 };
+/**
+ * A stored screenshot, without its pixels.
+ */
+export type Screenshot = {
+  id: string;
+  sessionId: string;
+  mimeType: string;
+  width: number;
+  height: number;
+  /**
+   * Epoch ms.
+   */
+  createdAt: number;
+};
+/**
+ * A screenshot was stored (`screenshot.captured`, tech doc 5.2).
+ */
+export type ScreenshotCaptured = { screenshot: Screenshot };
 /**
  * A session as the UI sees it.
  */
@@ -895,6 +1010,10 @@ export type TranscriptSegment = {
  * Token counts reported by the provider.
  */
 export type Usage = { inputTokens: number; outputTokens: number };
+/**
+ * A window the user can pick.
+ */
+export type WindowInfo = { id: number; appName: string; title: string };
 
 /** tauri-specta globals **/
 

@@ -31,9 +31,10 @@ export function useAnswering(session: Session | null) {
     const { clear } = useAnswersStore.getState();
     clear();
     void useChatStore.getState().load(sessionId);
-    // Chat answers go to the Chat tab, everything else to Live Answers.
+    // Questions the user asked (Chat, capture-and-ask) go to the Chat tab;
+    // detected ones to Live Answers.
     const upsert = (v: AnswerView) =>
-      v.source === "chat"
+      v.source !== "detected"
         ? useChatStore.getState().upsert(v)
         : useAnswersStore.getState().upsert(v);
     const batcher = createBatcher<AnswerView>(50, (views) => {
@@ -82,11 +83,15 @@ export async function askChat(text: string): Promise<string | null> {
   if (!q) return null;
   const active = current;
   if (!active) return "Start a session to ask questions.";
+  // A question asked right after a capture is about that screenshot (SCR-4).
+  const chat = useChatStore.getState();
+  const aboutScreenshot = !!chat.pending;
+  chat.clearPending();
   await active.router.ask({
     sessionId: active.sessionId,
     text: q,
     directed: true,
-    source: "chat",
+    source: aboutScreenshot ? "screenshot" : "chat",
     endedAt: Date.now(),
     models: active.models(),
     history: chatHistory(useChatStore.getState().turns),
