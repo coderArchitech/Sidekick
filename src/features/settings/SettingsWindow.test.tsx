@@ -2,7 +2,7 @@ import { render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import axe from "axe-core";
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { mockCommands, mockWindowCalls, resetMocks } from "@/ipc/mock";
+import { mockCommands, mockWindowCalls, resetMocks } from "@/ipc/testing";
 import { SettingsWindow } from "./SettingsWindow";
 
 function section(name: RegExp) {

@@ -1010,7 +1010,7 @@ These rules keep each part replaceable on its own. The compiler (Rust) and ESLin
 | --- | --- |
 | Import another feature only through `@/features/<name>` (its `index.ts`) | *Enforced* (`no-restricted-imports`) |
 | Only `src/ipc` imports `@tauri-apps/api/core`; everything else uses `@/ipc` | *Enforced* |
-| Nothing imports `src/ipc/bindings` or `src/ipc/mock` directly | *Enforced* |
+| Nothing imports `src/ipc/bindings` or `src/ipc/mock` directly; tests use `@/ipc/testing`, which non-test files may not import | *Enforced* |
 | Feature state lives in the feature; `src/stores/` only for state shared by several features | Code review |
 | Every command in `bindings.ts` has a mock in `src/ipc/mock.ts` | *Enforced* by the type checker |
 
