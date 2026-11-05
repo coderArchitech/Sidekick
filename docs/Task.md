@@ -245,6 +245,7 @@ All Phase 0 code and automated tests are done and green on Linux, Windows and ma
 - [x] Integration: 401 maps to `KEY_INVALID`, `Failed`, no retry; unreachable server gives up after the deadline; cancel stops the run; missing key reported.
 - [x] Integration: Deepgram key verifier (wiremock 200 / 401); gateway uses registered verifiers before saving keys.
 - [x] Integration: mock provider turns speech bursts in fixture frames into segments.
+- [x] Tool: `cargo run -p sidekick-stt --example live_transcribe` streams live audio to Deepgram and reports lag p50/p95 (key read from the keychain).
 - [ ] Manual: transcript lag measured against NFR-1 with a real key on a real call; result recorded in TECHNICAL.md 13.2.
 
 ### T-011 `window` crate: capture exclusion and protection status 🖥️
@@ -258,7 +259,8 @@ All Phase 0 code and automated tests are done and green on Linux, Windows and ma
 - [x] Unit: disabled flag and failure to apply produce `disabled` / `unavailable`.
 - [x] Component: shield shows each state with colour, label and tooltip reason.
 - [x] Manual: real app on Linux applies protection at startup and shows the red shield.
-- [ ] Screen-share detection to drive auto-hide: no reliable cross-platform OS signal; design needed (manual hide hotkey in T-015 covers it until then).
+- [x] Screen-share detection design: [ADR-015](adr/0015-screen-share-detection.md) (proposed) detects meeting apps' own share windows; manual hide hotkey (T-015) stays as the fallback.
+- [ ] Validate ADR-015: record the top-level window lists while sharing in each meeting app on Windows and macOS (do this during the manual check below), then implement it as its own task.
 - [ ] Manual (Windows 10, 11; macOS 14, 15, latest): overlay not visible to others when sharing full screen and a window in Teams, Zoom, Meet, Webex, Slack huddles; results recorded in a table in TECHNICAL.md 8.5; adjust the status rules to match.
 
 ### T-012 `diagnostics` crate: latency metrics and baselines
