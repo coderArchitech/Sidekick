@@ -84,6 +84,7 @@ Priority: P0 = must ship in MVP, P1 = ship if time allows, P2 = later.
 | LIS-3 | Speaker separation: label the user as "Me" and others as Speaker 1, 2 (renameable) | P0 |
 | LIS-4 | Works with any meeting app (Teams, Zoom, Meet, Webex) via OS-level audio capture, no bot joins the call | P0 |
 | LIS-5 | Custom vocabulary (product names, acronyms, people) to boost accuracy | P1 |
+| LIS-5a | The user's own name and nicknames (from QA-2) are always sent as vocabulary boosts, so directed questions are detected even when STT would misspell the name | P0 |
 | LIS-6 | Pause / resume listening with one hotkey; clear visual "listening" indicator | P0 |
 
 ### 4.3 Live meeting memory
@@ -166,6 +167,7 @@ The user decides which speech-to-text and LLM providers Sidekick uses, and adds 
 | KEY-1 | Settings screen with separate sections for Speech-to-text, LLM, and Web search, each with a provider dropdown | P0 |
 | KEY-2 | Speech-to-text dropdown: Deepgram (default), AssemblyAI, Soniox, Local Whisper (no key needed) | P0 |
 | KEY-3 | LLM dropdown: Anthropic (Claude), OpenAI, Google Gemini, Ollama (local, no key needed), with a second dropdown to pick the model for the chosen provider | P0 |
+| KEY-3a | Embeddings dropdown: OpenAI (default, `text-embedding-3-small`), Google Gemini, Voyage AI, Ollama (local); reuses a saved key for the same provider | P0 |
 | KEY-4 | Key field per provider: masked input with show/hide and paste, plus a "Test connection" button that confirms the key works | P0 |
 | KEY-5 | Keys are saved in the OS keychain, never in plain files or logs; after saving, only the last 4 characters are shown | P0 |
 | KEY-6 | Keys can be saved for several providers at once; the dropdown selects which one is active, and switching needs no re-entry | P0 |

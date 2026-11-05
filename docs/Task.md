@@ -34,10 +34,10 @@ The working task list for building Sidekick end to end, derived from the [techni
 | ID | Task | Status | Notes |
 | --- | --- | --- | --- |
 | T-001 | Project scaffold | ✅ Done | Branch `chore/scaffold` |
-| T-002 | CI green on Windows and macOS | ⬜ To do | Needs a PR to trigger CI |
-| T-003 | Apply doc fixes P1–P5 | ⛔ Blocked | Awaiting owner approval (TECHNICAL.md 14.6) |
+| T-002 | CI green on Windows and macOS | 🟡 In progress: testing | [PR #1](https://github.com/coderArchitech/Sidekick/pull/1) opened; waiting for CI |
+| T-003 | Apply doc fixes P1–P5 | ✅ Done | Applied with recommended defaults; ADR-013 |
 | T-004 | `secrets` crate: OS keychain | ⬜ To do | |
-| T-005 | `store` crate: encrypted database and migrations | ⬜ To do | Vector table waits on T-003 (P1) |
+| T-005 | `store` crate: encrypted database and migrations | ⬜ To do | |
 | T-006 | Settings storage and commands | ⬜ To do | |
 | T-007 | `gateway` crate: LLM provider trait, mock and Anthropic | ⬜ To do | |
 | T-008 | Settings window: providers and API keys | ⬜ To do | |
@@ -54,7 +54,7 @@ The working task list for building Sidekick end to end, derived from the [techni
 | T-014 | Live transcript tab | ⬜ To do | |
 | T-015 | `hotkeys` crate: global shortcuts | ⬜ To do | 🖥️ |
 | T-016 | Profile: name and nicknames | ⬜ To do | |
-| T-017 | `ingest` crate: parse, chunk, embed | ⬜ To do | Embeddings need T-003 (P1) |
+| T-017 | `ingest` crate: parse, chunk, embed | ⬜ To do | |
 | T-018 | `retrieval` crate: hybrid search and context packs | ⬜ To do | |
 | T-019 | Library feature: documents in a session | ⬜ To do | |
 | T-020 | Orchestrator: question detection and modes | ⬜ To do | |
@@ -129,7 +129,7 @@ The working task list for building Sidekick end to end, derived from the [techni
 **Scope:** Once approved, update the named sections: separate `EmbeddingProvider` and choose the embeddings model and vector size (P1); `web_search` command (P2); per-question concurrency (P3); FTS sync triggers (P4); name vocabulary as P0 (P5). Add ADRs where the decision is significant (P1).
 
 **Tests**
-- [ ] Doc link check passes (all relative links and anchors resolve).
+- [x] Doc link check passes (all relative links and anchors resolve).
 - [ ] Tests for each change are added in the task that implements it (T-005, T-007, T-010, T-017, T-021).
 
 ### T-004 `secrets` crate: OS keychain

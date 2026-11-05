@@ -63,7 +63,7 @@ The problem it solves: in context-heavy meetings, people can't recall details fr
 
 | Field | Value |
 | --- | --- |
-| Version | 1.2 (draft) |
+| Version | 1.3 (draft) |
 | Owner | @nitesh |
 | Status | Draft, in development (Phase 0) |
 | Review cadence | At every minor release, and whenever an ADR is added |
@@ -75,6 +75,7 @@ The problem it solves: in context-heavy meetings, people can't recall details fr
 | 1.0 | Nov 5, 2026 | First full draft |
 | 1.1 | Nov 5, 2026 | Repo scaffolded. Added ADR-011 (Cargo workspace, one crate per module) and ADR-012 (frontend feature boundaries); updated 3.2, 3.5, 6, 7.1, 9.1, 14; added 7.8 module boundaries; diagrams redrawn in Mermaid; proposed changes listed in 14.6 |
 | 1.2 | Nov 5, 2026 | Added the implementation task list ([Task.md](Task.md)) and linked it from 1.6 and 14.1 |
+| 1.3 | Nov 5, 2026 | Applied P1–P5 (14.6): `EmbeddingProvider` and ADR-013; `web_search` command; per-question concurrency; FTS sync triggers; name vocabulary P0 |
 
 ### 1.6 Related documents
 
@@ -259,7 +260,7 @@ Steps 3 to 8 must finish within the NFR-2 budget. The cue in step 9 comes from a
 
 | Workflow | Path |
 | --- | --- |
-| Document upload | `library` → `ingest_document` → `ingest` parses and chunks → `gateway` embeds → `store` writes chunks and vectors → `ingest.progress` events |
+| Document upload | `library` → `ingest_document` → `ingest` parses and chunks → `gateway` embeds with the active `EmbeddingProvider` → `store` writes chunks and vectors → `ingest.progress` events |
 | Screenshot | Hotkey → `capture` → `store` saves image → `screenshot.captured` event → capture-and-ask continues at step 3 above |
 | Rolling notes | Every 45 s, `orchestrator` sends new transcript plus current notes to the fast model → `save_notes` |
 | Session start | `start_session` → `consent` checks confirmation → `audio` and `stt` start → `session.state` event |
@@ -305,6 +306,7 @@ Major versions are fixed here; exact versions are pinned in `Cargo.lock` and `pn
 | ADR-010 | WebdriverIO for full-app E2E; Playwright for UI-only tests | Playwright only | Only WebdriverIO drives a Tauri app on both OSes. Trade-off: two test runners |
 | ADR-011 | Cargo workspace: one crate per Rust module; `sidekick-core` for shared types; `src-tauri` is a thin shell | One crate with modules | Compiler-enforced boundaries, crates testable without Tauri, faster incremental builds. Trade-off: more `Cargo.toml` files |
 | ADR-012 | Frontend features expose a public `index.ts`; all Rust calls through `@/ipc`; enforced by ESLint | Convention only; eslint-plugin-boundaries | Features can change freely behind their API; UI runs in a browser with mocks. Trade-off: relative cross-feature imports aren't caught, so use the `@/features/<name>` alias |
+| ADR-013 | Embeddings behind their own `EmbeddingProvider`; default OpenAI `text-embedding-3-small`; vector table sized per model | Embed on `LlmProvider`; fixed 1024 dims | Anthropic has no embeddings API; any model can be used without a schema migration. Trade-off: changing model means re-embedding |
 
 Each decision has its own file in [`docs/adr/`](adr/README.md). New decisions get the next ADR number (copy [`docs/adr/template.md`](adr/template.md)) and are added here in the same pull request as the code change.
 
@@ -316,8 +318,9 @@ Each decision has its own file in [`docs/adr/`](adr/README.md). New decisions ge
 | AssemblyAI | WebSocket (streaming) | API key in header | Alternative STT |
 | Soniox | WebSocket (streaming) | API key | Alternative STT, multilingual |
 | Anthropic | HTTPS + server-sent events | API key header | LLM answers, vision |
-| OpenAI | HTTPS + server-sent events | Bearer token | LLM answers, vision, embeddings |
-| Google Gemini | HTTPS streaming | API key header | LLM answers, vision |
+| OpenAI | HTTPS + server-sent events | Bearer token | LLM answers, vision, embeddings (default: `text-embedding-3-small`, 1536 dims) |
+| Voyage AI | HTTPS | Bearer token | Embeddings (Anthropic's recommended partner; Anthropic has no embeddings API) |
+| Google Gemini | HTTPS streaming | API key header | LLM answers, vision, embeddings |
 | Ollama | HTTP on localhost:11434 | None | Local LLM and embeddings |
 | Tavily / Brave | HTTPS | API key | Web search tool |
 | OS keychain | OS API | User login | Secret storage |
@@ -405,11 +408,25 @@ CREATE TABLE chunks (
 );
 CREATE INDEX idx_chunks_document ON chunks(document_id, ord);
 
-CREATE VIRTUAL TABLE chunk_vectors USING vec0(
-  chunk_id  INTEGER PRIMARY KEY,
-  embedding float[1024]                         -- dimension fixed per embedding model
-);
+-- chunk_vectors is NOT created by this migration: its size depends on the active
+-- embedding model (ADR-013). The store creates it on first use:
+--   CREATE VIRTUAL TABLE chunk_vectors USING vec0(chunk_id INTEGER PRIMARY KEY, embedding float[<dims>]);
+-- and records the dimension in settings key 'embedding.dims'. Changing model drops
+-- and recreates it, then the re-embedding job refills it (section 4.5).
+
 CREATE VIRTUAL TABLE chunks_fts USING fts5(text, content='chunks', content_rowid='id');
+
+-- Keep the external-content FTS table in sync with chunks.
+CREATE TRIGGER chunks_ai AFTER INSERT ON chunks BEGIN
+  INSERT INTO chunks_fts(rowid, text) VALUES (new.id, new.text);
+END;
+CREATE TRIGGER chunks_ad AFTER DELETE ON chunks BEGIN
+  INSERT INTO chunks_fts(chunks_fts, rowid, text) VALUES ('delete', old.id, old.text);
+END;
+CREATE TRIGGER chunks_au AFTER UPDATE ON chunks BEGIN
+  INSERT INTO chunks_fts(chunks_fts, rowid, text) VALUES ('delete', old.id, old.text);
+  INSERT INTO chunks_fts(rowid, text) VALUES (new.id, new.text);
+END;
 
 CREATE TABLE transcript_segments (
   id            INTEGER PRIMARY KEY,
@@ -507,7 +524,7 @@ Foreign keys are enforced (`PRAGMA foreign_keys = ON`), and the database runs in
 | `sessions.status` | TEXT | Lifecycle state | `live` |
 | `sessions.retention` | TEXT | How long data is kept after the session ends | `30d` |
 | `documents.sha256` | TEXT | Hash of the file, to skip duplicate uploads | `9f86d0...` |
-| `documents.embedding_model` | TEXT | Model used for this document's vectors; re-embed if it changes | `voyage-3` |
+| `documents.embedding_model` | TEXT | Model used for this document's vectors; re-embed if it changes | `openai/text-embedding-3-small` |
 | `chunks.page` | INTEGER | Source page, used in citations | `14` |
 | `transcript_segments.start_ms` | INTEGER | Milliseconds from session start, used in citations | `754000` |
 | `transcript_segments.is_user` | INTEGER (0/1) | 1 if the segment came from the user's microphone | `0` |
@@ -569,10 +586,11 @@ Commands are request/response calls from the frontend to Rust (`invoke`). All re
 | `retrieve_context` | `session_id, query, opts` | `ContextPack` | Transcript window, notes, top chunks, screenshot |
 | `llm_stream` | `request_id, provider?, model?, messages, tools?` | `()` (tokens arrive as events) | Start a streaming LLM call |
 | `cancel_stream` | `request_id` | `()` | Abort an in-flight LLM call |
+| `web_search` | `request_id, query, max_results?` | `SearchResult[]` | Run a web search for a model tool call; the orchestrator sends results back to the model |
 | `save_answer` | `Answer` | `AnswerId` | Persist a completed answer |
 | `rate_answer` | `answer_id, rating` | `()` | Thumbs up/down |
 | `save_notes` | `session_id, content_md, version` | `NotesVersion` | Update rolling notes (optimistic version check) |
-| `list_providers` | `kind: stt / llm / search` | `ProviderInfo[]` | Dropdown options, with key status |
+| `list_providers` | `kind: stt / llm / embed / search` | `ProviderInfo[]` | Dropdown options, with key status |
 | `set_api_key` | `provider, key` | `KeyStatus` | Test and store a key (key never returned) |
 | `test_api_key` | `provider` | `KeyStatus` | Re-test a stored key |
 | `delete_api_key` | `provider` | `()` | Remove a key from the keychain |
@@ -654,7 +672,7 @@ Every error crossing IPC is a `SidekickError` with a stable `code`, a user-facin
 ### 5.5 Rate limits, pagination and versioning
 
 - **Provider rate limits:** the gateway retries `RATE_LIMITED` and `PROVIDER_UNAVAILABLE` up to 3 times with exponential backoff and jitter (0.5 s, 1 s, 2 s), respecting any `Retry-After` header.
-- **Internal throttling:** at most 2 concurrent LLM answer streams; a new detected question cancels the oldest unfinished one. Detection is debounced 600 ms after a segment ends.
+- **Internal throttling:** at most 2 questions in flight (each uses up to 2 streams: cue and full answer, so at most 4 streams); a new detected question cancels the oldest unfinished question's streams. Detection is debounced 600 ms after a segment ends.
 - **Pagination:** list commands use an opaque `cursor` and a `limit` (default 50, max 200).
 - **Versioning:** the IPC contract ships with the app, so frontend and backend always match; there is no separate API version. Breaking changes are allowed between releases but must regenerate bindings (section 5.6). Skill files carry `schema_version`; the database uses `user_version`.
 - **Deprecation:** settings keys and Skill fields are kept readable for 2 minor releases after being renamed, with a migration in between.
@@ -677,7 +695,15 @@ pub trait LlmProvider: Send + Sync {
     fn id(&self) -> ProviderId;
     async fn list_models(&self, key: &SecretString) -> Result<Vec<ModelInfo>, SidekickError>;
     async fn stream(&self, req: LlmRequest, key: &SecretString) -> Result<TokenStream, SidekickError>;
-    async fn embed(&self, texts: &[String], key: &SecretString) -> Result<Vec<Vec<f32>>, SidekickError>;
+}
+
+/// Separate from LlmProvider because not every LLM vendor offers embeddings (ADR-013).
+#[async_trait]
+pub trait EmbeddingProvider: Send + Sync {
+    fn id(&self) -> ProviderId;
+    fn model(&self) -> &str;
+    fn dims(&self) -> usize;
+    async fn embed(&self, texts: &[String], key: Option<&SecretString>) -> Result<Vec<Vec<f32>>, SidekickError>;
 }
 
 #[async_trait]
@@ -709,7 +735,7 @@ There are no users or roles; access control is about which window may call which
 
 | Window | Allowed commands |
 | --- | --- |
-| Overlay | Session, capture, retrieval, LLM, answers, notes, overlay, protection status |
+| Overlay | Session, capture, retrieval, LLM, web search, answers, notes, overlay, protection status |
 | Settings | Providers, keys, models, settings, skills, usage, diagnostics, backup |
 
 Key commands (`set_api_key`, `delete_api_key`) are only exposed to the Settings window. No window gets filesystem or shell access beyond the dialogs it needs.
@@ -1517,17 +1543,18 @@ Provider APIs (Deepgram, AssemblyAI, Soniox, Anthropic, OpenAI, Google, Tavily, 
 | Nov 5, 2026 | User confirms consent before each session; no automatic notice | PRD section 8 |
 | Nov 5, 2026 | Cargo workspace, one crate per Rust module | ADR-011 |
 | Nov 5, 2026 | Frontend feature boundaries enforced by lint | ADR-012 |
+| Nov 5, 2026 | Separate embeddings provider; OpenAI text-embedding-3-small default | ADR-013 |
 
 ### 14.6 Open issues
 
 - [ ] Compare Deepgram, Soniox and local Whisper on real Hinglish audio; confirm default.
-- [ ] Choose embeddings provider and dimension (affects `chunk_vectors` schema).
+- [x] Choose embeddings provider and dimension: OpenAI `text-embedding-3-small` default, dimension per model (ADR-013).
 - [ ] Decide Sidekick's own license.
 - [ ] Verify capture exclusion behaviour on the latest macOS and Windows releases.
 - [ ] Confirm the consent flow with legal counsel before any public release.
 - [ ] Fill in the PRD roadmap (section 10): the original diagram didn't survive export.
 
-**Proposed changes awaiting owner approval.** Found while reviewing this document; each will update the sections named when approved.
+**Changes P1–P5 (applied in version 1.3).** Found while reviewing this document and applied with the recommended defaults so Phase 0 could proceed; revert any of them by editing the sections named.
 
 | # | Proposal | Sections affected |
 | --- | --- | --- |
