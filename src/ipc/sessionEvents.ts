@@ -4,6 +4,7 @@
  */
 import type {
   HotkeyPressed,
+  IngestProgress,
   SessionChanged,
   SttStatusChanged,
   TranscriptPartial,
@@ -18,6 +19,8 @@ export interface SessionEvents {
   onSttStatus(cb: (e: SttStatusChanged) => void): Promise<Unlisten>;
   /** A global shortcut was pressed (registered by the Rust shell). */
   onHotkey(cb: (e: HotkeyPressed) => void): Promise<Unlisten>;
+  /** Document ingest progress (tech doc 5.2 `ingest.progress`). */
+  onIngestProgress(cb: (e: IngestProgress) => void): Promise<Unlisten>;
 }
 
 type Payloads = {
@@ -26,6 +29,7 @@ type Payloads = {
   segment: TranscriptSegment;
   stt: SttStatusChanged;
   hotkey: HotkeyPressed;
+  ingest: IngestProgress;
 };
 
 /** In-memory event bus used by the browser mocks and tests. */
@@ -36,6 +40,7 @@ export function createMockSessionBus() {
     segment: new Set(),
     stt: new Set(),
     hotkey: new Set(),
+    ingest: new Set(),
   };
   function on<K extends keyof Payloads>(kind: K, cb: (e: Payloads[K]) => void): Promise<Unlisten> {
     handlers[kind].add(cb);
@@ -52,6 +57,7 @@ export function createMockSessionBus() {
     onTranscriptSegment: (cb) => on("segment", cb),
     onSttStatus: (cb) => on("stt", cb),
     onHotkey: (cb) => on("hotkey", cb),
+    onIngestProgress: (cb) => on("ingest", cb),
   };
   return { events, emit };
 }

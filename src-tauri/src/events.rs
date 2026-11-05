@@ -190,3 +190,11 @@ impl SttSink for TauriSttSink {
 pub struct HotkeyPressed {
     pub action: sidekick_hotkeys::Action,
 }
+
+/// Document ingest progress (`ingest.progress`).
+#[derive(Debug, Clone, Serialize, specta::Type, Event)]
+#[serde(rename_all = "camelCase")]
+pub struct IngestProgress {
+    #[serde(flatten)]
+    pub progress: sidekick_ingest::Progress,
+}

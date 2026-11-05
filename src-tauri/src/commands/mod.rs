@@ -3,6 +3,7 @@
 
 pub mod app;
 pub mod diagnostics;
+pub mod documents;
 pub mod keys;
 pub mod llm;
 pub mod session;

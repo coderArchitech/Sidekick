@@ -204,7 +204,7 @@ Each module below is its own crate at `crates/<module>/`, named `sidekick-<modul
 | `capture` | Region, window and full-screen screenshots; downscale and encode | Not started |
 | `window` | Capture-exclusion status rules per OS and version (Windows build 19041+ protected; macOS 13–14 protected, 15+ not guaranteed because ScreenCaptureKit can bypass it; Linux unavailable) and the auto-hide rule. Pure logic: the shell applies `set_content_protected(true)` to every window at startup. Transparency, click-through and screen-share detection still to come (T-029) | Started (status done; manual checklist pending) |
 | `hotkeys` | Actions, defaults (12.3) and validation (normalise, one modifier minimum, no duplicates, every action once). The shell registers them with `tauri-plugin-global-shortcut`, handles show/hide itself, emits `hotkey-pressed`, and only saves a new set after the OS accepts it | Done (Linux verified; Windows/macOS check pending) |
-| `ingest` | Parse documents, split into chunks, request embeddings, write to store | Not started |
+| `ingest` | Parsers (PDF via pdf-extract, DOCX/PPTX via zip + quick-xml, spreadsheets via calamine, text/Markdown, web pages), chunker (~500 tokens ≈ 2,000 chars, 50 overlap, within a page), SHA-256 duplicate check, batched embeddings (100 per request, retries), progress events; at most 3 documents at once. Owns the SQL for `documents` and `chunks`. Images wait for vision (T-025/T-026) | Done (images pending) |
 | `store` | SQLCipher database (raw 256-bit key from `secrets`), WAL, foreign keys; migrations with pre-migration backups; sqlite-vec registered for every connection; `settings` (raw JSON) and `vectors` (per-model `chunk_vectors`) modules; repository modules added per feature | Done |
 | `settings` | Typed `Settings` (providers and models for STT, LLM, embeddings, search; Auto-answer; retention) with defaults and partial `SettingsPatch` updates; one `settings` row per section; unreadable sections fall back to defaults | Done |
 | `retrieval` | Vector and keyword search over chunks; assemble context packs (transcript window, notes, chunks, screenshot) | Not started |
@@ -591,7 +591,9 @@ Commands are request/response calls from the frontend to Rust (`invoke`). All re
 | `get_transcript` | `session_id` | `Transcript` (`lines`, `bookmarks`) | Saved transcript in time order, for opening the Transcript tab |
 | `rename_speaker` | `session_id, from, to` | `u32` (lines changed) | Rename a speaker in every line; renaming to an existing name merges (LIS-3) |
 | `add_bookmark` | `session_id, at_ms, label?` | `Bookmark` | Mark a moment (ms from session start) |
-| `ingest_document` | `session_id or pack_id, file_path` | `DocumentId` | Queue a document for parsing and embedding |
+| `ingest_document` | `session_id, path` | `()` | Queue a file for parsing and embedding; progress arrives as `ingest-progress` events. A missing embeddings key fails immediately |
+| `ingest_url` | `session_id, url` | `()` | Queue a web page (http/https only) |
+| `list_documents` | `session_id` | `DocumentInfo[]` | Session documents with status, pages, chunk count and error |
 | `delete_document` | `document_id` | `()` | Remove document and its chunks |
 | `capture_screenshot` | `mode: region / window / screen` | `Screenshot` | Capture and store a screenshot |
 | `retrieve_context` | `session_id, query, opts` | `ContextPack` | Transcript window, notes, top chunks, screenshot |
@@ -619,7 +621,7 @@ Commands are request/response calls from the frontend to Rust (`invoke`). All re
 
 ### 5.2 Events
 
-Events are pushed from Rust to the frontend. Payloads are typed and versioned with the app. Tauri event names can't contain dots, so the wire names use a dash (`answer-token`); the table keeps the dotted names for readability. In TypeScript, features subscribe through `answerEvents` from `@/ipc`, which also works with the browser mocks. Status: `answer.*`, `session.state` (`session-changed`, payload `{ session }`), `transcript.partial`, `transcript.segment` (already saved, with its row `id`) and `stt.status` (`stt-status-changed`) and `hotkey.pressed` (`hotkey-pressed`, payload `{ action }`) are implemented. Features subscribe through `answerEvents` and `sessionEvents` from `@/ipc`.
+Events are pushed from Rust to the frontend. Payloads are typed and versioned with the app. Tauri event names can't contain dots, so the wire names use a dash (`answer-token`); the table keeps the dotted names for readability. In TypeScript, features subscribe through `answerEvents` from `@/ipc`, which also works with the browser mocks. Status: `answer.*`, `session.state` (`session-changed`, payload `{ session }`), `transcript.partial`, `transcript.segment` (already saved, with its row `id`) and `stt.status` (`stt-status-changed`) `hotkey.pressed` (`hotkey-pressed`, payload `{ action }`) and `ingest.progress` (`ingest-progress`, payload `{ documentId, status, percent, error }`) are implemented. Features subscribe through `answerEvents` and `sessionEvents` from `@/ipc`.
 
 | Event | Payload | When |
 | --- | --- | --- |

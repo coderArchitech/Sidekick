@@ -56,7 +56,7 @@ All Phase 0 code and automated tests are done and green on Linux, Windows and ma
 | T-014 | Live transcript tab | ✅ Done | Verified in the real app with fixture audio |
 | T-015 | `hotkeys` crate: global shortcuts | 🟡 In progress: testing | 🖥️ Waiting on hardware: verified on Linux (X11); needs a check on Windows and macOS. Ask/Screenshot/Auto/Skill actions hook in with T-023/T-025/T-020/T-028 |
 | T-016 | Profile: name and nicknames | ✅ Done | Detection use lands in T-020 |
-| T-017 | `ingest` crate: parse, chunk, embed | ⬜ To do | |
+| T-017 | `ingest` crate: parse, chunk, embed | 🟡 In progress: testing | Waiting on dependency: image files need a vision model (T-025/T-026); Gemini, Voyage and Ollama embeddings come with T-026. Everything else done |
 | T-018 | `retrieval` crate: hybrid search and context packs | ⬜ To do | |
 | T-019 | Library feature: documents in a session | ⬜ To do | |
 | T-020 | Orchestrator: question detection and modes | ⬜ To do | |
@@ -338,13 +338,16 @@ All Phase 0 code and automated tests are done and green on Linux, Windows and ma
 **Scope:** Parsers for PDF, DOCX, PPTX, XLSX, TXT, MD, images (OCR or vision description), URLs; ~500-token chunks with 50-token overlap and page numbers; duplicate detection by SHA-256; batched embeddings (100 per request, 3 docs in parallel); progress events; `EmbeddingProvider` from T-003.
 
 **Tests**
-- [ ] Unit: each parser extracts text and page numbers from fixture files.
-- [ ] Unit: corrupted file returns `PARSE_FAILED`; unknown type returns `UNSUPPORTED_FILE`.
-- [ ] Unit: chunker sizes, overlap and page attribution.
-- [ ] Unit: same file twice is detected by hash and not re-embedded.
-- [ ] Integration: fixture 50-page PDF ingests end to end in under 30 s with the mock embedder (CTX-3).
-- [ ] Integration: progress events go queued → parsing → embedding → ready.
-- [ ] Integration: deleting a document removes its chunks, vectors and FTS rows.
+- [x] Unit: PDF (pages), DOCX (paragraphs, entities), PPTX (slide numbers), XLSX (sheet rows), text and Markdown parsers, on generated fixture files; web pages to text (scripts, nav and tags removed).
+- [x] Unit: corrupted file returns `PARSE_FAILED`; unknown type and images return `UNSUPPORTED_FILE`; text-less files fail clearly.
+- [x] Unit: chunker sizes (450–500 tokens), overlap (~50 tokens), page attribution, nothing lost.
+- [x] Integration: same file twice in a session is detected by hash and not re-embedded; another session gets its own copy.
+- [x] Integration: 50-page PDF ingests end to end in 0.1 s with the mock embedder (CTX-3 target 30 s); every chunk has a vector and keyword entry; page attribution checked.
+- [x] Integration: progress goes queued → parsing → embedding → ready, percent only rises; failures stored on the document and reported.
+- [x] Integration: deleting a document removes its chunks, vectors and keyword rows.
+- [x] Integration: OpenAI embeddings adapter (order by index, bearer auth, 401, wrong sizes) and the gateway's embedder choice.
+- [ ] Images (OCR or vision description): needs the vision-capable LLM adapters (T-025, T-026).
+- [ ] Gemini, Voyage and Ollama embeddings: with the other providers (T-026).
 
 ### T-018 `retrieval` crate: hybrid search and context packs
 

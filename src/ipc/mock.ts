@@ -4,6 +4,7 @@ import type {
   commands as tauriCommands,
   Bookmark,
   ConsentOption,
+  DocumentInfo,
   Session,
   TranscriptLine,
   SidekickError,
@@ -70,6 +71,57 @@ export const mockSessionBus = createMockSessionBus();
 const sessions = new Map<string, Session>();
 const transcripts = new Map<string, TranscriptLine[]>();
 const bookmarks = new Map<string, Bookmark[]>();
+const documents = new Map<string, DocumentInfo[]>();
+
+/** Simulates ingest like the Rust pipeline: queued → parsing → embedding → ready (or failed). */
+function mockIngest(sessionId: string, name: string, sizeBytes: number) {
+  const supported =
+    /\.(pdf|docx|pptx|xlsx|xls|ods|txt|md|markdown|csv|json)$/i.test(name) || /^https?:/.test(name);
+  if (!supported) {
+    return err(
+      "UNSUPPORTED_FILE",
+      `Sidekick can't read ${name}. Supported: PDF, Word (.docx), PowerPoint (.pptx), Excel, text and Markdown.`,
+    );
+  }
+  const doc: DocumentInfo = {
+    id: `mock-doc-${nextLineId++}`,
+    name,
+    status: "queued",
+    pageCount: null,
+    chunkCount: 0,
+    sizeBytes,
+    error: null,
+    createdAt: Date.now(),
+  };
+  documents.set(sessionId, [...(documents.get(sessionId) ?? []), doc]);
+  const failing = name.includes("broken");
+  const steps: [DocumentInfo["status"], number][] = failing
+    ? [
+        ["parsing", 5],
+        ["failed", 100],
+      ]
+    : [
+        ["parsing", 5],
+        ["embedding", 10],
+        ["embedding", 60],
+        ["ready", 100],
+      ];
+  steps.forEach(([status, percent], i) =>
+    setTimeout(
+      () => {
+        doc.status = status;
+        if (status === "ready") {
+          doc.pageCount = 3;
+          doc.chunkCount = 3;
+        }
+        if (status === "failed") doc.error = `Couldn't read ${name}: the PDF is damaged.`;
+        mockSessionBus.emit("ingest", { documentId: doc.id, status, percent, error: doc.error });
+      },
+      (i + 1) * mockOptions.ingestStepMs,
+    ),
+  );
+  return { status: "ok" as const, data: null };
+}
 let nextLineId = 1;
 
 /** Adds a final transcript line and emits it, like the Rust STT sink does. Tests use it. */
@@ -152,7 +204,7 @@ export const mockProtection: { status: ProtectionStatus } = {
   status: { state: "unavailable", reason: "Running in a browser: no screen-share protection." },
 };
 /** Browser-demo switches; tests leave them off. */
-export const mockOptions = { demoTranscript: false };
+export const mockOptions = { demoTranscript: false, ingestStepMs: 5 };
 /** What the mocks were asked to do, for assertions. */
 export const mockCalls: { streams: ("mic" | "system")[] } = { streams: [] };
 /** Counts window actions so tests can assert them. */
@@ -202,6 +254,7 @@ export function resetMocks(): void {
   latencySamples.clear();
   sessions.clear();
   transcripts.clear();
+  documents.clear();
   bookmarks.clear();
   nextLineId = 1;
   liveSessionId = null;
@@ -443,6 +496,26 @@ export const mockCommands: Commands = {
     };
     bookmarks.set(sessionId, [...(bookmarks.get(sessionId) ?? []), mark]);
     return Promise.resolve({ status: "ok", data: structuredClone(mark) });
+  },
+  ingestDocument: (sessionId, path) => {
+    const name = path.split(/[\\/]/).pop() ?? path;
+    return Promise.resolve(mockIngest(sessionId, name, 1000));
+  },
+  ingestUrl: (sessionId, url) =>
+    Promise.resolve(
+      /^https?:\/\//.test(url)
+        ? mockIngest(sessionId, url, 1000)
+        : err("UNSUPPORTED_FILE", "Only http and https links can be added."),
+    ),
+  listDocuments: (sessionId) =>
+    Promise.resolve({ status: "ok", data: structuredClone(documents.get(sessionId) ?? []) }),
+  deleteDocument: (documentId) => {
+    for (const [k, list] of documents)
+      documents.set(
+        k,
+        list.filter((d) => d.id !== documentId),
+      );
+    return Promise.resolve({ status: "ok", data: null });
   },
   listSessions: (_cursor, limit) => {
     const items = [...sessions.values()]

@@ -234,6 +234,44 @@ export const commands = {
       else return { status: "error", error: e as any };
     }
   },
+  /**
+   * Queues a file for parsing and embedding.
+   */
+  async ingestDocument(sessionId: string, path: string): Promise<Result<null, SidekickError>> {
+    try {
+      return { status: "ok", data: await TAURI_INVOKE("ingest_document", { sessionId, path }) };
+    } catch (e) {
+      if (e instanceof Error) throw e;
+      else return { status: "error", error: e as any };
+    }
+  },
+  /**
+   * Queues a web page (http/https) for ingest.
+   */
+  async ingestUrl(sessionId: string, url: string): Promise<Result<null, SidekickError>> {
+    try {
+      return { status: "ok", data: await TAURI_INVOKE("ingest_url", { sessionId, url }) };
+    } catch (e) {
+      if (e instanceof Error) throw e;
+      else return { status: "error", error: e as any };
+    }
+  },
+  async listDocuments(sessionId: string): Promise<Result<DocumentInfo[], SidekickError>> {
+    try {
+      return { status: "ok", data: await TAURI_INVOKE("list_documents", { sessionId }) };
+    } catch (e) {
+      if (e instanceof Error) throw e;
+      else return { status: "error", error: e as any };
+    }
+  },
+  async deleteDocument(documentId: string): Promise<Result<null, SidekickError>> {
+    try {
+      return { status: "ok", data: await TAURI_INVOKE("delete_document", { documentId }) };
+    } catch (e) {
+      if (e instanceof Error) throw e;
+      else return { status: "error", error: e as any };
+    }
+  },
 };
 
 /** user-defined events **/
@@ -243,6 +281,7 @@ export const events = __makeEvents__<{
   answerError: AnswerError;
   answerToken: AnswerToken;
   hotkeyPressed: HotkeyPressed;
+  ingestProgress: IngestProgress;
   sessionChanged: SessionChanged;
   sttStatusChanged: SttStatusChanged;
   transcriptPartial: TranscriptPartial;
@@ -252,6 +291,7 @@ export const events = __makeEvents__<{
   answerError: "answer-error",
   answerToken: "answer-token",
   hotkeyPressed: "hotkey-pressed",
+  ingestProgress: "ingest-progress",
   sessionChanged: "session-changed",
   sttStatusChanged: "stt-status-changed",
   transcriptPartial: "transcript-partial",
@@ -304,6 +344,20 @@ export type Diagnostics = {
   protection: ProtectionStatus;
   stages: StageStats[];
 };
+export type DocStatus = "queued" | "parsing" | "embedding" | "ready" | "failed";
+/**
+ * A document as the Library shows it.
+ */
+export type DocumentInfo = {
+  id: string;
+  name: string;
+  status: DocStatus;
+  pageCount: number | null;
+  chunkCount: number;
+  sizeBytes: number;
+  error: string | null;
+  createdAt: number;
+};
 /**
  * How hard the model should think. Lower is faster and cheaper.
  */
@@ -342,6 +396,18 @@ export type FinishReason =
  * A global shortcut was pressed (`hotkey.pressed`).
  */
 export type HotkeyPressed = { action: Action };
+/**
+ * Document ingest progress (`ingest.progress`).
+ */
+export type IngestProgress = {
+  documentId: string;
+  status: DocStatus;
+  /**
+   * 0–100.
+   */
+  percent: number;
+  error: string | null;
+};
 /**
  * Result of saving or testing a key.
  */

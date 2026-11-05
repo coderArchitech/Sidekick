@@ -27,6 +27,10 @@ const COMMANDS: &[&str] = &[
     "get_transcript",
     "rename_speaker",
     "add_bookmark",
+    "ingest_document",
+    "ingest_url",
+    "list_documents",
+    "delete_document",
 ];
 
 fn main() {

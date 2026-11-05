@@ -30,9 +30,12 @@ export type {
   Bookmark,
   ChatMessage,
   ConsentOption,
+  DocStatus,
+  DocumentInfo,
   Diagnostics,
   Effort,
   ErrorCode,
+  IngestProgress,
   FinishReason,
   KeyCheck,
   KeyStatus,
@@ -80,6 +83,7 @@ const tauriSessionEvents: SessionEvents = {
   onTranscriptSegment: (cb) => tauriEvents.transcriptSegment.listen((e) => cb(e.payload)),
   onSttStatus: (cb) => tauriEvents.sttStatusChanged.listen((e) => cb(e.payload)),
   onHotkey: (cb) => tauriEvents.hotkeyPressed.listen((e) => cb(e.payload)),
+  onIngestProgress: (cb) => tauriEvents.ingestProgress.listen((e) => cb(e.payload)),
 };
 
 export const sessionEvents: SessionEvents = isTauri ? tauriSessionEvents : mockSessionBus.events;

@@ -3,3 +3,5 @@
 pub mod anthropic;
 pub mod http;
 pub mod mock;
+pub mod mock_embed;
+pub mod openai;

@@ -22,6 +22,10 @@
     "allow-get-transcript",
     "allow-rename-speaker",
     "allow-add-bookmark",
+    "allow-ingest-document",
+    "allow-ingest-url",
+    "allow-list-documents",
+    "allow-delete-document",
     "core:window:allow-start-dragging",
     "core:window:allow-set-always-on-top"
   ]

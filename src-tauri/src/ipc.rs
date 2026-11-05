@@ -36,6 +36,10 @@ pub fn builder() -> Builder<tauri::Wry> {
             commands::session::get_transcript,
             commands::session::rename_speaker,
             commands::session::add_bookmark,
+            commands::documents::ingest_document,
+            commands::documents::ingest_url,
+            commands::documents::list_documents,
+            commands::documents::delete_document,
         ])
         .events(collect_events![
             events::AnswerToken,
@@ -46,6 +50,7 @@ pub fn builder() -> Builder<tauri::Wry> {
             events::TranscriptSegment,
             events::SttStatusChanged,
             events::HotkeyPressed,
+            events::IngestProgress,
         ])
 }
 

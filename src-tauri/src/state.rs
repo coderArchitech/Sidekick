@@ -11,7 +11,9 @@ use sidekick_store::{DB_FILE_NAME, Database, database_key};
 
 /// Everything commands need. Crates receive only the parts they use.
 pub struct AppState {
-    db: Mutex<Database>,
+    db: Arc<Mutex<Database>>,
+    /// At most 3 documents are processed at once (tech doc 13.5).
+    pub ingest_slots: Arc<tokio::sync::Semaphore>,
     pub gateway: Gateway,
     pub diagnostics: Arc<Recorder>,
     pub keys: Arc<dyn KeyStore>,
@@ -54,13 +56,19 @@ impl AppState {
             );
         }
         Ok(Self {
-            db: Mutex::new(db),
+            db: Arc::new(Mutex::new(db)),
+            ingest_slots: Arc::new(tokio::sync::Semaphore::new(3)),
             gateway,
             diagnostics,
             keys,
             live: tokio::sync::Mutex::new(None),
             mock,
         })
+    }
+
+    /// The shared database handle, for background work like document ingest.
+    pub fn db_handle(&self) -> Arc<Mutex<Database>> {
+        Arc::clone(&self.db)
     }
 
     /// Locks the database. A panic in another command doesn't make it unusable.
