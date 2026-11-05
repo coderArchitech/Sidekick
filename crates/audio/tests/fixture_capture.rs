@@ -105,14 +105,18 @@ async fn pause_drops_frames_and_resume_continues() {
     handle.resume();
     let frames = collect(rx).await;
     handle.stop();
+    // Robust to slow runners: the timestamps must show a gap (frames dropped
+    // while paused) with frames on both sides of it (resume continues).
+    let starts: Vec<u64> = frames.iter().map(|f| f.start_ms).collect();
+    let gap = starts.windows(2).position(|w| w[1] - w[0] > 50);
+    let Some(i) = gap else {
+        panic!("no frames were dropped while paused: {starts:?}")
+    };
+    assert!(i >= 1, "frames before the pause: {starts:?}");
+    assert!(i + 2 < starts.len(), "frames after resume: {starts:?}");
     assert!(
-        frames.len() < 26,
-        "paused frames must be dropped, got {}",
-        frames.len()
-    );
-    assert!(
-        frames.len() > 10,
-        "frames before and after the pause, got {}",
+        frames.len() < 30,
+        "not every frame delivered: {}",
         frames.len()
     );
 }
