@@ -19,6 +19,9 @@
     "allow-end-session",
     "allow-delete-session",
     "allow-list-sessions",
+    "allow-get-transcript",
+    "allow-rename-speaker",
+    "allow-add-bookmark",
     "core:window:allow-start-dragging",
     "core:window:allow-set-always-on-top"
   ]

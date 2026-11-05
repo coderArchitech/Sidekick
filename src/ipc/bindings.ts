@@ -196,6 +196,44 @@ export const commands = {
       else return { status: "error", error: e as any };
     }
   },
+  async getTranscript(sessionId: string): Promise<Result<Transcript, SidekickError>> {
+    try {
+      return { status: "ok", data: await TAURI_INVOKE("get_transcript", { sessionId }) };
+    } catch (e) {
+      if (e instanceof Error) throw e;
+      else return { status: "error", error: e as any };
+    }
+  },
+  /**
+   * Renames (or, if the name exists, merges) a speaker across the session.
+   */
+  async renameSpeaker(
+    sessionId: string,
+    from: string,
+    to: string,
+  ): Promise<Result<number, SidekickError>> {
+    try {
+      return { status: "ok", data: await TAURI_INVOKE("rename_speaker", { sessionId, from, to }) };
+    } catch (e) {
+      if (e instanceof Error) throw e;
+      else return { status: "error", error: e as any };
+    }
+  },
+  /**
+   * Marks a moment; `at_ms` is milliseconds from session start.
+   */
+  async addBookmark(
+    sessionId: string,
+    atMs: number,
+    label: string | null,
+  ): Promise<Result<Bookmark, SidekickError>> {
+    try {
+      return { status: "ok", data: await TAURI_INVOKE("add_bookmark", { sessionId, atMs, label }) };
+    } catch (e) {
+      if (e instanceof Error) throw e;
+      else return { status: "error", error: e as any };
+    }
+  },
 };
 
 /** user-defined events **/
@@ -229,6 +267,10 @@ export type AnswerToken = { requestId: string; delta: string };
  * Basic facts about the running app, shown in the overlay and diagnostics.
  */
 export type AppInfo = { name: string; version: string; os: string };
+/**
+ * A moment the user marked (PRD 5 "Bookmarks").
+ */
+export type Bookmark = { id: string; atMs: number; label: string | null };
 /**
  * One turn of the conversation. Text only for now; images arrive with screenshots (T-025).
  */
@@ -495,6 +537,21 @@ export type SttState = "connecting" | "live" | "reconnecting" | "failed";
  * STT connection changes (`stt.status`).
  */
 export type SttStatusChanged = { sessionId: string; stream: Stream; state: SttState };
+/**
+ * Everything the Transcript tab needs when it opens (T-014).
+ */
+export type Transcript = { lines: TranscriptLine[]; bookmarks: Bookmark[] };
+/**
+ * A saved transcript line, as the UI shows it.
+ */
+export type TranscriptLine = {
+  id: number;
+  speakerLabel: string;
+  isUser: boolean;
+  text: string;
+  startMs: number;
+  endMs: number;
+};
 /**
  * Interim text, replaced by the next partial or a segment (`transcript.partial`).
  */

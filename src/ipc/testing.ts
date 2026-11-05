@@ -4,6 +4,7 @@ export {
   mockAnswerBus,
   mockCalls,
   mockSessionBus,
+  mockTranscriptLine,
   mockCommands,
   mockProtection,
   mockWindowCalls,

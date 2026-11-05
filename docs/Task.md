@@ -53,7 +53,7 @@ All Phase 0 code and automated tests are done and green on Linux, Windows and ma
 | ID | Task | Status | Notes |
 | --- | --- | --- | --- |
 | T-013 | Sessions and consent | 🟡 In progress: testing | Waiting on dependency: E2E needs the WebdriverIO harness (T-033). Everything else done, including a real-app run |
-| T-014 | Live transcript tab | ⬜ To do | |
+| T-014 | Live transcript tab | ✅ Done | Verified in the real app with fixture audio |
 | T-015 | `hotkeys` crate: global shortcuts | ⬜ To do | 🖥️ |
 | T-016 | Profile: name and nicknames | ⬜ To do | |
 | T-017 | `ingest` crate: parse, chunk, embed | ⬜ To do | |
@@ -300,10 +300,12 @@ All Phase 0 code and automated tests are done and green on Linux, Windows and ma
 **Scope:** Transcript feature subscribing to `transcript.partial` and `transcript.segment`; speaker names with rename and merge; partial text replaced by final; listening indicator; bookmarks list.
 
 **Tests**
-- [ ] Component: partial text replaced by final segment.
-- [ ] Component: renaming a speaker updates all their segments.
-- [ ] Component: listening indicator reflects `session.state` and pause.
-- [ ] Unit: token batching every 50 ms (TECHNICAL.md 13.5) keeps render count bounded.
+- [x] Component: saved lines load in time order; partial text replaced by the final segment; other sessions' events ignored.
+- [x] Component: renaming a speaker updates all their lines (and the database); renaming to an existing name merges (Rust test).
+- [x] Component: listening indicator reflects `session.state` and pause.
+- [x] Component: bookmarks added and listed (Rust test covers ordering and labels).
+- [x] Unit: batching every 50 ms keeps flushes to one per interval under a steady stream.
+- [x] Manual: real app with fixture audio and mock STT shows live lines in the Transcript tab.
 
 ### T-015 `hotkeys` crate: global shortcuts 🖥️
 

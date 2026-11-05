@@ -6,7 +6,16 @@
 import type { AnswerEvents } from "./answerEvents";
 import { commands as tauriCommands, events as tauriEvents } from "./bindings";
 import { getCurrentWindow } from "@tauri-apps/api/window";
-import { mockAnswerBus, mockCommands, mockSessionBus, mockWindowCalls } from "./mock";
+import { mockAnswerBus, mockCommands, mockOptions, mockSessionBus, mockWindowCalls } from "./mock";
+
+// In a plain browser (pnpm dev:web) the mocks play a short demo transcript.
+if (
+  typeof window !== "undefined" &&
+  !("__TAURI_INTERNALS__" in window) &&
+  import.meta.env.MODE === "web"
+) {
+  mockOptions.demoTranscript = true;
+}
 import type { SessionEvents } from "./sessionEvents";
 
 export type { AnswerEvents, Unlisten } from "./answerEvents";
@@ -16,6 +25,7 @@ export type {
   AnswerError,
   AnswerToken,
   AppInfo,
+  Bookmark,
   ChatMessage,
   ConsentOption,
   Diagnostics,
@@ -42,6 +52,8 @@ export type {
   Stage,
   StageStats,
   SttStatusChanged,
+  Transcript,
+  TranscriptLine,
   TranscriptPartial,
   TranscriptSegment,
   Usage,

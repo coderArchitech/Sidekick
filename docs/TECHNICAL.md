@@ -224,7 +224,7 @@ Each module below is its own crate at `crates/<module>/`, named `sidekick-<modul
 | `overlay` | Window chrome: opacity, font size, compact/expanded, protection indicator, tabs |
 | `answers` | Live Answers tab: cue, full answer, sources, follow-up chips, code blocks |
 | `chat` | Chat tab: user questions with session context |
-| `transcript` | Live transcript with speaker names and bookmarks |
+| `transcript` | Transcript tab: loads saved lines, applies live `transcript-partial` / `transcript-segment` events batched every 50 ms (`lib/batcher`), shows partial text until the final line arrives, rename/merge speakers, bookmarks, listening indicator |
 | `notes` | Rolling notes, decisions, action items |
 | `library` | Session documents and screenshot strip |
 | `settings` | Settings window: provider and model dropdowns per kind (STT, LLM, embeddings, web search), masked key field with show/hide, paste, Save and test, Test connection, Remove; Auto-answer and retention. Opened with `open_settings`; Close hides the window |
@@ -588,6 +588,9 @@ Commands are request/response calls from the frontend to Rust (`invoke`). All re
 | `end_session` | `session_id` | `Session` | Stop capture and let STT flush; the summary arrives with T-024 |
 | `delete_session` | `session_id` | `()` | Delete all session data (the consent record is kept, 4.4) |
 | `list_sessions` | `cursor?, limit?` | `SessionPage` (`items`, `nextCursor`) | Session history, newest first |
+| `get_transcript` | `session_id` | `Transcript` (`lines`, `bookmarks`) | Saved transcript in time order, for opening the Transcript tab |
+| `rename_speaker` | `session_id, from, to` | `u32` (lines changed) | Rename a speaker in every line; renaming to an existing name merges (LIS-3) |
+| `add_bookmark` | `session_id, at_ms, label?` | `Bookmark` | Mark a moment (ms from session start) |
 | `ingest_document` | `session_id or pack_id, file_path` | `DocumentId` | Queue a document for parsing and embedding |
 | `delete_document` | `document_id` | `()` | Remove document and its chunks |
 | `capture_screenshot` | `mode: region / window / screen` | `Screenshot` | Capture and store a screenshot |

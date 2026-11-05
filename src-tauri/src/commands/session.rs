@@ -240,3 +240,49 @@ async fn stop_if_live(state: &AppState, session_id: &str) {
         runner.stop().await;
     }
 }
+
+/// Everything the Transcript tab needs when it opens (T-014).
+#[derive(Debug, Clone, Serialize, specta::Type)]
+#[serde(rename_all = "camelCase")]
+pub struct Transcript {
+    pub lines: Vec<repo::TranscriptLine>,
+    pub bookmarks: Vec<repo::Bookmark>,
+}
+
+#[tauri::command]
+#[specta::specta]
+pub fn get_transcript(
+    state: State<'_, AppState>,
+    session_id: String,
+) -> SidekickResult<Transcript> {
+    let db = state.db();
+    Ok(Transcript {
+        lines: repo::list_segments(&db, &session_id)?,
+        bookmarks: repo::list_bookmarks(&db, &session_id)?,
+    })
+}
+
+/// Renames (or, if the name exists, merges) a speaker across the session.
+#[tauri::command]
+#[specta::specta]
+pub fn rename_speaker(
+    state: State<'_, AppState>,
+    session_id: String,
+    from: String,
+    to: String,
+) -> SidekickResult<u32> {
+    repo::rename_speaker(&state.db(), &session_id, &from, &to)
+        .map(|n| u32::try_from(n).unwrap_or(u32::MAX))
+}
+
+/// Marks a moment; `at_ms` is milliseconds from session start.
+#[tauri::command]
+#[specta::specta]
+pub fn add_bookmark(
+    state: State<'_, AppState>,
+    session_id: String,
+    at_ms: u32,
+    label: Option<String>,
+) -> SidekickResult<repo::Bookmark> {
+    repo::add_bookmark(&state.db(), &session_id, at_ms, label.as_deref())
+}

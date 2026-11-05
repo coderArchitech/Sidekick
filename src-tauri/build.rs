@@ -24,6 +24,9 @@ const COMMANDS: &[&str] = &[
     "end_session",
     "delete_session",
     "list_sessions",
+    "get_transcript",
+    "rename_speaker",
+    "add_bookmark",
 ];
 
 fn main() {

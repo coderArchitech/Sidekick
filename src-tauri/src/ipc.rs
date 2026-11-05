@@ -33,6 +33,9 @@ pub fn builder() -> Builder<tauri::Wry> {
             commands::session::end_session,
             commands::session::delete_session,
             commands::session::list_sessions,
+            commands::session::get_transcript,
+            commands::session::rename_speaker,
+            commands::session::add_bookmark,
         ])
         .events(collect_events![
             events::AnswerToken,

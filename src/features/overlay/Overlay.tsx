@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { SessionBar } from "@/features/session";
+import { TranscriptView } from "@/features/transcript";
 import { commands, type AppInfo } from "@/ipc";
 import { ProtectionShield } from "./ProtectionShield";
 import { MAX_OPACITY, MIN_OPACITY, TABS, useOverlayStore, type Tab } from "./store";
@@ -79,7 +80,7 @@ export function Overlay() {
         aria-labelledby={`tab-${tab}`}
         className="flex-1 overflow-auto p-3 text-sm text-slate-300"
       >
-        {TAB_LABELS[tab]} will appear here.
+        {tab === "transcript" ? <TranscriptView /> : `${TAB_LABELS[tab]} will appear here.`}
       </section>
     </div>
   );

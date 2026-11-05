@@ -228,3 +228,116 @@ pub fn consent_log(db: &Database, session_id: &str) -> SidekickResult<Vec<(Conse
     }
     Ok(out)
 }
+
+/// A saved transcript line, as the UI shows it.
+#[derive(Debug, Clone, PartialEq, Serialize)]
+#[cfg_attr(feature = "specta", derive(specta::Type))]
+#[serde(rename_all = "camelCase")]
+pub struct TranscriptLine {
+    pub id: i64,
+    pub speaker_label: String,
+    pub is_user: bool,
+    pub text: String,
+    pub start_ms: u32,
+    pub end_ms: u32,
+}
+
+/// A moment the user marked (PRD 5 "Bookmarks").
+#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
+#[cfg_attr(feature = "specta", derive(specta::Type))]
+#[serde(rename_all = "camelCase")]
+pub struct Bookmark {
+    pub id: String,
+    pub at_ms: u32,
+    pub label: Option<String>,
+}
+
+fn ms_u32(v: i64) -> u32 {
+    u32::try_from(v.max(0)).unwrap_or(u32::MAX)
+}
+
+/// All segments of a session in time order.
+pub fn list_segments(db: &Database, session_id: &str) -> SidekickResult<Vec<TranscriptLine>> {
+    let mut stmt = db
+        .conn()
+        .prepare(
+            "SELECT id, speaker_label, is_user, text, start_ms, end_ms FROM transcript_segments
+             WHERE session_id = ?1 ORDER BY start_ms, id",
+        )
+        .map_err(|e| db_err("reading the transcript", &e))?;
+    let rows = stmt
+        .query_map([session_id], |r| {
+            Ok(TranscriptLine {
+                id: r.get(0)?,
+                speaker_label: r.get(1)?,
+                is_user: r.get(2)?,
+                text: r.get(3)?,
+                start_ms: ms_u32(r.get(4)?),
+                end_ms: ms_u32(r.get(5)?),
+            })
+        })
+        .map_err(|e| db_err("reading the transcript", &e))?;
+    rows.collect::<Result<_, _>>()
+        .map_err(|e| db_err("reading the transcript", &e))
+}
+
+/// Renames a speaker in every segment of the session (PRD LIS-3). Renaming to a
+/// label another speaker already has merges the two. Returns rows changed.
+pub fn rename_speaker(
+    db: &Database,
+    session_id: &str,
+    from: &str,
+    to: &str,
+) -> SidekickResult<usize> {
+    let to = to.trim();
+    if to.is_empty() || to.chars().count() > 60 {
+        return Err(SidekickError::new(
+            ErrorCode::Internal,
+            "Speaker names need 1 to 60 characters.",
+        ));
+    }
+    db.conn()
+        .execute(
+            "UPDATE transcript_segments SET speaker_label = ?3 WHERE session_id = ?1 AND speaker_label = ?2",
+            params![session_id, from, to],
+        )
+        .map_err(|e| db_err("renaming a speaker", &e))
+}
+
+pub fn add_bookmark(
+    db: &Database,
+    session_id: &str,
+    at_ms: u32,
+    label: Option<&str>,
+) -> SidekickResult<Bookmark> {
+    let label = label
+        .map(str::trim)
+        .filter(|l| !l.is_empty())
+        .map(str::to_owned);
+    let id = uuid::Uuid::now_v7().to_string();
+    db.conn()
+        .execute(
+            "INSERT INTO bookmarks (id, session_id, at_ms, label) VALUES (?1, ?2, ?3, ?4)",
+            params![id, session_id, at_ms, label],
+        )
+        .map_err(|e| db_err("adding a bookmark", &e))?;
+    Ok(Bookmark { id, at_ms, label })
+}
+
+pub fn list_bookmarks(db: &Database, session_id: &str) -> SidekickResult<Vec<Bookmark>> {
+    let mut stmt = db
+        .conn()
+        .prepare("SELECT id, at_ms, label FROM bookmarks WHERE session_id = ?1 ORDER BY at_ms")
+        .map_err(|e| db_err("reading bookmarks", &e))?;
+    let rows = stmt
+        .query_map([session_id], |r| {
+            Ok(Bookmark {
+                id: r.get(0)?,
+                at_ms: ms_u32(r.get(1)?),
+                label: r.get(2)?,
+            })
+        })
+        .map_err(|e| db_err("reading bookmarks", &e))?;
+    rows.collect::<Result<_, _>>()
+        .map_err(|e| db_err("reading bookmarks", &e))
+}

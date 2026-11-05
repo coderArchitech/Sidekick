@@ -347,3 +347,56 @@ async fn pause_and_resume_reach_the_capture() {
         "gap where the pause was: {segs:?}"
     );
 }
+
+#[test]
+fn transcript_lines_rename_merge_and_bookmarks() {
+    let db = db();
+    let s = repo::create(&db, &new("Design review")).unwrap();
+    let seg = |label: &str, start: u64, text: &str| Segment {
+        speaker_label: label.into(),
+        is_user: label == "me",
+        text: text.into(),
+        start_ms: start,
+        end_ms: start + 500,
+        confidence: None,
+    };
+    repo::insert_segment(&db, &s.id, &seg("speaker_2", 2_000, "Second")).unwrap();
+    repo::insert_segment(&db, &s.id, &seg("speaker_1", 1_000, "First")).unwrap();
+    repo::insert_segment(&db, &s.id, &seg("me", 3_000, "Mine")).unwrap();
+    repo::insert_segment(&db, &s.id, &seg("speaker_1", 4_000, "Again")).unwrap();
+
+    let lines = repo::list_segments(&db, &s.id).unwrap();
+    assert_eq!(
+        lines.iter().map(|l| l.text.as_str()).collect::<Vec<_>>(),
+        ["First", "Second", "Mine", "Again"],
+        "time order"
+    );
+
+    assert_eq!(
+        repo::rename_speaker(&db, &s.id, "speaker_1", "Priya").unwrap(),
+        2
+    );
+    // Merge: speaker_2 was really Priya too.
+    assert_eq!(
+        repo::rename_speaker(&db, &s.id, "speaker_2", "Priya").unwrap(),
+        1
+    );
+    let labels: Vec<String> = repo::list_segments(&db, &s.id)
+        .unwrap()
+        .into_iter()
+        .map(|l| l.speaker_label)
+        .collect();
+    assert_eq!(labels, ["Priya", "Priya", "me", "Priya"]);
+    assert!(repo::rename_speaker(&db, &s.id, "Priya", "  ").is_err());
+
+    repo::add_bookmark(&db, &s.id, 3_500, Some("  pricing  ")).unwrap();
+    repo::add_bookmark(&db, &s.id, 1_200, None).unwrap();
+    let marks = repo::list_bookmarks(&db, &s.id).unwrap();
+    assert_eq!(
+        marks
+            .iter()
+            .map(|b| (b.at_ms, b.label.clone()))
+            .collect::<Vec<_>>(),
+        [(1_200, None), (3_500, Some("pricing".into()))]
+    );
+}

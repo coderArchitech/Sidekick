@@ -2,8 +2,10 @@ import { createMockAnswerBus } from "./answerEvents";
 import { createMockSessionBus } from "./sessionEvents";
 import type {
   commands as tauriCommands,
+  Bookmark,
   ConsentOption,
   Session,
+  TranscriptLine,
   SidekickError,
   Stage,
   StageStats,
@@ -56,6 +58,20 @@ export const mockSessionBus = createMockSessionBus();
 // ---- Sessions (mirrors crates/session: lifecycle and consent rules) ----------
 
 const sessions = new Map<string, Session>();
+const transcripts = new Map<string, TranscriptLine[]>();
+const bookmarks = new Map<string, Bookmark[]>();
+let nextLineId = 1;
+
+/** Adds a final transcript line and emits it, like the Rust STT sink does. Tests use it. */
+export function mockTranscriptLine(
+  sessionId: string,
+  line: Omit<TranscriptLine, "id">,
+): TranscriptLine {
+  const full = { ...line, id: nextLineId++ };
+  transcripts.set(sessionId, [...(transcripts.get(sessionId) ?? []), full]);
+  mockSessionBus.emit("segment", { sessionId, ...full });
+  return full;
+}
 let liveSessionId: string | null = null;
 let nextId = 1;
 
@@ -125,6 +141,8 @@ function stageStats(): StageStats[] {
 export const mockProtection: { status: ProtectionStatus } = {
   status: { state: "unavailable", reason: "Running in a browser: no screen-share protection." },
 };
+/** Browser-demo switches; tests leave them off. */
+export const mockOptions = { demoTranscript: false };
 /** What the mocks were asked to do, for assertions. */
 export const mockCalls: { streams: ("mic" | "system")[] } = { streams: [] };
 /** Counts window actions so tests can assert them. */
@@ -163,6 +181,9 @@ export function resetMocks(): void {
   activeStreams.clear();
   latencySamples.clear();
   sessions.clear();
+  transcripts.clear();
+  bookmarks.clear();
+  nextLineId = 1;
   liveSessionId = null;
   nextId = 1;
   mockCalls.streams = [];
@@ -328,6 +349,24 @@ export const mockCommands: Commands = {
     if (result.status === "error") return Promise.resolve(result);
     liveSessionId = sessionId;
     mockCalls.streams = s.consent === "me_only" ? ["mic"] : ["mic", "system"];
+    if (mockOptions.demoTranscript) {
+      // Browser demo (pnpm dev:web): a partial, then a final line.
+      setTimeout(
+        () => mockSessionBus.emit("partial", { sessionId, stream: "system", text: "What is the" }),
+        300,
+      );
+      setTimeout(
+        () =>
+          mockTranscriptLine(sessionId, {
+            speakerLabel: "speaker_1",
+            isUser: false,
+            text: "What is the API rate limit for the Pro tier?",
+            startMs: 500,
+            endMs: 2600,
+          }),
+        900,
+      );
+    }
     return Promise.resolve({ status: "ok", data: { session: result.data, warnings: [] } });
   },
   pauseSession: (sessionId) => Promise.resolve(move(sessionId, "pause")),
@@ -340,6 +379,38 @@ export const mockCommands: Commands = {
     if (liveSessionId === sessionId) liveSessionId = null;
     sessions.delete(sessionId);
     return Promise.resolve({ status: "ok", data: null });
+  },
+  getTranscript: (sessionId) =>
+    Promise.resolve({
+      status: "ok",
+      data: {
+        lines: structuredClone(transcripts.get(sessionId) ?? []).sort(
+          (a, b) => a.startMs - b.startMs || a.id - b.id,
+        ),
+        bookmarks: structuredClone(bookmarks.get(sessionId) ?? []).sort((a, b) => a.atMs - b.atMs),
+      },
+    }),
+  renameSpeaker: (sessionId, from, to) => {
+    const name = to.trim();
+    if (!name || name.length > 60)
+      return Promise.resolve(err("INTERNAL", "Speaker names need 1 to 60 characters."));
+    let changed = 0;
+    for (const line of transcripts.get(sessionId) ?? []) {
+      if (line.speakerLabel === from) {
+        line.speakerLabel = name;
+        changed++;
+      }
+    }
+    return Promise.resolve({ status: "ok", data: changed });
+  },
+  addBookmark: (sessionId, atMs, label) => {
+    const mark: Bookmark = {
+      id: `mock-bookmark-${nextLineId++}`,
+      atMs,
+      label: label?.trim() || null,
+    };
+    bookmarks.set(sessionId, [...(bookmarks.get(sessionId) ?? []), mark]);
+    return Promise.resolve({ status: "ok", data: structuredClone(mark) });
   },
   listSessions: (_cursor, limit) => {
     const items = [...sessions.values()]
