@@ -283,6 +283,53 @@ export const commands = {
     }
   },
   /**
+   * Notes, summary and action items for a session (version 0 before the first save).
+   */
+  async getNotes(sessionId: string): Promise<Result<Notes, SidekickError>> {
+    try {
+      return { status: "ok", data: await TAURI_INVOKE("get_notes", { sessionId }) };
+    } catch (e) {
+      if (e instanceof Error) throw e;
+      else return { status: "error", error: e as any };
+    }
+  },
+  /**
+   * Saves rolling notes if `version` is current; `VERSION_CONFLICT` otherwise.
+   */
+  async saveNotes(
+    sessionId: string,
+    contentMd: string,
+    version: number,
+  ): Promise<Result<Notes, SidekickError>> {
+    try {
+      return {
+        status: "ok",
+        data: await TAURI_INVOKE("save_notes", { sessionId, contentMd, version }),
+      };
+    } catch (e) {
+      if (e instanceof Error) throw e;
+      else return { status: "error", error: e as any };
+    }
+  },
+  /**
+   * Saves the summary written when the session ends and replaces its action items.
+   */
+  async saveSummary(
+    sessionId: string,
+    summaryMd: string,
+    actionItems: NewActionItem[],
+  ): Promise<Result<Notes, SidekickError>> {
+    try {
+      return {
+        status: "ok",
+        data: await TAURI_INVOKE("save_summary", { sessionId, summaryMd, actionItems }),
+      };
+    } catch (e) {
+      if (e instanceof Error) throw e;
+      else return { status: "error", error: e as any };
+    }
+  },
+  /**
    * Queues a file for parsing and embedding.
    */
   async ingestDocument(sessionId: string, path: string): Promise<Result<null, SidekickError>> {
@@ -370,6 +417,16 @@ export const events = __makeEvents__<{
  */
 export type Action =
   "show_hide" | "ask" | "screenshot" | "auto_answer" | "pause_resume" | "switch_skill" | "bookmark";
+/**
+ * One action item from the summary (PRD MEM-3).
+ */
+export type ActionItem = {
+  id: string;
+  text: string;
+  owner: string | null;
+  due: string | null;
+  done: boolean;
+};
 export type AnswerDone = { requestId: string; usage: Usage; finishReason: FinishReason };
 export type AnswerError = { requestId: string; error: SidekickError };
 export type AnswerToken = { requestId: string; delta: string };
@@ -470,6 +527,10 @@ export type ErrorCode =
   | "CAPTURE_EXCLUSION_UNAVAILABLE"
   | "DB_ERROR"
   | "CANCELLED"
+  /**
+   * An optimistic version check failed: someone saved first (e.g. `save_notes`).
+   */
+  | "VERSION_CONFLICT"
   | "INTERNAL";
 /**
  * Why generation stopped.
@@ -535,6 +596,10 @@ export type LlmRequest = {
  */
 export type ModelInfo = { id: string; displayName: string };
 /**
+ * An action item to save with a summary.
+ */
+export type NewActionItem = { text: string; owner: string | null; due: string | null };
+/**
  * A finished answer to save.
  */
 export type NewAnswer = {
@@ -554,6 +619,22 @@ export type NewAnswer = {
   latencyMs: number;
   inputTokens: number | null;
   outputTokens: number | null;
+};
+/**
+ * A session's notes. `version` is 0 before the first save.
+ */
+export type Notes = {
+  contentMd: string;
+  version: number;
+  /**
+   * Epoch ms; 0 before the first save.
+   */
+  updatedAt: number;
+  /**
+   * Summary and decisions, written when the session ends.
+   */
+  summaryMd: string | null;
+  actionItems: ActionItem[];
 };
 /**
  * Who the user is, for directed questions and STT boosts (PRD QA-2, LIS-5a).

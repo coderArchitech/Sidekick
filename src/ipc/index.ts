@@ -31,6 +31,7 @@ export type { AnswerEvents, Unlisten } from "./answerEvents";
 export type { SessionEvents } from "./sessionEvents";
 import type { Unlisten } from "./answerEvents";
 export type {
+  ActionItem,
   AnswerDone,
   AnswerError,
   AnswerToken,
@@ -54,7 +55,9 @@ export type {
   KeyStatus,
   LlmRequest,
   ModelInfo,
+  NewActionItem,
   NewAnswer,
+  Notes,
   Profile,
   QuestionSource,
   SavedAnswer,

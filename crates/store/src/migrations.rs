@@ -6,6 +6,7 @@ use sidekick_core::{ErrorCode, SidekickError, SidekickResult};
 const MIGRATIONS: &[&str] = &[
     include_str!("../migrations/0001_init.sql"),
     include_str!("../migrations/0002_consent_log_outlives_sessions.sql"),
+    include_str!("../migrations/0003_notes_summary.sql"),
 ];
 
 /// Schema version after all migrations (`PRAGMA user_version`).
