@@ -30,6 +30,7 @@ const COMMANDS: &[&str] = &[
     "set_auto_answer",
     "save_answer",
     "rate_answer",
+    "list_answers",
     "ingest_document",
     "ingest_url",
     "list_documents",

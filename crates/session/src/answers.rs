@@ -125,3 +125,68 @@ pub fn rate(db: &Database, answer_id: &str, rating: i8) -> SidekickResult<()> {
     }
     Ok(())
 }
+
+/// A saved question with its answer, for history (Chat tab, PRD QA-8).
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[cfg_attr(feature = "specta", derive(specta::Type))]
+#[serde(rename_all = "camelCase")]
+pub struct SavedAnswer {
+    pub answer_id: String,
+    pub question: String,
+    pub source: QuestionSource,
+    pub directed: bool,
+    pub cue: Option<String>,
+    pub body_md: String,
+    pub sources: Vec<Source>,
+    pub rating: Option<i8>,
+    /// Epoch ms.
+    #[cfg_attr(feature = "specta", specta(type = f64))]
+    pub created_at: i64,
+}
+
+fn parse_source(s: &str) -> QuestionSource {
+    match s {
+        "chat" => QuestionSource::Chat,
+        "screenshot" => QuestionSource::Screenshot,
+        _ => QuestionSource::Detected,
+    }
+}
+
+/// A session's answers, oldest first, optionally only from one source.
+pub fn list(
+    db: &Database,
+    session_id: &str,
+    source: Option<QuestionSource>,
+) -> SidekickResult<Vec<SavedAnswer>> {
+    let mut stmt = db
+        .conn()
+        .prepare(
+            "SELECT a.id, q.text, q.source, q.directed, a.cue, a.body_md, a.sources_json, a.rating, a.created_at
+             FROM answers a JOIN questions q ON q.id = a.question_id
+             WHERE q.session_id = ?1 AND (?2 IS NULL OR q.source = ?2)
+             ORDER BY a.created_at, a.id",
+        )
+        .map_err(|e| db_err("loading answers", &e))?;
+    let rows = stmt
+        .query_map(
+            params![session_id, source.map(QuestionSource::as_str)],
+            |r| {
+                let sources: String = r.get(6)?;
+                let kind: String = r.get(2)?;
+                Ok(SavedAnswer {
+                    answer_id: r.get(0)?,
+                    question: r.get(1)?,
+                    source: parse_source(&kind),
+                    directed: r.get(3)?,
+                    cue: r.get(4)?,
+                    body_md: r.get(5)?,
+                    sources: serde_json::from_str(&sources).unwrap_or_default(),
+                    rating: r.get(7)?,
+                    created_at: r.get(8)?,
+                })
+            },
+        )
+        .map_err(|e| db_err("loading answers", &e))?;
+    rows.collect::<Result<Vec<_>, _>>()
+        .map_err(|e| db_err("loading answers", &e))
+}

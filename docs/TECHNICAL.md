@@ -223,7 +223,7 @@ Each module below is its own crate at `crates/<module>/`, named `sidekick-<modul
 | --- | --- |
 | `overlay` | Window chrome: opacity, font size, compact/expanded, protection indicator, tabs |
 | `answers` | Live Answers tab, newest first: cue line (Stop while streaming), expandable full answer (open by default when the question used your name), numbered sources, thumbs up/down (`rate_answer`, click again to clear). Markdown via `react-markdown` with raw HTML skipped and links shown as text, never opened. Fenced code uses Shiki, loaded lazily on first code block with 13 languages and the JavaScript regex engine (no WASM); unknown languages fall back to plain text. Copy writes only the code, only on click. Follow-up chips are not built yet |
-| `chat` | Chat tab: user questions with session context |
+| `chat` | Chat tab: typed questions answered through the same `AnswerRouter` with `source = chat` and the session context (transcript, notes, documents), plus the last 3 finished exchanges as history so follow-ups make sense. Enter sends, Shift+Enter adds a line, Stop cancels. History is per session: saved answers reload with `list_answers(session, chat)`. The Ask hotkey shows and focuses the overlay, switches to Chat and focuses the input. A chat question shares the 2-in-flight limit, so it can stop the oldest detected answer. Voice input arrives later |
 | `transcript` | Transcript tab: loads saved lines, applies live `transcript-partial` / `transcript-segment` events batched every 50 ms (`lib/batcher`), shows partial text until the final line arrives, rename/merge speakers, bookmarks, listening indicator |
 | `notes` | Rolling notes, decisions, action items |
 | `library` | Collapsible Documents panel under the session bar: add files (native picker via `tauri-plugin-dialog`, or drop onto the window), add links, live indexing progress, failure reason with Retry, remove. Screenshot strip arrives with T-043 |
@@ -607,6 +607,7 @@ Commands are request/response calls from the frontend to Rust (`invoke`). All re
 | `web_search` | `request_id, query, max_results?` | `SearchResult[]` | Run a web search for a model tool call; the orchestrator sends results back to the model |
 | `save_answer` | `NewAnswer` (session, question, source, directed, segment, cue, body, sources, provider, model, latency, tokens) | `String` (answer id) | Persist a question and its answer in one transaction |
 | `rate_answer` | `answer_id, rating` (1, -1, or 0 to clear) | `()` | Thumbs up/down |
+| `list_answers` | `session_id, source?` (`detected`, `chat`, `screenshot`) | `SavedAnswer[]` (question, cue, body, sources, rating, `createdAt`), oldest first | Chat history per session |
 | `save_notes` | `session_id, content_md, version` | `NotesVersion` | Update rolling notes (optimistic version check) |
 | `list_providers` | `kind: stt / llm / embed / search` | `ProviderInfo[]` | Dropdown options, with key status |
 | `set_api_key` | `provider, key` | `KeyStatus` | Test and store a key (key never returned) |
@@ -1388,7 +1389,7 @@ This is not legal advice; confirm requirements with legal counsel before any pub
 
 **Auto-answer:** on by default, so every detected question gets an answer. Turn it off with the **Auto** button in the overlay header (or `Ctrl/Cmd+Shift+A`) to answer only questions that use your name.
 
-**Chat:** open the **Chat** tab and type or speak your own question at any time. Sidekick uses everything in the session to answer.
+**Chat:** open the **Chat** tab (or press the Ask shortcut) and type your own question at any time during a session. Sidekick uses everything in the session to answer, and remembers the last few questions so you can ask follow-ups like "and for the Free tier?". Press Enter to send and Shift+Enter for a new line. Speaking a question into Chat comes in a later release.
 
 **Screenshots:** press `Ctrl/Cmd+Shift+S`, select an area, and optionally type a question about it. The screenshot joins the session so later answers can use it.
 

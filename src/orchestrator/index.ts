@@ -7,4 +7,5 @@ export { AnswerRouter, type AnswerView, type AnswerStatus } from "./answerer";
 export { useAnswersStore } from "./answersStore";
 export { modelPlan, type ModelPlan } from "./models";
 export { NOT_FOUND, buildPrompt, citedSources, type SourceRef } from "./prompt";
-export { activeRouter, useAnswering } from "./useAnswering";
+export { activeRouter, askChat, useAnswering } from "./useAnswering";
+export { CHAT_HISTORY_TURNS, chatHistory, useChatStore } from "./chatStore";

@@ -39,6 +39,7 @@ pub fn builder() -> Builder<tauri::Wry> {
             commands::session::set_auto_answer,
             commands::session::save_answer,
             commands::session::rate_answer,
+            commands::session::list_answers,
             commands::documents::ingest_document,
             commands::documents::ingest_url,
             commands::documents::list_documents,

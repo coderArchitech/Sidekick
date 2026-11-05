@@ -57,6 +57,7 @@ export type {
   NewAnswer,
   Profile,
   QuestionSource,
+  SavedAnswer,
   ProtectionState,
   ProtectionStatus,
   ProviderChoice,

@@ -2,6 +2,8 @@ import { act, render } from "@testing-library/react";
 import { beforeEach, describe, expect, it } from "vitest";
 import { useSessionStore } from "@/features/session";
 import { mockCommands, mockSessionBus, resetMocks } from "@/ipc/testing";
+import { useChatStore } from "@/orchestrator";
+import { useOverlayStore } from "./store";
 import { useHotkeyActions } from "./useHotkeyActions";
 
 function Harness() {
@@ -76,5 +78,16 @@ describe("auto-answer shortcut", () => {
     mockSessionBus.emit("hotkey", { action: "auto_answer" });
     await tick();
     expect(useSessionStore.getState().session?.autoAnswer).toBe(false);
+  });
+
+  it("Ask opens the Chat tab and focuses its input", async () => {
+    useOverlayStore.setState({ tab: "answers" });
+    const before = useChatStore.getState().focusTick;
+    render(<Harness />);
+    await tick();
+    mockSessionBus.emit("hotkey", { action: "ask" });
+    await tick();
+    expect(useOverlayStore.getState().tab).toBe("chat");
+    expect(useChatStore.getState().focusTick).toBe(before + 1);
   });
 });

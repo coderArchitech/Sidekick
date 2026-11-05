@@ -74,7 +74,12 @@ const transcripts = new Map<string, TranscriptLine[]>();
 const bookmarks = new Map<string, Bookmark[]>();
 const documents = new Map<string, DocumentInfo[]>();
 /** Answers saved through `saveAnswer`, for assertions. */
-export const savedAnswers: { id: string; answer: NewAnswer; rating: number | null }[] = [];
+export const savedAnswers: {
+  id: string;
+  answer: NewAnswer;
+  rating: number | null;
+  createdAt: number;
+}[] = [];
 
 /** Simulates ingest like the Rust pipeline: queued → parsing → embedding → ready (or failed). */
 function mockIngest(sessionId: string, name: string, sizeBytes: number) {
@@ -479,9 +484,29 @@ export const mockCommands: Commands = {
   },
   saveAnswer: (answer) => {
     const id = `mock-answer-${nextLineId++}`;
-    savedAnswers.push({ id, answer: structuredClone(answer), rating: null });
+    savedAnswers.push({ id, answer: structuredClone(answer), rating: null, createdAt: Date.now() });
     return Promise.resolve({ status: "ok", data: id });
   },
+  listAnswers: (sessionId, source) =>
+    Promise.resolve({
+      status: "ok",
+      data: savedAnswers
+        .filter(
+          (a) =>
+            a.answer.sessionId === sessionId && (source === null || a.answer.source === source),
+        )
+        .map((a) => ({
+          answerId: a.id,
+          question: a.answer.question,
+          source: a.answer.source,
+          directed: a.answer.directed,
+          cue: a.answer.cue,
+          bodyMd: a.answer.bodyMd,
+          sources: structuredClone(a.answer.sources),
+          rating: a.rating,
+          createdAt: a.createdAt,
+        })),
+    }),
   rateAnswer: (answerId, rating) => {
     const a = savedAnswers.find((x) => x.id === answerId);
     if (!a) return Promise.resolve(err("INTERNAL", "That answer no longer exists."));

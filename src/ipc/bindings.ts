@@ -268,6 +268,21 @@ export const commands = {
     }
   },
   /**
+   * A session's saved answers, oldest first, optionally one source only
+   * (Chat history, PRD QA-8).
+   */
+  async listAnswers(
+    sessionId: string,
+    source: QuestionSource | null,
+  ): Promise<Result<SavedAnswer[], SidekickError>> {
+    try {
+      return { status: "ok", data: await TAURI_INVOKE("list_answers", { sessionId, source }) };
+    } catch (e) {
+      if (e instanceof Error) throw e;
+      else return { status: "error", error: e as any };
+    }
+  },
+  /**
    * Queues a file for parsing and embedding.
    */
   async ingestDocument(sessionId: string, path: string): Promise<Result<null, SidekickError>> {
@@ -605,6 +620,23 @@ export type Retention = "session" | "7d" | "30d" | "forever";
  * Who wrote a message.
  */
 export type Role = "user" | "assistant";
+/**
+ * A saved question with its answer, for history (Chat tab, PRD QA-8).
+ */
+export type SavedAnswer = {
+  answerId: string;
+  question: string;
+  source: QuestionSource;
+  directed: boolean;
+  cue: string | null;
+  bodyMd: string;
+  sources: Source[];
+  rating: number | null;
+  /**
+   * Epoch ms.
+   */
+  createdAt: number;
+};
 /**
  * A session as the UI sees it.
  */
