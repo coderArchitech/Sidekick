@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { LiveAnswers } from "@/features/answers";
+import { ChatView } from "@/features/chat";
 import { Library } from "@/features/library";
 import { SessionBar, useSessionStore } from "@/features/session";
 import { TranscriptView } from "@/features/transcript";
@@ -93,6 +94,8 @@ export function Overlay() {
           <TranscriptView />
         ) : tab === "answers" ? (
           <LiveAnswers />
+        ) : tab === "chat" ? (
+          <ChatView />
         ) : (
           `${TAB_LABELS[tab]} will appear here.`
         )}

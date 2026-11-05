@@ -27,6 +27,7 @@
     "allow-set-auto-answer",
     "allow-save-answer",
     "allow-rate-answer",
+    "allow-list-answers",
     "allow-ingest-document",
     "allow-ingest-url",
     "allow-list-documents",

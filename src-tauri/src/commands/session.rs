@@ -322,3 +322,15 @@ pub fn rate_answer(
 ) -> SidekickResult<()> {
     sidekick_session::answers::rate(&state.db(), &answer_id, rating)
 }
+
+/// A session's saved answers, oldest first, optionally one source only
+/// (Chat history, PRD QA-8).
+#[tauri::command]
+#[specta::specta]
+pub fn list_answers(
+    state: State<'_, AppState>,
+    session_id: String,
+    source: Option<sidekick_session::answers::QuestionSource>,
+) -> SidekickResult<Vec<sidekick_session::answers::SavedAnswer>> {
+    sidekick_session::answers::list(&state.db(), &session_id, source)
+}

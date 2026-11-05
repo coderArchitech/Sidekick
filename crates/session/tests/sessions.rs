@@ -511,6 +511,27 @@ fn answers_are_saved_with_sources_and_rated() {
     );
     assert!(directed);
     answers::rate(&db, &id, 1).unwrap();
+    let chat = answers::save(
+        &mut db,
+        &NewAnswer {
+            question: "And the burst limit?".into(),
+            source: QuestionSource::Chat,
+            directed: false,
+            sources: vec![],
+            ..a.clone()
+        },
+    )
+    .unwrap();
+    let all = answers::list(&db, &s.id, None).unwrap();
+    assert_eq!(all.len(), 2);
+    assert_eq!(all[0].answer_id, id, "oldest first");
+    assert_eq!(all[0].rating, Some(1));
+    assert_eq!(all[0].sources, a.sources);
+    let only_chat = answers::list(&db, &s.id, Some(QuestionSource::Chat)).unwrap();
+    assert_eq!(only_chat.len(), 1);
+    assert_eq!(only_chat[0].answer_id, chat);
+    assert_eq!(only_chat[0].question, "And the burst limit?");
+    assert!(answers::list(&db, "other", None).unwrap().is_empty());
     answers::rate(&db, &id, 0).unwrap();
     assert!(answers::rate(&db, &id, 2).is_err());
     assert!(answers::rate(&db, "missing", 1).is_err());

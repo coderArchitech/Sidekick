@@ -3,6 +3,7 @@ import { answerEvents, commands, type Session } from "@/ipc";
 import { createBatcher } from "@/lib/batcher";
 import { AnswerRouter, type AnswerView } from "./answerer";
 import { useAnswersStore } from "./answersStore";
+import { chatHistory, useChatStore } from "./chatStore";
 import { modelPlan, type ModelPlan } from "./models";
 import { useOrchestratorStore } from "./store";
 
@@ -27,8 +28,14 @@ export function useAnswering(session: Session | null) {
     void commands.getSettings().then((r) => {
       if (r.status === "ok") models = modelPlan(r.data.llm);
     });
-    const { upsert, clear } = useAnswersStore.getState();
+    const { clear } = useAnswersStore.getState();
     clear();
+    void useChatStore.getState().load(sessionId);
+    // Chat answers go to the Chat tab, everything else to Live Answers.
+    const upsert = (v: AnswerView) =>
+      v.source === "chat"
+        ? useChatStore.getState().upsert(v)
+        : useAnswersStore.getState().upsert(v);
     const batcher = createBatcher<AnswerView>(50, (views) => {
       // Only the latest state of each answer matters.
       const latest = new Map(views.map((v) => [v.id, v]));
@@ -63,4 +70,26 @@ export function useAnswering(session: Session | null) {
       if (current?.router === router) current = null;
     };
   }, [sessionId]);
+}
+
+/**
+ * Asks a typed Chat question with the session context and recent chat turns
+ * as history (PRD QA-8). Returns an error message when there's no session to
+ * answer from.
+ */
+export async function askChat(text: string): Promise<string | null> {
+  const q = text.trim();
+  if (!q) return null;
+  const active = current;
+  if (!active) return "Start a session to ask questions.";
+  await active.router.ask({
+    sessionId: active.sessionId,
+    text: q,
+    directed: true,
+    source: "chat",
+    endedAt: Date.now(),
+    models: active.models(),
+    history: chatHistory(useChatStore.getState().turns),
+  });
+  return null;
 }

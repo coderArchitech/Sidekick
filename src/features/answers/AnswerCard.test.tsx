@@ -100,6 +100,7 @@ describe("AnswerCard", () => {
       id: "a1",
       answer: {} as (typeof savedAnswers)[number]["answer"],
       rating: null,
+      createdAt: 0,
     });
     render(<AnswerCard view={view({ answerId: "a1" })} />);
 

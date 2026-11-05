@@ -2,11 +2,13 @@ import { useEffect } from "react";
 import { useSessionStore } from "@/features/session";
 import { bookmarkNow } from "@/features/transcript";
 import { sessionEvents, type Action } from "@/ipc";
+import { useChatStore } from "@/orchestrator";
+import { useOverlayStore } from "./store";
 
 /**
  * Runs overlay actions for global shortcuts (PRD UI-6). Show/hide is handled in
- * Rust. Ask, Screenshot and Switch Skill hook in when their features land
- * (T-023, T-025, T-028).
+ * Rust. Ask opens Chat and focuses its input. Screenshot and Switch Skill hook
+ * in when their features land (T-025, T-028).
  */
 export function useHotkeyActions() {
   useEffect(() => {
@@ -31,6 +33,10 @@ export async function handle(action: Action): Promise<void> {
       break;
     case "bookmark":
       await bookmarkNow(store.session);
+      break;
+    case "ask":
+      useOverlayStore.getState().setTab("chat");
+      useChatStore.getState().requestFocus();
       break;
     case "auto_answer":
       await store.toggleAuto();

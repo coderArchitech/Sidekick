@@ -62,7 +62,7 @@ All Phase 0 code and automated tests are done and green on Linux, Windows and ma
 | T-020 | Orchestrator: question detection and modes | ✅ Done | Rules meet the targets on a never-tuned set (95% / 100%); real-meeting check in T-039 |
 | T-021 | Orchestrator: prompts, Skills, two-tier answers | 🟡 In progress: testing | Waiting on dependency: prompts accept a Skill; picking the active Skill comes with T-028. Live-model quality check in T-039 |
 | T-022 | Live Answers tab | ✅ Done | Follow-up chips not in scope; Playwright pass in T-032 |
-| T-023 | Chat tab | ⬜ To do | |
+| T-023 | Chat tab | ✅ Done | Voice input to Chat later; Playwright pass in T-032 |
 | T-024 | Rolling notes | ⬜ To do | |
 | T-025 | `capture` crate: screenshots and answer from screen | ⬜ To do | 🖥️ |
 | T-026 | More LLM providers: OpenAI, Gemini, Ollama | ⬜ To do | |
@@ -427,10 +427,10 @@ All Phase 0 code and automated tests are done and green on Linux, Windows and ma
 **Scope:** Typed questions with full session context; follow-ups with history; per-session chat history; Ask hotkey focuses the input.
 
 **Tests**
-- [ ] Component: sending a message streams an answer and keeps history.
-- [ ] Component: follow-up includes previous turns in the request.
-- [ ] Integration: chat questions stored with `source = chat`.
-- [ ] UI: Ask hotkey focuses the chat input.
+- [x] Component: sending a message streams an answer and keeps history.
+- [x] Component: follow-up includes previous turns in the request.
+- [x] Integration: chat questions stored with `source = chat`.
+- [x] UI: Ask hotkey focuses the chat input.
 
 ### T-024 Rolling notes
 
