@@ -2,13 +2,12 @@ import { useEffect, useId, useState } from "react";
 import { useSessionStore } from "@/features/session";
 import { commands, sessionEvents } from "@/ipc";
 import { createBatcher } from "@/lib/batcher";
-import { clock, displayName, useTranscriptStore, type TranscriptEvent } from "./store";
+import { bookmarkNow, clock, displayName, useTranscriptStore, type TranscriptEvent } from "./store";
 
 /** The Transcript tab (PRD LIS-3, LIS-6): live lines, partial text, speaker names, bookmarks. */
 export function TranscriptView() {
   const session = useSessionStore((s) => s.session);
-  const { lines, partials, bookmarks, load, applyEvents, renameLocal, addBookmarkLocal } =
-    useTranscriptStore();
+  const { lines, partials, bookmarks, load, applyEvents, renameLocal } = useTranscriptStore();
   const [editing, setEditing] = useState<string | null>(null);
   const [name, setName] = useState("");
   const [error, setError] = useState<string | null>(null);
@@ -63,16 +62,6 @@ export function TranscriptView() {
     }
   }
 
-  async function bookmark() {
-    if (!sessionId || !session?.startedAt) return;
-    const r = await commands.addBookmark(
-      sessionId,
-      Math.max(0, Date.now() - session.startedAt),
-      null,
-    );
-    if (r.status === "ok") addBookmarkLocal(r.data);
-  }
-
   const live = session.status === "live";
   const partialText = [partials.system, partials.mic].filter(Boolean).join(" … ");
 
@@ -90,7 +79,7 @@ export function TranscriptView() {
           type="button"
           className="rounded-md border border-slate-600 px-2 py-0.5 hover:bg-slate-700 disabled:opacity-50"
           disabled={!session.startedAt || session.status === "ended"}
-          onClick={() => void bookmark()}
+          onClick={() => void bookmarkNow(session)}
         >
           Bookmark
         </button>

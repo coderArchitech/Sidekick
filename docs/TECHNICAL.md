@@ -203,7 +203,7 @@ Each module below is its own crate at `crates/<module>/`, named `sidekick-<modul
 | `stt` | `SttProvider` (one `run` per audio stream), Deepgram Nova-3 WebSocket adapter (interim + final results, diarization for system audio, `keyterm` boosts, keep-alives, silence not sent with a `Timeline` mapping provider time back to meeting time, reconnect with backoff and replay of unfinalised and buffered audio, up to 10 s), `DeepgramVerifier` for key checks, mock provider; speaker labels `me` / `speaker_N` | Done (live latency check pending) |
 | `capture` | Region, window and full-screen screenshots; downscale and encode | Not started |
 | `window` | Capture-exclusion status rules per OS and version (Windows build 19041+ protected; macOS 13–14 protected, 15+ not guaranteed because ScreenCaptureKit can bypass it; Linux unavailable) and the auto-hide rule. Pure logic: the shell applies `set_content_protected(true)` to every window at startup. Transparency, click-through and screen-share detection still to come (T-029) | Started (status done; manual checklist pending) |
-| `hotkeys` | Register and dispatch global shortcuts | Not started |
+| `hotkeys` | Actions, defaults (12.3) and validation (normalise, one modifier minimum, no duplicates, every action once). The shell registers them with `tauri-plugin-global-shortcut`, handles show/hide itself, emits `hotkey-pressed`, and only saves a new set after the OS accepts it | Done (Linux verified; Windows/macOS check pending) |
 | `ingest` | Parse documents, split into chunks, request embeddings, write to store | Not started |
 | `store` | SQLCipher database (raw 256-bit key from `secrets`), WAL, foreign keys; migrations with pre-migration backups; sqlite-vec registered for every connection; `settings` (raw JSON) and `vectors` (per-model `chunk_vectors`) modules; repository modules added per feature | Done |
 | `settings` | Typed `Settings` (providers and models for STT, LLM, embeddings, search; Auto-answer; retention) with defaults and partial `SettingsPatch` updates; one `settings` row per section; unreadable sections fall back to defaults | Done |
@@ -607,7 +607,7 @@ Commands are request/response calls from the frontend to Rust (`invoke`). All re
 | `delete_api_key` | `provider` | `()` | Remove a key from the keychain |
 | `list_models` | `provider` | `ModelInfo[]` | Models for the model dropdown |
 | `open_settings` | none | `()` | Show and focus the Settings window (overlay only) |
-| `get_settings` / `update_settings` | `patch?` | `Settings` | Read or change preferences. A patch replaces only the sections it names; unknown fields are rejected; `search: null` disables web search |
+| `get_settings` / `update_settings` | `patch?` | `Settings` | Read or change preferences. A patch replaces only the sections it names; unknown fields are rejected; `search: null` disables web search; `shortcuts` (the full set) is validated and registered with the OS before it is saved |
 | `list_skills` / `save_skill` / `delete_skill` | `skill?` | `Skill[]` / `Skill` / `()` | Manage Skills |
 | `import_skill` / `export_skill` | `file_path` / `skill_id, file_path` | `Skill` / `()` | Share Skills as files |
 | `set_overlay` | `opacity?, click_through?, compact?` | `OverlayState` | Overlay appearance |
@@ -619,7 +619,7 @@ Commands are request/response calls from the frontend to Rust (`invoke`). All re
 
 ### 5.2 Events
 
-Events are pushed from Rust to the frontend. Payloads are typed and versioned with the app. Tauri event names can't contain dots, so the wire names use a dash (`answer-token`); the table keeps the dotted names for readability. In TypeScript, features subscribe through `answerEvents` from `@/ipc`, which also works with the browser mocks. Status: `answer.*`, `session.state` (`session-changed`, payload `{ session }`), `transcript.partial`, `transcript.segment` (already saved, with its row `id`) and `stt.status` (`stt-status-changed`) are implemented. Features subscribe through `answerEvents` and `sessionEvents` from `@/ipc`.
+Events are pushed from Rust to the frontend. Payloads are typed and versioned with the app. Tauri event names can't contain dots, so the wire names use a dash (`answer-token`); the table keeps the dotted names for readability. In TypeScript, features subscribe through `answerEvents` from `@/ipc`, which also works with the browser mocks. Status: `answer.*`, `session.state` (`session-changed`, payload `{ session }`), `transcript.partial`, `transcript.segment` (already saved, with its row `id`) and `stt.status` (`stt-status-changed`) and `hotkey.pressed` (`hotkey-pressed`, payload `{ action }`) are implemented. Features subscribe through `answerEvents` and `sessionEvents` from `@/ipc`.
 
 | Event | Payload | When |
 | --- | --- | --- |

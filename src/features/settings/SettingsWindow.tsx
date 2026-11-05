@@ -8,6 +8,7 @@ import {
 } from "@/ipc";
 import { DiagnosticsPanel } from "./DiagnosticsPanel";
 import { ProviderSection } from "./ProviderSection";
+import { ShortcutsSection } from "./ShortcutsSection";
 
 const RETENTION_LABELS: Record<Retention, string> = {
   session: "Until the session ends",
@@ -124,6 +125,17 @@ export function SettingsWindow() {
                 ))}
               </select>
             </section>
+            <ShortcutsSection
+              shortcuts={settings.shortcuts}
+              onSave={async (shortcuts) => {
+                const result = await commands.updateSettings({ shortcuts });
+                if (result.status === "ok") {
+                  setSettings(result.data);
+                  return { saved: result.data.shortcuts };
+                }
+                return { error: result.error.message };
+              }}
+            />
             <DiagnosticsPanel />
           </>
         )}

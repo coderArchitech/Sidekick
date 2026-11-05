@@ -54,7 +54,7 @@ All Phase 0 code and automated tests are done and green on Linux, Windows and ma
 | --- | --- | --- | --- |
 | T-013 | Sessions and consent | 🟡 In progress: testing | Waiting on dependency: E2E needs the WebdriverIO harness (T-033). Everything else done, including a real-app run |
 | T-014 | Live transcript tab | ✅ Done | Verified in the real app with fixture audio |
-| T-015 | `hotkeys` crate: global shortcuts | ⬜ To do | 🖥️ |
+| T-015 | `hotkeys` crate: global shortcuts | 🟡 In progress: testing | 🖥️ Waiting on hardware: verified on Linux (X11); needs a check on Windows and macOS. Ask/Screenshot/Auto/Skill actions hook in with T-023/T-025/T-020/T-028 |
 | T-016 | Profile: name and nicknames | ⬜ To do | |
 | T-017 | `ingest` crate: parse, chunk, embed | ⬜ To do | |
 | T-018 | `retrieval` crate: hybrid search and context packs | ⬜ To do | |
@@ -313,9 +313,13 @@ All Phase 0 code and automated tests are done and green on Linux, Windows and ma
 **Scope:** Register shortcuts from settings; emit `hotkey.pressed`; conflicts reported; customisable in Settings → Shortcuts.
 
 **Tests**
-- [ ] Unit: default bindings match TECHNICAL.md 12.3 per OS.
-- [ ] Unit: conflicting or invalid bindings rejected with a clear error.
-- [ ] Component: each action handler (show/hide, ask, screenshot, Auto, pause, switch Skill, bookmark) runs on its event.
+- [x] Unit: default bindings match TECHNICAL.md 12.3 (`CmdOrCtrl` = Cmd on macOS, Ctrl on Windows).
+- [x] Unit: invalid bindings (no modifier, two keys, unknown key) and duplicates rejected with a clear error naming both actions; spelling normalised.
+- [x] Unit: settings store the set, invalid patches change nothing.
+- [x] Component: pause/resume and bookmark run on their events; nothing happens without a session; unmount stops listening.
+- [x] Component: Settings → Shortcuts lists, saves, rejects duplicates with a reason, and undoes.
+- [x] Manual (Linux, Xvfb): Ctrl+Shift+P pauses the session and Ctrl+Shift+H hides the overlay while another window has focus.
+- [ ] Ask, Screenshot, Auto-answer and Switch Skill actions: wired when T-023, T-025, T-020 and T-028 land.
 - [ ] Manual: shortcuts work while a meeting app has focus on Windows and macOS.
 
 ### T-016 Profile: name and nicknames

@@ -24,7 +24,9 @@ export type {
   AnswerDone,
   AnswerError,
   AnswerToken,
+  Action,
   AppInfo,
+  Binding,
   Bookmark,
   ChatMessage,
   ConsentOption,
@@ -76,6 +78,7 @@ const tauriSessionEvents: SessionEvents = {
   onTranscriptPartial: (cb) => tauriEvents.transcriptPartial.listen((e) => cb(e.payload)),
   onTranscriptSegment: (cb) => tauriEvents.transcriptSegment.listen((e) => cb(e.payload)),
   onSttStatus: (cb) => tauriEvents.sttStatusChanged.listen((e) => cb(e.payload)),
+  onHotkey: (cb) => tauriEvents.hotkeyPressed.listen((e) => cb(e.payload)),
 };
 
 export const sessionEvents: SessionEvents = isTauri ? tauriSessionEvents : mockSessionBus.events;

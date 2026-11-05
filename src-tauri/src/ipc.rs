@@ -45,6 +45,7 @@ pub fn builder() -> Builder<tauri::Wry> {
             events::TranscriptPartial,
             events::TranscriptSegment,
             events::SttStatusChanged,
+            events::HotkeyPressed,
         ])
 }
 

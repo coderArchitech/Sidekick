@@ -3,6 +3,7 @@
  * features don't depend on Tauri's event API and tests can emit them directly.
  */
 import type {
+  HotkeyPressed,
   SessionChanged,
   SttStatusChanged,
   TranscriptPartial,
@@ -15,6 +16,8 @@ export interface SessionEvents {
   onTranscriptPartial(cb: (e: TranscriptPartial) => void): Promise<Unlisten>;
   onTranscriptSegment(cb: (e: TranscriptSegment) => void): Promise<Unlisten>;
   onSttStatus(cb: (e: SttStatusChanged) => void): Promise<Unlisten>;
+  /** A global shortcut was pressed (registered by the Rust shell). */
+  onHotkey(cb: (e: HotkeyPressed) => void): Promise<Unlisten>;
 }
 
 type Payloads = {
@@ -22,6 +25,7 @@ type Payloads = {
   partial: TranscriptPartial;
   segment: TranscriptSegment;
   stt: SttStatusChanged;
+  hotkey: HotkeyPressed;
 };
 
 /** In-memory event bus used by the browser mocks and tests. */
@@ -31,6 +35,7 @@ export function createMockSessionBus() {
     partial: new Set(),
     segment: new Set(),
     stt: new Set(),
+    hotkey: new Set(),
   };
   function on<K extends keyof Payloads>(kind: K, cb: (e: Payloads[K]) => void): Promise<Unlisten> {
     handlers[kind].add(cb);
@@ -46,6 +51,7 @@ export function createMockSessionBus() {
     onTranscriptPartial: (cb) => on("partial", cb),
     onTranscriptSegment: (cb) => on("segment", cb),
     onSttStatus: (cb) => on("stt", cb),
+    onHotkey: (cb) => on("hotkey", cb),
   };
   return { events, emit };
 }

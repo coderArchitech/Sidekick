@@ -27,6 +27,15 @@ export const DEFAULT_SETTINGS: Settings = {
   search: null,
   autoAnswer: true,
   retention: "30d",
+  shortcuts: [
+    { action: "show_hide", keys: "CmdOrCtrl+Shift+H" },
+    { action: "ask", keys: "CmdOrCtrl+Shift+Space" },
+    { action: "screenshot", keys: "CmdOrCtrl+Shift+S" },
+    { action: "auto_answer", keys: "CmdOrCtrl+Shift+A" },
+    { action: "pause_resume", keys: "CmdOrCtrl+Shift+P" },
+    { action: "switch_skill", keys: "CmdOrCtrl+Shift+K" },
+    { action: "bookmark", keys: "CmdOrCtrl+Shift+B" },
+  ],
 };
 
 type CatalogRow = [id: string, kind: ProviderKind, displayName: string, keyRequired: boolean];
@@ -157,6 +166,7 @@ export function applyPatch(current: Settings, patch: SettingsPatch): Settings {
   if ("search" in patch) next.search = patch.search ?? null;
   if (patch.autoAnswer != null) next.autoAnswer = patch.autoAnswer;
   if (patch.retention) next.retention = patch.retention;
+  if (patch.shortcuts) next.shortcuts = patch.shortcuts;
   return next;
 }
 
@@ -213,6 +223,18 @@ export const mockCommands: Commands = {
   getCaptureProtection: () => Promise.resolve(structuredClone(mockProtection.status)),
   getSettings: () => Promise.resolve({ status: "ok", data: structuredClone(settings) }),
   updateSettings: (patch) => {
+    if (patch.shortcuts) {
+      // Mirrors sidekick_hotkeys::validate for the cases the UI can produce.
+      const norm = patch.shortcuts.map((b) => b.keys.replace(/\s+/g, "").toLowerCase());
+      const dup = norm.findIndex((k, i) => norm.indexOf(k) !== i);
+      if (dup >= 0)
+        return Promise.resolve(err("INTERNAL", `${patch.shortcuts[dup]?.keys} is used twice.`));
+      if (norm.some((k) => !k.includes("+"))) {
+        return Promise.resolve(
+          err("INTERNAL", "Each shortcut needs at least one modifier (Ctrl, Cmd, Alt or Shift)."),
+        );
+      }
+    }
     settings = applyPatch(settings, patch);
     return Promise.resolve({ status: "ok", data: structuredClone(settings) });
   },

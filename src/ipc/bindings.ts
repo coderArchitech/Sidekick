@@ -242,6 +242,7 @@ export const events = __makeEvents__<{
   answerDone: AnswerDone;
   answerError: AnswerError;
   answerToken: AnswerToken;
+  hotkeyPressed: HotkeyPressed;
   sessionChanged: SessionChanged;
   sttStatusChanged: SttStatusChanged;
   transcriptPartial: TranscriptPartial;
@@ -250,6 +251,7 @@ export const events = __makeEvents__<{
   answerDone: "answer-done",
   answerError: "answer-error",
   answerToken: "answer-token",
+  hotkeyPressed: "hotkey-pressed",
   sessionChanged: "session-changed",
   sttStatusChanged: "stt-status-changed",
   transcriptPartial: "transcript-partial",
@@ -260,6 +262,11 @@ export const events = __makeEvents__<{
 
 /** user-defined types **/
 
+/**
+ * What a shortcut does.
+ */
+export type Action =
+  "show_hide" | "ask" | "screenshot" | "auto_answer" | "pause_resume" | "switch_skill" | "bookmark";
 export type AnswerDone = { requestId: string; usage: Usage; finishReason: FinishReason };
 export type AnswerError = { requestId: string; error: SidekickError };
 export type AnswerToken = { requestId: string; delta: string };
@@ -267,6 +274,10 @@ export type AnswerToken = { requestId: string; delta: string };
  * Basic facts about the running app, shown in the overlay and diagnostics.
  */
 export type AppInfo = { name: string; version: string; os: string };
+/**
+ * One action and its key combination.
+ */
+export type Binding = { action: Action; keys: string };
 /**
  * A moment the user marked (PRD 5 "Bookmarks").
  */
@@ -327,6 +338,10 @@ export type FinishReason =
   | "refusal"
   | "tool_use"
   | "other";
+/**
+ * A global shortcut was pressed (`hotkey.pressed`).
+ */
+export type HotkeyPressed = { action: Action };
 /**
  * Result of saving or testing a key.
  */
@@ -470,6 +485,10 @@ export type Settings = {
   search: ProviderChoice | null;
   autoAnswer: boolean;
   retention: Retention;
+  /**
+   * Global shortcuts, one per action (tech doc 12.3).
+   */
+  shortcuts: Binding[];
 };
 /**
  * A partial update. Only the sections present are replaced; unknown fields are
@@ -485,6 +504,10 @@ export type SettingsPatch = {
   search?: ProviderChoice | null;
   autoAnswer?: boolean | null;
   retention?: Retention | null;
+  /**
+   * The full set of shortcuts; validated (every action once, no duplicates).
+   */
+  shortcuts?: Binding[] | null;
 };
 /**
  * Error returned by every fallible Sidekick function and IPC command.

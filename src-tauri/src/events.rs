@@ -183,3 +183,10 @@ impl SttSink for TauriSttSink {
         .emit(&self.app);
     }
 }
+
+/// A global shortcut was pressed (`hotkey.pressed`).
+#[derive(Debug, Clone, Serialize, specta::Type, Event)]
+#[serde(rename_all = "camelCase")]
+pub struct HotkeyPressed {
+    pub action: sidekick_hotkeys::Action,
+}

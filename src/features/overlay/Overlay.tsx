@@ -3,6 +3,7 @@ import { SessionBar } from "@/features/session";
 import { TranscriptView } from "@/features/transcript";
 import { commands, type AppInfo } from "@/ipc";
 import { ProtectionShield } from "./ProtectionShield";
+import { useHotkeyActions } from "./useHotkeyActions";
 import { MAX_OPACITY, MIN_OPACITY, TABS, useOverlayStore, type Tab } from "./store";
 
 const TAB_LABELS: Record<Tab, string> = {
@@ -16,6 +17,7 @@ const TAB_LABELS: Record<Tab, string> = {
 export function Overlay() {
   const { tab, opacity, setTab, setOpacity } = useOverlayStore();
   const [info, setInfo] = useState<AppInfo | null>(null);
+  useHotkeyActions();
 
   useEffect(() => {
     void commands.appInfo().then((result) => {

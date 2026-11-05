@@ -11,6 +11,7 @@ mod events;
 mod ipc;
 mod logging;
 mod protection;
+mod shortcuts;
 mod state;
 
 #[cfg(test)]
@@ -23,6 +24,7 @@ pub fn run() {
 
     #[allow(clippy::expect_used)] // Startup: the app cannot run without its context.
     tauri::Builder::default()
+        .plugin(shortcuts::plugin())
         .invoke_handler(builder.invoke_handler())
         .setup(move |app| {
             builder.mount_events(app);
@@ -33,8 +35,16 @@ pub fn run() {
                 tracing::error!(code = ?e.code, "startup failed");
                 Box::new(e) as Box<dyn std::error::Error>
             })?;
+            let bindings = sidekick_settings::load(&state.db())
+                .map(|s| s.shortcuts)
+                .unwrap_or_default();
             app.manage(state);
             app.manage(protection::apply(app.handle()));
+            app.manage(shortcuts::Registered::default());
+            // A shortcut another app already owns shouldn't stop Sidekick from starting.
+            if let Err(e) = shortcuts::apply(app.handle(), &bindings, &[]) {
+                tracing::warn!(message = %e.message, "some shortcuts could not be registered");
+            }
             Ok(())
         })
         .run(tauri::generate_context!())

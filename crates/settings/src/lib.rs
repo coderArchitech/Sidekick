@@ -6,6 +6,7 @@
 
 use serde::{Deserialize, Serialize, de::DeserializeOwned};
 use sidekick_core::{ErrorCode, SidekickError, SidekickResult};
+use sidekick_hotkeys::Binding;
 use sidekick_store::{Database, settings as raw};
 
 /// The active provider and model for one kind of service.
@@ -45,6 +46,8 @@ pub struct Settings {
     pub search: Option<ProviderChoice>,
     pub auto_answer: bool,
     pub retention: Retention,
+    /// Global shortcuts, one per action (tech doc 12.3).
+    pub shortcuts: Vec<Binding>,
 }
 
 impl Default for Settings {
@@ -66,6 +69,7 @@ impl Default for Settings {
             search: None,
             auto_answer: true,
             retention: Retention::ThirtyDays,
+            shortcuts: sidekick_hotkeys::defaults(),
         }
     }
 }
@@ -90,6 +94,9 @@ pub struct SettingsPatch {
     pub auto_answer: Option<bool>,
     #[serde(default)]
     pub retention: Option<Retention>,
+    /// The full set of shortcuts; validated (every action once, no duplicates).
+    #[serde(default)]
+    pub shortcuts: Option<Vec<Binding>>,
 }
 
 impl Settings {
@@ -112,6 +119,9 @@ impl Settings {
         }
         if let Some(v) = patch.retention {
             self.retention = v;
+        }
+        if let Some(v) = patch.shortcuts {
+            self.shortcuts = sidekick_hotkeys::validate(&v)?;
         }
         self.validate()?;
         Ok(self)
@@ -152,6 +162,9 @@ pub fn load(db: &Database) -> SidekickResult<Settings> {
         search: section(db, "search")?.unwrap_or(d.search),
         auto_answer: section(db, "autoAnswer")?.unwrap_or(d.auto_answer),
         retention: section(db, "retention")?.unwrap_or(d.retention),
+        shortcuts: section::<Vec<Binding>>(db, "shortcuts")?
+            .and_then(|b| sidekick_hotkeys::validate(&b).ok())
+            .unwrap_or(d.shortcuts),
     })
 }
 
@@ -175,6 +188,9 @@ pub fn update(db: &Database, patch: SettingsPatch) -> SidekickResult<Settings> {
     }
     if patch.retention.is_some() {
         raw::set(db, "retention", &to_json(&updated.retention)?)?;
+    }
+    if patch.shortcuts.is_some() {
+        raw::set(db, "shortcuts", &to_json(&updated.shortcuts)?)?;
     }
     Ok(updated)
 }
@@ -273,6 +289,42 @@ mod tests {
         assert!(
             update(&db, clear).unwrap().search.is_none(),
             "null clears it"
+        );
+    }
+
+    #[test]
+    fn shortcuts_default_validate_and_persist() {
+        let db = db();
+        assert_eq!(load(&db).unwrap().shortcuts, sidekick_hotkeys::defaults());
+        let mut keys = sidekick_hotkeys::defaults();
+        keys[0].keys = "alt+shift+o".into();
+        let updated = update(
+            &db,
+            SettingsPatch {
+                shortcuts: Some(keys),
+                ..SettingsPatch::default()
+            },
+        )
+        .unwrap();
+        assert_eq!(updated.shortcuts[0].keys, "Alt+Shift+O", "normalised");
+        assert_eq!(load(&db).unwrap().shortcuts[0].keys, "Alt+Shift+O");
+
+        let mut dup = sidekick_hotkeys::defaults();
+        dup[1].keys = dup[0].keys.clone();
+        assert!(
+            update(
+                &db,
+                SettingsPatch {
+                    shortcuts: Some(dup),
+                    ..SettingsPatch::default()
+                }
+            )
+            .is_err()
+        );
+        assert_eq!(
+            load(&db).unwrap().shortcuts[0].keys,
+            "Alt+Shift+O",
+            "invalid patch changes nothing"
         );
     }
 

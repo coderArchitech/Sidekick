@@ -1,5 +1,12 @@
 import { create } from "zustand";
-import type { Bookmark, TranscriptLine, TranscriptPartial, TranscriptSegment } from "@/ipc";
+import {
+  commands,
+  type Bookmark,
+  type Session,
+  type TranscriptLine,
+  type TranscriptPartial,
+  type TranscriptSegment,
+} from "@/ipc";
 
 type Stream = TranscriptPartial["stream"];
 
@@ -75,4 +82,16 @@ export function clock(ms: number): string {
   const m = Math.floor(total / 60);
   const s = total % 60;
   return `${m}:${s.toString().padStart(2, "0")}`;
+}
+
+/** Bookmarks "now" in a running session (button and shortcut). */
+export async function bookmarkNow(session: Session | null): Promise<boolean> {
+  if (!session?.startedAt || session.status === "ended") return false;
+  const r = await commands.addBookmark(
+    session.id,
+    Math.max(0, Date.now() - session.startedAt),
+    null,
+  );
+  if (r.status === "ok") useTranscriptStore.getState().addBookmarkLocal(r.data);
+  return r.status === "ok";
 }
