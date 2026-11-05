@@ -203,6 +203,8 @@ function stageStats(): StageStats[] {
 export const mockProtection: { status: ProtectionStatus } = {
   status: { state: "unavailable", reason: "Running in a browser: no screen-share protection." },
 };
+/** Paths the mock file picker returns next (tests set them). */
+export const mockFiles: { picked: string[] } = { picked: [] };
 /** Browser-demo switches; tests leave them off. */
 export const mockOptions = { demoTranscript: false, ingestStepMs: 5 };
 /** What the mocks were asked to do, for assertions. */
@@ -255,6 +257,7 @@ export function resetMocks(): void {
   sessions.clear();
   transcripts.clear();
   documents.clear();
+  mockFiles.picked = [];
   bookmarks.clear();
   nextLineId = 1;
   liveSessionId = null;

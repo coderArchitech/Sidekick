@@ -5,8 +5,17 @@
  */
 import type { AnswerEvents } from "./answerEvents";
 import { commands as tauriCommands, events as tauriEvents } from "./bindings";
+import { getCurrentWebview } from "@tauri-apps/api/webview";
 import { getCurrentWindow } from "@tauri-apps/api/window";
-import { mockAnswerBus, mockCommands, mockOptions, mockSessionBus, mockWindowCalls } from "./mock";
+import { open } from "@tauri-apps/plugin-dialog";
+import {
+  mockAnswerBus,
+  mockCommands,
+  mockFiles,
+  mockOptions,
+  mockSessionBus,
+  mockWindowCalls,
+} from "./mock";
 
 // In a plain browser (pnpm dev:web) the mocks play a short demo transcript.
 if (
@@ -20,6 +29,7 @@ import type { SessionEvents } from "./sessionEvents";
 
 export type { AnswerEvents, Unlisten } from "./answerEvents";
 export type { SessionEvents } from "./sessionEvents";
+import type { Unlisten } from "./answerEvents";
 export type {
   AnswerDone,
   AnswerError,
@@ -87,6 +97,7 @@ const tauriSessionEvents: SessionEvents = {
   onSttStatus: (cb) => tauriEvents.sttStatusChanged.listen((e) => cb(e.payload)),
   onHotkey: (cb) => tauriEvents.hotkeyPressed.listen((e) => cb(e.payload)),
   onIngestProgress: (cb) => tauriEvents.ingestProgress.listen((e) => cb(e.payload)),
+  onFileDrop: (cb) => onFileDrop(cb),
 };
 
 export const sessionEvents: SessionEvents = isTauri ? tauriSessionEvents : mockSessionBus.events;
@@ -105,4 +116,38 @@ export async function hideCurrentWindow(): Promise<void> {
   } else {
     mockWindowCalls.hide += 1;
   }
+}
+
+/** Files Sidekick can read (PRD CTX-2); images arrive with screenshots. */
+export const DOCUMENT_EXTENSIONS = [
+  "pdf",
+  "docx",
+  "pptx",
+  "xlsx",
+  "xls",
+  "ods",
+  "txt",
+  "md",
+  "markdown",
+  "csv",
+  "json",
+];
+
+/** Opens the OS file picker; resolves to the chosen paths (empty if cancelled). */
+export async function pickFiles(): Promise<string[]> {
+  if (!isTauri) return mockFiles.picked.splice(0);
+  const chosen = await open({
+    multiple: true,
+    filters: [{ name: "Documents", extensions: DOCUMENT_EXTENSIONS }],
+  });
+  if (!chosen) return [];
+  return Array.isArray(chosen) ? chosen : [chosen];
+}
+
+/** Files dropped onto the window. */
+export function onFileDrop(cb: (paths: string[]) => void): Promise<Unlisten> {
+  if (!isTauri) return mockSessionBus.events.onFileDrop(cb);
+  return getCurrentWebview().onDragDropEvent((e) => {
+    if (e.payload.type === "drop") cb(e.payload.paths);
+  });
 }

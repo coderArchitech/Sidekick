@@ -25,6 +25,7 @@ pub fn run() {
     #[allow(clippy::expect_used)] // Startup: the app cannot run without its context.
     tauri::Builder::default()
         .plugin(shortcuts::plugin())
+        .plugin(tauri_plugin_dialog::init())
         .invoke_handler(builder.invoke_handler())
         .setup(move |app| {
             builder.mount_events(app);

@@ -58,7 +58,7 @@ All Phase 0 code and automated tests are done and green on Linux, Windows and ma
 | T-016 | Profile: name and nicknames | ✅ Done | Detection use lands in T-020 |
 | T-017 | `ingest` crate: parse, chunk, embed | 🟡 In progress: testing | Waiting on dependency: image files need a vision model (T-025/T-026); Gemini, Voyage and Ollama embeddings come with T-026. Everything else done |
 | T-018 | `retrieval` crate: hybrid search and context packs | 🟡 In progress: testing | Waiting on dependency: the latest screenshot joins the pack with T-025. Everything else done; 20k-chunk search 8 ms in release |
-| T-019 | Library feature: documents in a session | ⬜ To do | |
+| T-019 | Library feature: documents in a session | 🟡 In progress: testing | Waiting on dependency: Playwright drag-and-drop spec comes with the UI suite (T-032); native picker/drop check on Windows/macOS |
 | T-020 | Orchestrator: question detection and modes | ⬜ To do | |
 | T-021 | Orchestrator: prompts, Skills, two-tier answers | ⬜ To do | |
 | T-022 | Live Answers tab | ⬜ To do | |
@@ -369,9 +369,11 @@ All Phase 0 code and automated tests are done and green on Linux, Windows and ma
 **Scope:** Drag-and-drop and file picker; per-document status and errors; delete; URL input.
 
 **Tests**
-- [ ] Component: dropped files call `ingest_document`; progress events update status.
-- [ ] Component: failed documents show the reason and a retry.
-- [ ] UI: drag and drop with mocked IPC.
+- [x] Component: picked files and files dropped onto the window call `ingest_document`; progress events move them to Ready with a count in the header.
+- [x] Component: failed documents show the reason and a retry; unsupported files are refused with the reason.
+- [x] Component: links added (http/https only, others refused), documents removed.
+- [ ] UI: drag and drop with mocked IPC in Playwright (T-032).
+- [ ] Manual: native file picker and OS drag-and-drop on Windows and macOS.
 
 ### T-020 Orchestrator: question detection and modes
 

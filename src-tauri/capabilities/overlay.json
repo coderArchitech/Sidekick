@@ -5,6 +5,7 @@
   "windows": ["overlay"],
   "permissions": [
     "core:default",
+    "dialog:allow-open",
     "allow-app-info",
     "allow-open-settings",
     "allow-get-capture-protection",

@@ -21,6 +21,8 @@ export interface SessionEvents {
   onHotkey(cb: (e: HotkeyPressed) => void): Promise<Unlisten>;
   /** Document ingest progress (tech doc 5.2 `ingest.progress`). */
   onIngestProgress(cb: (e: IngestProgress) => void): Promise<Unlisten>;
+  /** Mock only: files dropped onto the window (Tauri uses the webview's drop event). */
+  onFileDrop(cb: (paths: string[]) => void): Promise<Unlisten>;
 }
 
 type Payloads = {
@@ -30,6 +32,7 @@ type Payloads = {
   stt: SttStatusChanged;
   hotkey: HotkeyPressed;
   ingest: IngestProgress;
+  drop: string[];
 };
 
 /** In-memory event bus used by the browser mocks and tests. */
@@ -41,6 +44,7 @@ export function createMockSessionBus() {
     stt: new Set(),
     hotkey: new Set(),
     ingest: new Set(),
+    drop: new Set(),
   };
   function on<K extends keyof Payloads>(kind: K, cb: (e: Payloads[K]) => void): Promise<Unlisten> {
     handlers[kind].add(cb);
@@ -58,6 +62,7 @@ export function createMockSessionBus() {
     onSttStatus: (cb) => on("stt", cb),
     onHotkey: (cb) => on("hotkey", cb),
     onIngestProgress: (cb) => on("ingest", cb),
+    onFileDrop: (cb) => on("drop", cb),
   };
   return { events, emit };
 }

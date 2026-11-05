@@ -6,6 +6,8 @@ export {
   mockSessionBus,
   mockTranscriptLine,
   mockCommands,
+  mockFiles,
+  mockOptions,
   mockProtection,
   mockWindowCalls,
   resetMocks,

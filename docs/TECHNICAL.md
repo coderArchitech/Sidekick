@@ -226,7 +226,7 @@ Each module below is its own crate at `crates/<module>/`, named `sidekick-<modul
 | `chat` | Chat tab: user questions with session context |
 | `transcript` | Transcript tab: loads saved lines, applies live `transcript-partial` / `transcript-segment` events batched every 50 ms (`lib/batcher`), shows partial text until the final line arrives, rename/merge speakers, bookmarks, listening indicator |
 | `notes` | Rolling notes, decisions, action items |
-| `library` | Session documents and screenshot strip |
+| `library` | Collapsible Documents panel under the session bar: add files (native picker via `tauri-plugin-dialog`, or drop onto the window), add links, live indexing progress, failure reason with Retry, remove. Screenshot strip arrives with T-043 |
 | `settings` | Settings window: provider and model dropdowns per kind (STT, LLM, embeddings, web search), masked key field with show/hide, paste, Save and test, Test connection, Remove; Auto-answer and retention. Opened with `open_settings`; Close hides the window |
 | `skills` | Skill builder, templates, import/export |
 | `orchestrator` | Question detection, prompt building, Skill application, notes job, two-tier model routing |

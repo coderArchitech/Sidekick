@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { Library } from "@/features/library";
 import { SessionBar } from "@/features/session";
 import { TranscriptView } from "@/features/transcript";
 import { commands, type AppInfo } from "@/ipc";
@@ -59,6 +60,7 @@ export function Overlay() {
       </header>
 
       <SessionBar />
+      <Library />
 
       <div role="tablist" aria-label="Sidekick views" className="flex border-b border-slate-700">
         {TABS.map((id) => (
