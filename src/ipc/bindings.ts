@@ -272,6 +272,21 @@ export const commands = {
       else return { status: "error", error: e as any };
     }
   },
+  async retrieveContext(
+    sessionId: string,
+    query: string,
+    options: ContextOptions | null,
+  ): Promise<Result<ContextPack, SidekickError>> {
+    try {
+      return {
+        status: "ok",
+        data: await TAURI_INVOKE("retrieve_context", { sessionId, query, options }),
+      };
+    } catch (e) {
+      if (e instanceof Error) throw e;
+      else return { status: "error", error: e as any };
+    }
+  },
 };
 
 /** user-defined events **/
@@ -338,6 +353,34 @@ export type ConsentOption =
    * "Transcribe me only": the microphone only, never other participants.
    */
   | "me_only";
+/**
+ * A document passage with what a citation needs.
+ */
+export type ContextChunk = {
+  chunkId: number;
+  documentId: string;
+  documentName: string;
+  page: number | null;
+  text: string;
+};
+/**
+ * How much context to gather (tech doc 13.5: last 3 minutes, top 5 chunks).
+ */
+export type ContextOptions = { windowMs: number; topK: number };
+export type ContextPack = {
+  /**
+   * The most recent `window_ms` of transcript, in time order.
+   */
+  transcript: TranscriptLine[];
+  /**
+   * Rolling notes (filled by T-024).
+   */
+  notes: string | null;
+  /**
+   * Best document passages, best first.
+   */
+  chunks: ContextChunk[];
+};
 export type Diagnostics = {
   appVersion: string;
   os: string;

@@ -4045,6 +4045,7 @@ dependencies = [
  "sidekick-gateway",
  "sidekick-hotkeys",
  "sidekick-ingest",
+ "sidekick-retrieval",
  "sidekick-secrets",
  "sidekick-session",
  "sidekick-settings",
@@ -4152,6 +4153,25 @@ dependencies = [
  "uuid",
  "wiremock",
  "zip 2.6.1",
+]
+
+[[package]]
+name = "sidekick-retrieval"
+version = "0.1.0"
+dependencies = [
+ "rusqlite",
+ "serde",
+ "sidekick-core",
+ "sidekick-gateway",
+ "sidekick-ingest",
+ "sidekick-secrets",
+ "sidekick-session",
+ "sidekick-store",
+ "sidekick-stt",
+ "specta",
+ "tempfile",
+ "tokio",
+ "tracing",
 ]
 
 [[package]]

@@ -40,6 +40,7 @@ pub fn builder() -> Builder<tauri::Wry> {
             commands::documents::ingest_url,
             commands::documents::list_documents,
             commands::documents::delete_document,
+            commands::retrieval::retrieve_context,
         ])
         .events(collect_events![
             events::AnswerToken,

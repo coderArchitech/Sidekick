@@ -121,6 +121,10 @@ pub async fn ingest(
     let http = reqwest::Client::new();
     let (name, bytes, pre_parsed) = read(&source, &http).await?;
     let sha = hex::encode(Sha256::digest(&bytes));
+    let vector_owner = match &owner {
+        Owner::Session(s) => vectors::session_owner(s),
+        Owner::Pack(p) => vectors::pack_owner(p),
+    };
     let (session_id, pack_id) = match &owner {
         Owner::Session(s) => (Some(s.as_str()), None),
         Owner::Pack(p) => (None, Some(p.as_str())),
@@ -165,6 +169,7 @@ pub async fn ingest(
     match run(
         &db,
         &id,
+        &vector_owner,
         &name,
         bytes,
         pre_parsed,
@@ -191,6 +196,7 @@ pub async fn ingest(
 async fn run(
     db: &Db,
     id: &str,
+    vector_owner: &str,
     name: &str,
     bytes: Vec<u8>,
     pre_parsed: Option<Vec<Page>>,
@@ -245,7 +251,7 @@ async fn run(
         {
             let guard = lock(db);
             for (offset, v) in vectors_out.iter().enumerate() {
-                vectors::upsert(&guard, chunk_ids[start + offset], v)?;
+                vectors::upsert(&guard, chunk_ids[start + offset], vector_owner, v)?;
             }
         }
         let done = start + batch.len();

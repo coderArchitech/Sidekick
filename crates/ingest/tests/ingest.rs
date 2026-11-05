@@ -486,7 +486,7 @@ async fn vector_search_finds_the_right_page() {
     .await
     .unwrap();
     let q = sidekick_gateway::providers::mock_embed::embed_one("What is the Pro tier rate limit?");
-    let hits = vectors::nearest(&db.lock().unwrap(), &q, 1).unwrap();
+    let hits = vectors::nearest(&db.lock().unwrap(), &vectors::session_owner("s1"), &q, 1).unwrap();
     let page: i64 = db
         .lock()
         .unwrap()

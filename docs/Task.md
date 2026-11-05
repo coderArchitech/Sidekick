@@ -57,7 +57,7 @@ All Phase 0 code and automated tests are done and green on Linux, Windows and ma
 | T-015 | `hotkeys` crate: global shortcuts | 🟡 In progress: testing | 🖥️ Waiting on hardware: verified on Linux (X11); needs a check on Windows and macOS. Ask/Screenshot/Auto/Skill actions hook in with T-023/T-025/T-020/T-028 |
 | T-016 | Profile: name and nicknames | ✅ Done | Detection use lands in T-020 |
 | T-017 | `ingest` crate: parse, chunk, embed | 🟡 In progress: testing | Waiting on dependency: image files need a vision model (T-025/T-026); Gemini, Voyage and Ollama embeddings come with T-026. Everything else done |
-| T-018 | `retrieval` crate: hybrid search and context packs | ⬜ To do | |
+| T-018 | `retrieval` crate: hybrid search and context packs | 🟡 In progress: testing | Waiting on dependency: the latest screenshot joins the pack with T-025. Everything else done; 20k-chunk search 8 ms in release |
 | T-019 | Library feature: documents in a session | ⬜ To do | |
 | T-020 | Orchestrator: question detection and modes | ⬜ To do | |
 | T-021 | Orchestrator: prompts, Skills, two-tier answers | ⬜ To do | |
@@ -355,11 +355,13 @@ All Phase 0 code and automated tests are done and green on Linux, Windows and ma
 **Scope:** Vector and FTS search filtered to the session, merged with reciprocal rank fusion; context pack = last 3 minutes of transcript + notes + top 5 chunks + latest screenshot; retrieval order transcript → documents → web.
 
 **Tests**
-- [ ] Unit: rank fusion ordering on known inputs.
-- [ ] Unit: transcript window trimming to 3 minutes.
-- [ ] Integration: golden queries return the expected chunk in the top 5 on fixture docs.
-- [ ] Integration: results never include another session's documents.
-- [ ] Benchmark: under 50 ms over 20k chunks (TECHNICAL.md 13.2).
+- [x] Unit: rank fusion ordering on known inputs (items in both lists first; deterministic ties).
+- [x] Unit: transcript window trimming to 3 minutes; safe FTS queries (quoted words, stop words and operators dropped).
+- [x] Integration: 5 golden queries return the expected document first (top 5 returned), with vector + keyword and keyword-only.
+- [x] Integration: results never include another session's documents (vector index partitioned by owner; keyword search filtered).
+- [x] Integration: pack carries recent transcript, notes, top-k passages with document name, id and page.
+- [x] Benchmark: 20k chunks, release build: vector search 8 ms (target 50 ms), full context pack 23 ms (budget 100 ms). Debug: 17 / 91 ms.
+- [ ] Latest screenshot in the pack: with T-025.
 
 ### T-019 Library feature: documents in a session
 

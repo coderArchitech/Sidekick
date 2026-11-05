@@ -207,7 +207,7 @@ Each module below is its own crate at `crates/<module>/`, named `sidekick-<modul
 | `ingest` | Parsers (PDF via pdf-extract, DOCX/PPTX via zip + quick-xml, spreadsheets via calamine, text/Markdown, web pages), chunker (~500 tokens ≈ 2,000 chars, 50 overlap, within a page), SHA-256 duplicate check, batched embeddings (100 per request, retries), progress events; at most 3 documents at once. Owns the SQL for `documents` and `chunks`. Images wait for vision (T-025/T-026) | Done (images pending) |
 | `store` | SQLCipher database (raw 256-bit key from `secrets`), WAL, foreign keys; migrations with pre-migration backups; sqlite-vec registered for every connection; `settings` (raw JSON) and `vectors` (per-model `chunk_vectors`) modules; repository modules added per feature | Done |
 | `settings` | Typed `Settings` (providers and models for STT, LLM, embeddings, search; Auto-answer; retention) with defaults and partial `SettingsPatch` updates; one `settings` row per section; unreadable sections fall back to defaults | Done |
-| `retrieval` | Vector and keyword search over chunks; assemble context packs (transcript window, notes, chunks, screenshot) | Not started |
+| `retrieval` | Vector search (sqlite-vec KNN, partitioned by owner so only the session's vectors are scanned) + keyword search (FTS5, BM25), fused with reciprocal rank fusion (k = 60); context pack = last 3 minutes of transcript + notes + top 5 passages with citation fields. Keyword-only when there's no query vector. Screenshot joins with T-025 | Done (screenshot pending) |
 | `gateway` | Provider catalog (all kinds, for Settings); `LlmProvider` adapters (Anthropic, mock; OpenAI, Gemini, Ollama in T-026); the only place keys are attached; streaming via an `AnswerSink` the shell implements; retries with backoff and `Retry-After`; cancellation; key checks before saving. `SearchProvider` and `EmbeddingProvider` arrive with T-046 and T-017 | Started (LLM done) |
 | `secrets` | `KeyStore` trait with `KeychainStore` (OS keychain, service `sidekick`) and `MemoryStore` (tests, mock mode); keys as `SecretString`; `KeyStatus` exposes only the last 4 characters; account names restricted to `[a-z0-9-]` | Done |
 | `skills` | Load, validate, import and export Skill files | Not started |
@@ -414,9 +414,13 @@ CREATE INDEX idx_chunks_document ON chunks(document_id, ord);
 
 -- chunk_vectors is NOT created by this migration: its size depends on the active
 -- embedding model (ADR-013). The store creates it on first use:
---   CREATE VIRTUAL TABLE chunk_vectors USING vec0(chunk_id INTEGER PRIMARY KEY, embedding float[<dims>]);
--- and records the dimension in settings key 'embedding.dims'. Changing model drops
--- and recreates it, then the re-embedding job refills it (section 4.5).
+--   CREATE VIRTUAL TABLE chunk_vectors USING vec0(
+--     chunk_id INTEGER PRIMARY KEY,
+--     owner TEXT PARTITION KEY,            -- 's:<session id>' or 'p:<pack id>'
+--     embedding float[<dims>] distance_metric=cosine);
+-- and records {dims, layout} in settings key 'embedding.index'. A change of model
+-- size or layout drops and recreates it; the re-embedding job refills it (4.5).
+-- The partition key must never be NULL (sqlite-vec misbehaves); upsert rejects it.
 
 CREATE VIRTUAL TABLE chunks_fts USING fts5(text, content='chunks', content_rowid='id');
 
@@ -596,7 +600,7 @@ Commands are request/response calls from the frontend to Rust (`invoke`). All re
 | `list_documents` | `session_id` | `DocumentInfo[]` | Session documents with status, pages, chunk count and error |
 | `delete_document` | `document_id` | `()` | Remove document and its chunks |
 | `capture_screenshot` | `mode: region / window / screen` | `Screenshot` | Capture and store a screenshot |
-| `retrieve_context` | `session_id, query, opts` | `ContextPack` | Transcript window, notes, top chunks, screenshot |
+| `retrieve_context` | `session_id, query, options?` (`windowMs`, `topK`) | `ContextPack` (`transcript`, `notes`, `chunks`) | Transcript window, notes and top passages; embeds the query (keyword-only if no embeddings key); records retrieval latency. Screenshot arrives with T-025 |
 | `llm_stream` | `request_id, provider?, model?, messages, tools?` | `()` (tokens arrive as events) | Start a streaming LLM call |
 | `cancel_stream` | `request_id` | `()` | Abort an in-flight LLM call |
 | `web_search` | `request_id, query, max_results?` | `SearchResult[]` | Run a web search for a model tool call; the orchestrator sends results back to the model |
@@ -1465,7 +1469,7 @@ Targets are set now; measured baselines are filled in after the Phase 0 prototyp
 | CPU while listening (cloud STT) | Under 10% | To be measured |
 | RAM while listening | Under 800 MB | To be measured |
 | Ingest a 50-page PDF (parse + embed) | Under 30 s | To be measured |
-| Vector search over 20k chunks | Under 50 ms | To be measured |
+| Vector search over 20k chunks | Under 50 ms | 8 ms (release, 256-dim mock vectors, Linux CI container); 23 ms for the whole context pack |
 | Cold start to usable overlay | Under 3 s | To be measured |
 | Installer size | Under 30 MB | To be measured |
 

@@ -31,6 +31,7 @@ const COMMANDS: &[&str] = &[
     "ingest_url",
     "list_documents",
     "delete_document",
+    "retrieve_context",
 ];
 
 fn main() {

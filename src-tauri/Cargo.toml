@@ -28,6 +28,7 @@ sidekick-audio.workspace = true
 sidekick-hotkeys = { workspace = true, features = ["specta"] }
 tauri-plugin-global-shortcut = "2"
 sidekick-ingest = { workspace = true, features = ["specta"] }
+sidekick-retrieval = { workspace = true, features = ["specta"] }
 tauri = { version = "2", features = ["macos-private-api"] }
 serde.workspace = true
 serde_json.workspace = true

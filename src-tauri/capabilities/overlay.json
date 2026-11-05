@@ -26,6 +26,7 @@
     "allow-ingest-url",
     "allow-list-documents",
     "allow-delete-document",
+    "allow-retrieve-context",
     "core:window:allow-start-dragging",
     "core:window:allow-set-always-on-top"
   ]

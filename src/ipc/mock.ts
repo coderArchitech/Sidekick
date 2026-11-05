@@ -507,6 +507,33 @@ export const mockCommands: Commands = {
         ? mockIngest(sessionId, url, 1000)
         : err("UNSUPPORTED_FILE", "Only http and https links can be added."),
     ),
+  retrieveContext: (sessionId, query, options) => {
+    const windowMs = options?.windowMs ?? 180_000;
+    const lines = transcripts.get(sessionId) ?? [];
+    const end = Math.max(0, ...lines.map((l) => l.endMs));
+    const words = query
+      .toLowerCase()
+      .split(/\W+/)
+      .filter((w) => w.length > 2);
+    const chunks = (documents.get(sessionId) ?? [])
+      .filter((d) => d.status === "ready")
+      .map((d, i) => ({
+        chunkId: i + 1,
+        documentId: d.id,
+        documentName: d.name,
+        page: 1,
+        text: `Mock passage from ${d.name} about ${words.join(" ")}`,
+      }))
+      .slice(0, options?.topK ?? 5);
+    return Promise.resolve({
+      status: "ok",
+      data: {
+        transcript: structuredClone(lines.filter((l) => l.endMs >= end - windowMs)),
+        notes: null,
+        chunks,
+      },
+    });
+  },
   listDocuments: (sessionId) =>
     Promise.resolve({ status: "ok", data: structuredClone(documents.get(sessionId) ?? []) }),
   deleteDocument: (documentId) => {
