@@ -5289,6 +5289,7 @@ dependencies = [
  "sidekick-hotkeys",
  "sidekick-secrets",
  "sidekick-store",
+ "sidekick-window",
  "specta",
  "tempfile",
 ]

@@ -41,3 +41,7 @@ SIDEKICK_WHISPER_MODEL="$HOME/Library/Application Support/com.sidekick.app/model
 (On Windows the models folder is under `%APPDATA%\com.sidekick.app\models`.)
 
 **Hinglish (PRD open question).** Play the same 2-minute Hinglish clip through Deepgram (language `multi`), Soniox and Whisper `base`/`small`, and record which reads best in [TECHNICAL.md 13.2](TECHNICAL.md#132-benchmarks-and-baselines).
+
+## T-029: Overlay position on two monitors (10 minutes per OS)
+
+With a second monitor connected, run `pnpm tauri dev`, drag the overlay onto the second monitor near its top-right corner and let go: it snaps flush to the edges. Quit and start again: it reopens there. Disconnect the second monitor and start again: it opens where it last was on the built-in display. Try A−/A+ and Compact, restart, and check they're kept.
