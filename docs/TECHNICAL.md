@@ -1502,11 +1502,11 @@ There's no service, so these are product-quality objectives measured locally (an
 The phased roadmap (Prototype, MVP, V1 launch, V2) and its gates are maintained in the PRD, section 10, so there is one source of truth. Engineering work is broken into tasks with tests and status in [Task.md](Task.md). Phase 0 milestones:
 
 - [x] Tauri 2 project scaffolded (Cargo workspace, React frontend, typed IPC, lint and test setup).
-- [ ] CI green on Windows and macOS (workflow added; confirm on first run).
-- [ ] Audio capture (system + mic) working on both OSes.
+- [x] CI green on Windows and macOS.
+- [ ] Audio capture (system + mic) working on both OSes (code and fixture tests done; device check pending).
 - [ ] Deepgram streaming with latency measured against NFR-1.
 - [ ] Capture exclusion tested on Teams, Zoom, Meet and Webex.
-- [ ] Settings screen with provider dropdowns and keychain storage.
+- [x] Settings screen with provider dropdowns and keychain storage.
 - [ ] Baselines recorded in section 13.2.
 
 ### 14.2 Ownership and contacts

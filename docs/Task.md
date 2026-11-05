@@ -36,11 +36,11 @@ The working task list for building Sidekick end to end, derived from the [techni
 | T-001 | Project scaffold | ✅ Done | Branch `chore/scaffold` |
 | T-002 | CI green on Windows and macOS | ✅ Done | [PR #1](https://github.com/coderArchitech/Sidekick/pull/1) green on Linux, Windows, macOS |
 | T-003 | Apply doc fixes P1–P5 | ✅ Done | Applied with recommended defaults; ADR-013 |
-| T-004 | `secrets` crate: OS keychain | 🟡 In progress: testing | Passes locally (incl. real keychain on Linux); waiting for Windows/macOS CI |
-| T-005 | `store` crate: encrypted database and migrations | 🟡 In progress: testing | Passes locally; waiting for Windows/macOS CI |
-| T-006 | Settings storage and commands | 🟡 In progress: testing | Passes locally; waiting for Windows/macOS CI |
-| T-007 | `gateway` crate: LLM provider trait, mock and Anthropic | 🟡 In progress: testing | Passes locally; waiting for Windows/macOS CI |
-| T-008 | Settings window: providers and API keys | 🟡 In progress: testing | Passes locally; waiting for CI and a check in the real app on Windows/macOS |
+| T-004 | `secrets` crate: OS keychain | ✅ Done | Real keychain round trip passes on Windows and macOS CI |
+| T-005 | `store` crate: encrypted database and migrations | ✅ Done |  |
+| T-006 | Settings storage and commands | ✅ Done |  |
+| T-007 | `gateway` crate: LLM provider trait, mock and Anthropic | ✅ Done |  |
+| T-008 | Settings window: providers and API keys | 🟡 In progress: testing | CI green; needs a check in the real app on Windows/macOS |
 | T-009 | `audio` crate: microphone and system audio capture | 🟡 In progress: testing | 🖥️ Automated tests pass; needs device checks on Windows and macOS 14.6+ (ADR-014) |
 | T-010 | `stt` crate: Deepgram streaming | 🟡 In progress: testing | Automated tests pass; live latency check with a real key pending |
 | T-011 | `window` crate: capture exclusion and protection status | 🟡 In progress: testing | 🖥️ Exclusion and shield done; manual checklist on Windows/macOS pending; screen-share detection for auto-hide still open |
@@ -142,7 +142,7 @@ The working task list for building Sidekick end to end, derived from the [techni
 - [x] Unit: in-memory store set/get/delete/overwrite; multiple providers kept independently.
 - [x] Unit: `SecretString` values never appear in `Debug` output; `KeyStatus` JSON holds only the last 4.
 - [x] Unit: account names restricted to `[a-z0-9-]`, max 64.
-- [ ] Integration: real keychain round trip (`--ignored`; passes on Linux, CI runs it on Windows and macOS).
+- [x] Integration: real keychain round trip (`--ignored`) passes on Linux, Windows and macOS CI.
 - [x] Unit: keychain errors map to `SidekickError` codes, message contains no key.
 
 ### T-005 `store` crate: encrypted database and migrations
