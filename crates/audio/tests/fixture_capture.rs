@@ -90,7 +90,7 @@ async fn pause_drops_frames_and_resume_continues() {
     let dir = tempfile::tempdir().unwrap();
     let wav = dir.path().join("short.wav");
     write_wav(&wav, &[(true, 1.5)]);
-    let (tx, rx) = frame_channel();
+    let (tx, mut rx) = frame_channel();
     let handle = FixtureSource {
         path: wav,
         kind: StreamKind::Mic,
@@ -98,12 +98,17 @@ async fn pause_drops_frames_and_resume_continues() {
     }
     .start(tx)
     .unwrap();
-    tokio::time::sleep(Duration::from_millis(300)).await;
+    // Pause only once frames are flowing: a fixed sleep raced the playback
+    // thread's start on slow CI runners.
+    let mut frames = Vec::new();
+    while frames.len() < 3 {
+        frames.push(rx.recv().await.unwrap());
+    }
     handle.pause();
     assert!(handle.is_paused());
     tokio::time::sleep(Duration::from_millis(500)).await;
     handle.resume();
-    let frames = collect(rx).await;
+    frames.extend(collect(rx).await);
     handle.stop();
     // Robust to slow runners: the timestamps must show a gap (frames dropped
     // while paused) with frames on both sides of it (resume continues).
