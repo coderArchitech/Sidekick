@@ -1,0 +1,24 @@
+[package]
+name = "sidekick-settings"
+description = "Typed app settings (providers, models, Auto-answer, retention) with defaults and partial updates, persisted in the store. Never holds API keys."
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+publish.workspace = true
+
+[features]
+specta = ["dep:specta"]
+
+[dependencies]
+sidekick-core.workspace = true
+sidekick-store.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+specta = { workspace = true, optional = true }
+
+[dev-dependencies]
+sidekick-secrets.workspace = true
+tempfile.workspace = true
+
+[lints]
+workspace = true

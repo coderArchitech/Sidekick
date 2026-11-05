@@ -1,0 +1,11 @@
+# Automatically generated - DO NOT EDIT!
+
+[[permission]]
+identifier = "allow-get-capture-protection"
+description = "Enables the get_capture_protection command without any pre-configured scope."
+commands.allow = ["get_capture_protection"]
+
+[[permission]]
+identifier = "deny-get-capture-protection"
+description = "Denies the get_capture_protection command without any pre-configured scope."
+commands.deny = ["get_capture_protection"]

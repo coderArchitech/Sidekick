@@ -12,8 +12,8 @@ const boundaries = {
       message: "Import another feature only through its public index: '@/features/<name>'.",
     },
     {
-      group: ["@/ipc/*", "**/ipc/bindings", "**/ipc/mock"],
-      message: "Import IPC only through '@/ipc'.",
+      group: ["@/ipc/*", "!@/ipc/testing", "**/ipc/bindings", "**/ipc/mock"],
+      message: "Import IPC only through '@/ipc' (tests may also use '@/ipc/testing').",
     },
   ],
   paths: [
@@ -37,6 +37,23 @@ export default tseslint.config(
       ...reactHooks.configs.recommended.rules,
       "@typescript-eslint/no-explicit-any": "error",
       "no-restricted-imports": ["error", boundaries],
+    },
+  },
+  {
+    // Mock helpers are for tests only.
+    files: ["src/**/*.{ts,tsx}"],
+    ignores: ["src/**/*.test.{ts,tsx}", "src/ipc/**"],
+    rules: {
+      "no-restricted-imports": [
+        "error",
+        {
+          ...boundaries,
+          patterns: [
+            ...boundaries.patterns,
+            { group: ["@/ipc/testing"], message: "'@/ipc/testing' is for tests only." },
+          ],
+        },
+      ],
     },
   },
   {

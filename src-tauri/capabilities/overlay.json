@@ -6,6 +6,11 @@
   "permissions": [
     "core:default",
     "allow-app-info",
+    "allow-open-settings",
+    "allow-get-capture-protection",
+    "allow-llm-stream",
+    "allow-cancel-stream",
+    "allow-record-latency",
     "core:window:allow-start-dragging",
     "core:window:allow-set-always-on-top"
   ]

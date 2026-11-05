@@ -1,9 +1,11 @@
 import { Overlay } from "@/features/overlay";
+import { SettingsWindow } from "@/features/settings";
+import { currentWindow } from "@/ipc";
 
 /**
- * App shell. Each Tauri window renders one top-level feature; the Settings
- * window will be added here once the settings feature exists.
+ * App shell. Each Tauri window loads the same bundle and renders one
+ * top-level feature, chosen by the `?window=` query in tauri.conf.json.
  */
 export function App() {
-  return <Overlay />;
+  return currentWindow() === "settings" ? <SettingsWindow /> : <Overlay />;
 }

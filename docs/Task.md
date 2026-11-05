@@ -31,20 +31,22 @@ The working task list for building Sidekick end to end, derived from the [techni
 
 ### Phase 0: Foundation and risk retirement
 
+All Phase 0 code and automated tests are done and green on Linux, Windows and macOS. T-008 to T-012 stay at "testing" until the hardware checks in [phase-0-manual-checks.md](phase-0-manual-checks.md) are done on real Windows and macOS machines.
+
 | ID | Task | Status | Notes |
 | --- | --- | --- | --- |
 | T-001 | Project scaffold | ✅ Done | Branch `chore/scaffold` |
-| T-002 | CI green on Windows and macOS | ⬜ To do | Needs a PR to trigger CI |
-| T-003 | Apply doc fixes P1–P5 | ⛔ Blocked | Awaiting owner approval (TECHNICAL.md 14.6) |
-| T-004 | `secrets` crate: OS keychain | ⬜ To do | |
-| T-005 | `store` crate: encrypted database and migrations | ⬜ To do | Vector table waits on T-003 (P1) |
-| T-006 | Settings storage and commands | ⬜ To do | |
-| T-007 | `gateway` crate: LLM provider trait, mock and Anthropic | ⬜ To do | |
-| T-008 | Settings window: providers and API keys | ⬜ To do | |
-| T-009 | `audio` crate: microphone and system audio capture | ⬜ To do | 🖥️ |
-| T-010 | `stt` crate: Deepgram streaming | ⬜ To do | |
-| T-011 | `window` crate: capture exclusion and protection status | ⬜ To do | 🖥️ Highest technical risk |
-| T-012 | `diagnostics` crate: latency metrics and baselines | ⬜ To do | |
+| T-002 | CI green on Windows and macOS | ✅ Done | [PR #1](https://github.com/coderArchitech/Sidekick/pull/1) green on Linux, Windows, macOS |
+| T-003 | Apply doc fixes P1–P5 | ✅ Done | Applied with recommended defaults; ADR-013 |
+| T-004 | `secrets` crate: OS keychain | ✅ Done | Real keychain round trip passes on Windows and macOS CI |
+| T-005 | `store` crate: encrypted database and migrations | ✅ Done |  |
+| T-006 | Settings storage and commands | ✅ Done |  |
+| T-007 | `gateway` crate: LLM provider trait, mock and Anthropic | ✅ Done |  |
+| T-008 | Settings window: providers and API keys | 🟡 In progress: testing | CI green; needs a check in the real app on Windows/macOS |
+| T-009 | `audio` crate: microphone and system audio capture | 🟡 In progress: testing | 🖥️ Automated tests pass; needs device checks on Windows and macOS 14.6+ (ADR-014) |
+| T-010 | `stt` crate: Deepgram streaming | 🟡 In progress: testing | Automated tests pass; live latency check with a real key pending |
+| T-011 | `window` crate: capture exclusion and protection status | 🟡 In progress: testing | 🖥️ Exclusion and shield done; manual checklist on Windows/macOS pending; screen-share detection for auto-hide still open |
+| T-012 | `diagnostics` crate: latency metrics and baselines | 🟡 In progress: testing | Metrics and panel done; baselines need the reference laptops |
 
 ### Phase 1: MVP (all P0 requirements)
 
@@ -54,7 +56,7 @@ The working task list for building Sidekick end to end, derived from the [techni
 | T-014 | Live transcript tab | ⬜ To do | |
 | T-015 | `hotkeys` crate: global shortcuts | ⬜ To do | 🖥️ |
 | T-016 | Profile: name and nicknames | ⬜ To do | |
-| T-017 | `ingest` crate: parse, chunk, embed | ⬜ To do | Embeddings need T-003 (P1) |
+| T-017 | `ingest` crate: parse, chunk, embed | ⬜ To do | |
 | T-018 | `retrieval` crate: hybrid search and context packs | ⬜ To do | |
 | T-019 | Library feature: documents in a session | ⬜ To do | |
 | T-020 | Orchestrator: question detection and modes | ⬜ To do | |
@@ -129,7 +131,7 @@ The working task list for building Sidekick end to end, derived from the [techni
 **Scope:** Once approved, update the named sections: separate `EmbeddingProvider` and choose the embeddings model and vector size (P1); `web_search` command (P2); per-question concurrency (P3); FTS sync triggers (P4); name vocabulary as P0 (P5). Add ADRs where the decision is significant (P1).
 
 **Tests**
-- [ ] Doc link check passes (all relative links and anchors resolve).
+- [x] Doc link check passes (all relative links and anchors resolve).
 - [ ] Tests for each change are added in the task that implements it (T-005, T-007, T-010, T-017, T-021).
 
 ### T-004 `secrets` crate: OS keychain
@@ -138,11 +140,12 @@ The working task list for building Sidekick end to end, derived from the [techni
 **Scope:** `crates/secrets`: `set`, `get`, `delete`, `status` for `sidekick/<provider>` entries; keys held as `SecretString`; `mask()` returns only the last 4 characters; a `KeyStore` trait so other crates and tests can use an in-memory store.
 
 **Tests**
-- [ ] Unit: `mask()` shows only the last 4 characters, handles keys shorter than 4.
-- [ ] Unit: in-memory store set/get/delete/overwrite; multiple providers kept independently.
-- [ ] Unit: `SecretString` values never appear in `Debug` output of any public type.
-- [ ] Integration: real keychain round trip (ignored by default; run on CI for Windows and macOS).
-- [ ] Unit: keychain errors map to `SidekickError` codes, message contains no key.
+- [x] Unit: `last4()` shows only the last 4 characters, handles keys shorter than 4 and multi-byte text.
+- [x] Unit: in-memory store set/get/delete/overwrite; multiple providers kept independently.
+- [x] Unit: `SecretString` values never appear in `Debug` output; `KeyStatus` JSON holds only the last 4.
+- [x] Unit: account names restricted to `[a-z0-9-]`, max 64.
+- [x] Integration: real keychain round trip (`--ignored`) passes on Linux, Windows and macOS CI.
+- [x] Unit: keychain errors map to `SidekickError` codes, message contains no key.
 
 ### T-005 `store` crate: encrypted database and migrations
 
@@ -150,13 +153,15 @@ The working task list for building Sidekick end to end, derived from the [techni
 **Scope:** `crates/store`: rusqlite with bundled SQLCipher; database key generated on first run and kept in the keychain via `secrets`; `rusqlite_migration` with `0001_init.sql`; WAL and foreign keys on; pre-migration backup (keep 3); repository functions per table as features need them; sqlite-vec loaded.
 
 **Tests**
-- [ ] Integration: fresh database migrates to the latest `user_version`.
-- [ ] Integration: opening the database file without the key fails (NFR-8).
-- [ ] Integration: a failing migration rolls back and keeps the backup; only 3 backups are kept.
-- [ ] Integration: foreign keys enforced; deleting a session cascades to all child rows.
-- [ ] Integration: sqlite-vec loads; insert and nearest-neighbour query return the expected row.
-- [ ] Integration: FTS stays in sync with `chunks` on insert, update and delete (after T-003 P4).
-- [ ] Unit: no API key is ever written to any table (scan after a test run).
+- [x] Integration: fresh database migrates to the latest `user_version`; reopen keeps data.
+- [x] Integration: opening with the wrong key or without a key fails; no plaintext or SQLite header in the file (NFR-8).
+- [x] Unit: an upgrade backs up first; a failing migration rolls back and keeps the backup; only 3 backups are kept.
+- [x] Integration: foreign keys enforced; deleting a session cascades to all 10 child tables.
+- [x] Integration: sqlite-vec loads; nearest-neighbour query returns the expected rows; upsert replaces.
+- [x] Integration: changing embedding size recreates the vector table (ADR-013).
+- [x] Integration: FTS stays in sync with `chunks` on insert, update and delete (P4).
+- [x] Unit: database key created once (64 hex chars), reused, random per install.
+- Moved to T-007: no API key is ever written to any table (needs the key commands).
 
 ### T-006 Settings storage and commands
 
@@ -164,10 +169,14 @@ The working task list for building Sidekick end to end, derived from the [techni
 **Scope:** Typed `Settings` struct with defaults (Deepgram, Auto-answer on, retention 30 days); stored in the `settings` table; `get_settings` and `update_settings(patch)` commands; settings window capability.
 
 **Tests**
-- [ ] Unit: defaults match TECHNICAL.md 4.5.
-- [ ] Unit: partial patch updates only the given fields; unknown keys rejected.
-- [ ] Integration: settings persist across store reopen.
-- [ ] Unit: capability files grant settings commands to the Settings window only.
+- [x] Unit: defaults match TECHNICAL.md 4.5 and ADR-013.
+- [x] Unit: partial patch updates only the given sections; unknown keys rejected; invalid provider ids rejected.
+- [x] Unit: `search` absent leaves it, `null` clears it; retention uses the documented wire values.
+- [x] Unit: a corrupt stored section falls back to its default.
+- [x] Integration: settings persist across store reopen; app state creates the key and database on first run and reuses them.
+- [x] Unit: capability files grant settings commands to the Settings window only; every declared command is granted to some window.
+- [x] Component: browser mocks mirror the Rust patch rules.
+- [x] Manual: app starts with `SIDEKICK_DATA_DIR` and mock providers, creates and migrates the database.
 
 ### T-007 `gateway` crate: LLM provider trait, mock and Anthropic
 
@@ -175,13 +184,18 @@ The working task list for building Sidekick end to end, derived from the [techni
 **Scope:** `LlmProvider` trait in `sidekick-core`; provider registry with `ProviderInfo`; mock provider (`SIDEKICK_MOCK_PROVIDERS=1`); Anthropic adapter with streaming; retries with backoff and `Retry-After`; cancellation; key commands that test then store keys.
 
 **Tests**
-- [ ] Unit: Anthropic request building (system prompt, messages, model, tools).
-- [ ] Unit: SSE stream parsing into token deltas, usage and finish reason (recorded fixtures).
-- [ ] Unit: error mapping 401/403 → `KEY_INVALID`, 429 → `RATE_LIMITED`, 5xx → `PROVIDER_UNAVAILABLE`.
-- [ ] Integration (wiremock): retries 3 times with backoff, honours `Retry-After`, then fails.
-- [ ] Integration: `cancel_stream` stops token events and returns `CANCELLED`.
-- [ ] Integration: `set_api_key` stores only after a successful test; IPC responses never include the key.
-- [ ] Unit: mock provider is deterministic.
+- [x] Unit: Anthropic request building (system prompt, messages, model, effort); no sampling parameters; refusal fallback only on supported models. Tools move to T-021/T-046.
+- [x] Unit: SSE parser handles split chunks, CRLF, multi-line data, comments.
+- [x] Unit: stream parsing into token deltas, usage and finish reason; thinking blocks skipped; `refusal` surfaced; in-stream errors mapped without echoing provider text.
+- [x] Unit: error mapping 401/403 → `KEY_INVALID`, 429 → `RATE_LIMITED`, 5xx/529 → `PROVIDER_UNAVAILABLE`; `Retry-After` parsed.
+- [x] Unit: retries 3 times with ±20% jitter, honours `Retry-After`, gives up when it's too long, never retries non-retryable errors.
+- [x] Integration (wiremock): correct headers; 429 twice then success; 500 four times then `PROVIDER_UNAVAILABLE`.
+- [x] Integration: `cancel_stream` stops token events and reports `CANCELLED`; no tokens after cancel.
+- [x] Integration: `set_api_key` stores only after a successful test (401 not saved, not retried); responses and provider lists never include the key; providers without an adapter save unverified.
+- [x] Integration: missing key reported before streaming; mock mode answers without keys.
+- [x] Integration: no API key in any database table after saving one (moved from T-005).
+- [x] Unit: capability files give key commands to the Settings window only, streaming to the overlay.
+- [x] Component: browser mocks stream tokens, cancel, and mirror key rules.
 
 ### T-008 Settings window: providers and API keys
 
@@ -189,26 +203,32 @@ The working task list for building Sidekick end to end, derived from the [techni
 **Scope:** Second Tauri window; `settings` feature with Speech-to-text, LLM and Web search sections; provider and model dropdowns; masked key field with show/hide and paste; Test connection; Remove key; last 4 characters after save.
 
 **Tests**
-- [ ] Component: dropdowns list providers from `list_providers`; model dropdown follows provider.
-- [ ] Component: key field masked by default, show/hide toggles, paste works.
-- [ ] Component: Test connection shows success, `KEY_INVALID` and network errors distinctly.
-- [ ] Component: after save only last 4 characters show; Remove key clears status.
-- [ ] Component: switching active provider needs no re-entry when a key is saved.
-- [ ] Accessibility (axe): no violations; full keyboard operation.
+- [x] Component: one section per kind with defaults selected; dropdowns list providers from `list_providers`; model dropdown appears once a key is saved and the choice persists.
+- [x] Component: key field masked by default, show/hide toggles (`aria-pressed`), paste from clipboard works.
+- [x] Component: Save and test / Test connection show success; `KEY_INVALID` and network errors have distinct text (by error code).
+- [x] Component: after save the input is cleared and only the last 4 characters show; Remove key returns to the input.
+- [x] Component: switching active provider needs no re-entry when a key is saved; web search turns on and off; general settings save.
+- [x] Component: Close hides the window; the overlay's Settings button opens it; the app routes by `?window=`.
+- [x] Accessibility (axe): no violations (colour contrast checked manually).
+- [x] Manual: page checked in a real browser with mocks (screenshot in the PR).
+- [ ] Manual: Settings window opens from the overlay in the real app on Windows and macOS; keys reach the keychain.
 
 ### T-009 `audio` crate: microphone and system audio capture 🖥️
 
 **Refs:** LIS-1, LIS-4, LIS-6; TECHNICAL.md 3.2, 6.4 (`SIDEKICK_AUDIO_FIXTURE`), NFR-3, NFR-6; ADR-006
-**Scope:** `AudioSource` trait; microphone via cpal; Windows system audio via WASAPI loopback; macOS system audio via ScreenCaptureKit; resample to 16 kHz mono PCM; Silero VAD; WAV fixture source; pause and resume; never writes audio to disk.
+**Scope:** microphone and system audio via cpal 0.18 (WASAPI loopback on Windows, Core Audio tap on macOS 14.6+, ADR-014); resample to 16 kHz mono PCM in 50 ms frames; energy VAD; WAV fixture source; pause, resume, stop; never writes audio to disk.
 
 **Tests**
-- [ ] Unit: resampler converts 48 kHz stereo to 16 kHz mono within tolerance.
-- [ ] Unit: VAD marks speech and silence correctly on fixture audio.
-- [ ] Unit: fixture source streams a WAV file in real time and in fast mode.
-- [ ] Unit: pause stops frames; resume restarts without a gap error.
-- [ ] Integration: no files are created in the data folder during capture (NFR-6).
+- [x] Unit: resampler converts 48 kHz stereo (and 44.1/32/16 kHz) to 16 kHz mono, keeping pitch and level; content above 8 kHz attenuated below -38 dB.
+- [x] Unit: VAD marks silence, speech, and the 300 ms hangover; absorbs steady hum; keeps 10 s of continuous speech as speech.
+- [x] Unit: pipeline emits 800-sample frames with 50 ms timestamps.
+- [x] Integration: fixture source streams a WAV file (fast and real time) with correct speech flags.
+- [x] Integration: pause drops frames (time still passes); resume continues; stop closes the stream.
+- [x] Integration: no files are created during capture (NFR-6).
+- [x] Unit: system audio on Linux reports `PERMISSION_DENIED` clearly.
+- [ ] Manual (Windows, macOS 14.6+): `cargo test -p sidekick-audio -- --ignored` with a mic and audio playing.
 - [ ] Manual (Windows, macOS): mic and system audio captured as separate streams during a Teams, Zoom and Meet call, with no dropouts in the meeting app.
-- [ ] Manual (macOS): clear error and help link when Screen Recording permission is missing (`PERMISSION_DENIED`).
+- [ ] Manual (macOS): clear error when System Audio Recording permission is missing (`PERMISSION_DENIED`), and on macOS 13–14.5.
 
 ### T-010 `stt` crate: Deepgram streaming
 
@@ -216,12 +236,16 @@ The working task list for building Sidekick end to end, derived from the [techni
 **Scope:** `SttProvider` trait in `sidekick-core`; Deepgram Nova-3 WebSocket adapter with interim and final results, diarization for the system stream; mic stream labelled "Me"; reconnect within 3 s with 10 s audio buffer; mock provider replaying a fixture transcript.
 
 **Tests**
-- [ ] Unit: Deepgram message parsing into partial and final segments (recorded fixtures).
-- [ ] Unit: mic segments labelled `me` / `is_user = 1`; system segments labelled `speaker_N`.
-- [ ] Integration (mock WebSocket server): reconnects within 3 s and replays buffered audio; emits `stt.status` reconnecting → live.
-- [ ] Integration: 401 maps to `KEY_INVALID` and stops reconnecting.
-- [ ] Integration: fixture audio through the mock provider produces the expected transcript.
-- [ ] Manual: transcript lag measured against NFR-1 on a real call; result recorded in TECHNICAL.md 13.2.
+- [x] Unit: listen URL (model, encoding, diarize for system audio only, keyterms); message parsing into partial and final results; metadata and empty results ignored.
+- [x] Unit: mic segments labelled `me` / `is_user`; system segments split per speaker run as `speaker_N`.
+- [x] Unit: timeline maps provider time to meeting time across skipped silence.
+- [x] Integration (local WebSocket server): auth header sent; final result becomes a segment with meeting timestamps; `CloseStream` on end.
+- [x] Integration: silence isn't sent beyond a 500 ms tail; keep-alives sent during silence.
+- [x] Integration: connection drop → `Reconnecting` → `Live` within 3 s; unfinalised and buffered audio replayed, nothing lost.
+- [x] Integration: 401 maps to `KEY_INVALID`, `Failed`, no retry; unreachable server gives up after the deadline; cancel stops the run; missing key reported.
+- [x] Integration: Deepgram key verifier (wiremock 200 / 401); gateway uses registered verifiers before saving keys.
+- [x] Integration: mock provider turns speech bursts in fixture frames into segments.
+- [ ] Manual: transcript lag measured against NFR-1 with a real key on a real call; result recorded in TECHNICAL.md 13.2.
 
 ### T-011 `window` crate: capture exclusion and protection status 🖥️
 
@@ -229,10 +253,13 @@ The working task list for building Sidekick end to end, derived from the [techni
 **Scope:** Windows `SetWindowDisplayAffinity(WDA_EXCLUDEFROMCAPTURE)`; macOS window sharing type none; status check per OS version; auto-hide fallback when screen sharing is detected and exclusion isn't guaranteed; `SIDEKICK_DISABLE_EXCLUSION`.
 
 **Tests**
-- [ ] Unit: status logic returns protected / not guaranteed / unavailable per OS and version.
-- [ ] Unit: fallback hides the overlay when sharing starts and status isn't protected; restores after.
-- [ ] Unit: `SIDEKICK_DISABLE_EXCLUSION=1` turns exclusion off and status says so.
-- [ ] Manual (Windows 10, 11; macOS 14, 15, latest): overlay not visible to others when sharing full screen and a window in Teams, Zoom, Meet, Webex, Slack huddles; results recorded in a table in TECHNICAL.md 8.5.
+- [x] Unit: status logic returns protected / not guaranteed / unavailable per OS and version (Windows build 19041, macOS 15), with a reason for each.
+- [x] Unit: auto-hide rule applies only while sharing, with auto-hide on, and protection not guaranteed.
+- [x] Unit: disabled flag and failure to apply produce `disabled` / `unavailable`.
+- [x] Component: shield shows each state with colour, label and tooltip reason.
+- [x] Manual: real app on Linux applies protection at startup and shows the red shield.
+- [ ] Screen-share detection to drive auto-hide: no reliable cross-platform OS signal; design needed (manual hide hotkey in T-015 covers it until then).
+- [ ] Manual (Windows 10, 11; macOS 14, 15, latest): overlay not visible to others when sharing full screen and a window in Teams, Zoom, Meet, Webex, Slack huddles; results recorded in a table in TECHNICAL.md 8.5; adjust the status rules to match.
 
 ### T-012 `diagnostics` crate: latency metrics and baselines
 
@@ -240,10 +267,12 @@ The working task list for building Sidekick end to end, derived from the [techni
 **Scope:** Record per-stage timings (end of speech, segment, detection, retrieval, first token); p50/p95 over a rolling window; `get_diagnostics` command; Diagnostics panel in Settings.
 
 **Tests**
-- [ ] Unit: percentile calculation on known samples.
-- [ ] Unit: rolling window drops old samples.
-- [ ] Component: Diagnostics panel shows values and healthy/unhealthy state.
-- [ ] Manual: Phase 0 baselines recorded in TECHNICAL.md 13.2.
+- [x] Unit: nearest-rank percentile calculation on known samples.
+- [x] Unit: rolling window drops samples older than 15 minutes; at most 1,000 kept.
+- [x] Unit: health against targets; no verdict without samples.
+- [x] Integration: the gateway records LLM time-to-first-token.
+- [x] Component: Diagnostics panel shows every stage, p50/p95, Healthy / Slow / No data, and refreshes.
+- [ ] Manual: Phase 0 baselines recorded in TECHNICAL.md 13.2 on the reference Windows and macOS laptops (needs T-013 for end-to-end numbers).
 
 ## Phase 1 details
 

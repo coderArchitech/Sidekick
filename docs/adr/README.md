@@ -18,3 +18,5 @@ To add one: copy [template.md](template.md) to the next number, and add a row to
 | [ADR-010](0010-webdriverio-e2e-playwright-ui-tests.md)             | WebdriverIO for full-app E2E; Playwright for UI-only tests                                 | Accepted |
 | [ADR-011](0011-cargo-workspace-one-crate-per-module.md)            | Cargo workspace with one crate per Rust module                                             | Accepted |
 | [ADR-012](0012-frontend-feature-modules-with-public-index.md)      | Frontend feature modules with a public index, enforced by lint                             | Accepted |
+| [ADR-013](0013-separate-embedding-provider.md)                     | Embeddings behind a separate EmbeddingProvider                                             | Accepted |
+| [ADR-014](0014-audio-capture-with-cpal.md)                         | Audio capture with cpal; macOS system audio needs 14.6+                                    | Accepted |

@@ -1,7 +1,11 @@
 //! App-level commands that don't belong to a domain crate.
 
 use serde::Serialize;
-use sidekick_core::SidekickResult;
+use sidekick_core::{SidekickError, SidekickResult};
+use sidekick_window::ProtectionStatus;
+use tauri::{AppHandle, Manager, State};
+
+use crate::protection::Protection;
 
 /// Basic facts about the running app, shown in the overlay and diagnostics.
 #[derive(Debug, Clone, Serialize, specta::Type)]
@@ -20,6 +24,27 @@ pub fn app_info() -> SidekickResult<AppInfo> {
         version: env!("CARGO_PKG_VERSION").into(),
         os: std::env::consts::OS.into(),
     })
+}
+
+/// Whether the overlay is hidden from screen sharing (PRD UI-4a).
+#[tauri::command]
+#[specta::specta]
+pub fn get_capture_protection(protection: State<'_, Protection>) -> ProtectionStatus {
+    protection.0.clone()
+}
+
+/// Shows and focuses the Settings window (created hidden at startup).
+#[tauri::command]
+#[specta::specta]
+pub fn open_settings(app: AppHandle) -> SidekickResult<()> {
+    let window = app
+        .get_webview_window("settings")
+        .ok_or_else(|| SidekickError::internal("The Settings window is missing."))?;
+    window
+        .show()
+        .and_then(|()| window.unminimize())
+        .and_then(|()| window.set_focus())
+        .map_err(|_| SidekickError::internal("Couldn't open Settings."))
 }
 
 #[cfg(test)]

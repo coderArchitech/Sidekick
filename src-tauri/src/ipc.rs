@@ -3,13 +3,34 @@
 //! `src/ipc/bindings.ts` is generated from this list by `pnpm ipc:gen`, so the
 //! TypeScript types can never drift from the Rust signatures (tech doc 5.6).
 
-use tauri_specta::{Builder, collect_commands};
+use tauri_specta::{Builder, collect_commands, collect_events};
 
-use crate::commands;
+use crate::{commands, events};
 
 /// Builds the typed command and event registry.
 pub fn builder() -> Builder<tauri::Wry> {
-    Builder::<tauri::Wry>::new().commands(collect_commands![commands::app::app_info])
+    Builder::<tauri::Wry>::new()
+        .commands(collect_commands![
+            commands::app::app_info,
+            commands::app::open_settings,
+            commands::app::get_capture_protection,
+            commands::settings::get_settings,
+            commands::settings::update_settings,
+            commands::keys::list_providers,
+            commands::keys::set_api_key,
+            commands::keys::test_api_key,
+            commands::keys::delete_api_key,
+            commands::keys::list_models,
+            commands::llm::llm_stream,
+            commands::llm::cancel_stream,
+            commands::diagnostics::get_diagnostics,
+            commands::diagnostics::record_latency,
+        ])
+        .events(collect_events![
+            events::AnswerToken,
+            events::AnswerDone,
+            events::AnswerError,
+        ])
 }
 
 #[cfg(test)]

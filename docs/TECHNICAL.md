@@ -63,7 +63,7 @@ The problem it solves: in context-heavy meetings, people can't recall details fr
 
 | Field | Value |
 | --- | --- |
-| Version | 1.2 (draft) |
+| Version | 1.3 (draft) |
 | Owner | @nitesh |
 | Status | Draft, in development (Phase 0) |
 | Review cadence | At every minor release, and whenever an ADR is added |
@@ -75,6 +75,7 @@ The problem it solves: in context-heavy meetings, people can't recall details fr
 | 1.0 | Nov 5, 2026 | First full draft |
 | 1.1 | Nov 5, 2026 | Repo scaffolded. Added ADR-011 (Cargo workspace, one crate per module) and ADR-012 (frontend feature boundaries); updated 3.2, 3.5, 6, 7.1, 9.1, 14; added 7.8 module boundaries; diagrams redrawn in Mermaid; proposed changes listed in 14.6 |
 | 1.2 | Nov 5, 2026 | Added the implementation task list ([Task.md](Task.md)) and linked it from 1.6 and 14.1 |
+| 1.3 | Nov 5, 2026 | Applied P1–P5 (14.6): `EmbeddingProvider` and ADR-013; `web_search` command; per-question concurrency; FTS sync triggers; name vocabulary P0 |
 
 ### 1.6 Related documents
 
@@ -132,7 +133,7 @@ Full requirements with priorities are in the PRD. This table maps each requireme
 
 - No hosted backend: everything runs in the desktop app.
 - Capture exclusion depends on OS behaviour and can't be guaranteed for every capture method (see ADR-007).
-- macOS system audio capture requires macOS 13+ and Screen Recording permission.
+- macOS system audio capture requires macOS 14.6+ and the System Audio Recording permission (ADR-014). On macOS 13.0–14.5, sessions run in "Transcribe me only" mode.
 - Provider rate limits and pricing are outside our control.
 - Single developer at the start, so the design favours simplicity over flexibility.
 
@@ -197,21 +198,22 @@ Each module below is its own crate at `crates/<module>/`, named `sidekick-<modul
 
 | Crate | Responsibility | Status |
 | --- | --- | --- |
-| `audio` | Capture system audio and microphone as separate 16 kHz mono PCM streams; run Silero VAD | Not started |
-| `stt` | `SttProvider` trait plus adapters (Deepgram, AssemblyAI, Soniox, Whisper); WebSocket lifecycle and reconnects; emit segments | Not started |
+| `audio` | Microphone and system audio as separate 16 kHz mono streams of 50 ms frames via cpal (WASAPI loopback on Windows, Core Audio tap on macOS 14.6+); windowed-sinc resampler; energy VAD flag per frame; pause/resume/stop; WAV `FixtureSource` for tests and `SIDEKICK_AUDIO_FIXTURE`; never writes audio (ADR-014) | Done (manual device checks pending) |
+| `stt` | `SttProvider` (one `run` per audio stream), Deepgram Nova-3 WebSocket adapter (interim + final results, diarization for system audio, `keyterm` boosts, keep-alives, silence not sent with a `Timeline` mapping provider time back to meeting time, reconnect with backoff and replay of unfinalised and buffered audio, up to 10 s), `DeepgramVerifier` for key checks, mock provider; speaker labels `me` / `speaker_N` | Done (live latency check pending) |
 | `capture` | Region, window and full-screen screenshots; downscale and encode | Not started |
-| `window` | Overlay window: transparency, always-on-top, click-through, capture exclusion and its status check | Not started |
+| `window` | Capture-exclusion status rules per OS and version (Windows build 19041+ protected; macOS 13–14 protected, 15+ not guaranteed because ScreenCaptureKit can bypass it; Linux unavailable) and the auto-hide rule. Pure logic: the shell applies `set_content_protected(true)` to every window at startup. Transparency, click-through and screen-share detection still to come (T-029) | Started (status done; manual checklist pending) |
 | `hotkeys` | Register and dispatch global shortcuts | Not started |
 | `ingest` | Parse documents, split into chunks, request embeddings, write to store | Not started |
-| `store` | SQLite (SQLCipher) access, migrations, repository functions | Not started |
+| `store` | SQLCipher database (raw 256-bit key from `secrets`), WAL, foreign keys; migrations with pre-migration backups; sqlite-vec registered for every connection; `settings` (raw JSON) and `vectors` (per-model `chunk_vectors`) modules; repository modules added per feature | Done |
+| `settings` | Typed `Settings` (providers and models for STT, LLM, embeddings, search; Auto-answer; retention) with defaults and partial `SettingsPatch` updates; one `settings` row per section; unreadable sections fall back to defaults | Done |
 | `retrieval` | Vector and keyword search over chunks; assemble context packs (transcript window, notes, chunks, screenshot) | Not started |
-| `gateway` | `LlmProvider` and `SearchProvider` traits plus adapters; attach keys; stream tokens; retries and backoff | Not started |
-| `secrets` | Read, write and delete keys in the OS keychain; never return full keys | Not started |
+| `gateway` | Provider catalog (all kinds, for Settings); `LlmProvider` adapters (Anthropic, mock; OpenAI, Gemini, Ollama in T-026); the only place keys are attached; streaming via an `AnswerSink` the shell implements; retries with backoff and `Retry-After`; cancellation; key checks before saving. `SearchProvider` and `EmbeddingProvider` arrive with T-046 and T-017 | Started (LLM done) |
+| `secrets` | `KeyStore` trait with `KeychainStore` (OS keychain, service `sidekick`) and `MemoryStore` (tests, mock mode); keys as `SecretString`; `KeyStatus` exposes only the last 4 characters; account names restricted to `[a-z0-9-]` | Done |
 | `skills` | Load, validate, import and export Skill files | Not started |
 | `session` | Session lifecycle: create, start, pause, stop, delete | Not started |
 | `consent` | Enforce consent confirmation before capturing others; write consent log | Not started |
 | `usage` | Count STT minutes and LLM tokens per provider; estimate cost | Not started |
-| `diagnostics` | Latency metrics, health checks, log export | Not started |
+| `diagnostics` | `Recorder`: per-stage latency samples (last 15 min, max 1,000) with nearest-rank p50/p95 and health against the 10.1/13.1 targets; the gateway records LLM first-token time; the frontend reports question→cue/answer via `record_latency`. Health checks and log export arrive with T-031 | Started (latency done) |
 | `core` | `SidekickError` and error codes (5.4); IDs and provider traits as they are needed | Started |
 
 **Frontend** (`src/`, see [ADR-012](adr/0012-frontend-feature-modules-with-public-index.md))
@@ -224,10 +226,10 @@ Each module below is its own crate at `crates/<module>/`, named `sidekick-<modul
 | `transcript` | Live transcript with speaker names and bookmarks |
 | `notes` | Rolling notes, decisions, action items |
 | `library` | Session documents and screenshot strip |
-| `settings` | Provider dropdowns, key fields, test connection, preferences |
+| `settings` | Settings window: provider and model dropdowns per kind (STT, LLM, embeddings, web search), masked key field with show/hide, paste, Save and test, Test connection, Remove; Auto-answer and retention. Opened with `open_settings`; Close hides the window |
 | `skills` | Skill builder, templates, import/export |
 | `orchestrator` | Question detection, prompt building, Skill application, notes job, two-tier model routing |
-| `ipc` | Typed wrappers for every command and event (generated, see section 5.6) |
+| `ipc` | Generated `bindings.ts` (section 5.6), browser mocks (`mock.ts`) that mirror every command, `answerEvents` for answer streams, and window helpers (`currentWindow`, `hideCurrentWindow`). The only module that imports Tauri |
 
 ### 3.3 Key workflow: answering a question
 
@@ -259,7 +261,7 @@ Steps 3 to 8 must finish within the NFR-2 budget. The cue in step 9 comes from a
 
 | Workflow | Path |
 | --- | --- |
-| Document upload | `library` → `ingest_document` → `ingest` parses and chunks → `gateway` embeds → `store` writes chunks and vectors → `ingest.progress` events |
+| Document upload | `library` → `ingest_document` → `ingest` parses and chunks → `gateway` embeds with the active `EmbeddingProvider` → `store` writes chunks and vectors → `ingest.progress` events |
 | Screenshot | Hotkey → `capture` → `store` saves image → `screenshot.captured` event → capture-and-ask continues at step 3 above |
 | Rolling notes | Every 45 s, `orchestrator` sends new transcript plus current notes to the fast model → `save_notes` |
 | Session start | `start_session` → `consent` checks confirmation → `audio` and `stt` start → `session.state` event |
@@ -278,11 +280,12 @@ Major versions are fixed here; exact versions are pinned in `Cargo.lock` and `pn
 | Styling | Tailwind CSS + shadcn/ui | Tailwind 4.x |
 | State | Zustand | 5.x |
 | Markdown and code | react-markdown + Shiki | Current major |
-| Database | SQLite via rusqlite (bundled SQLCipher) + sqlite-vec | Current |
+| Database | SQLite via rusqlite 0.37 (`bundled-sqlcipher-vendored-openssl`) + sqlite-vec 0.1 + rusqlite_migration 2 | OpenSSL is built from source, so builds need Perl (preinstalled on CI runners and macOS; on Windows use Strawberry Perl) |
 | Secrets | keyring crate | Current |
 | HTTP and WebSocket | reqwest + tokio-tungstenite | Current |
 | Local STT | whisper.cpp via whisper-rs | Current |
-| VAD | Silero VAD (ONNX) | v5 model |
+| Audio I/O | cpal + hound (WAV fixtures) | cpal 0.18, hound 3 |
+| VAD | Energy VAD with adaptive noise floor (ADR-014); Silero VAD (ONNX) only if measurements need it | n/a |
 | Document parsing | pdf-extract, docx-rs, calamine, zip + quick-xml | Current |
 | IPC types | tauri-specta + specta + specta-typescript | Pinned exactly (`=2.0.0-rc.21`, `=2.0.0-rc.22`, `=0.0.9`) because these are pre-release and must match each other |
 | Logging | tracing + tracing-appender | Current |
@@ -305,6 +308,8 @@ Major versions are fixed here; exact versions are pinned in `Cargo.lock` and `pn
 | ADR-010 | WebdriverIO for full-app E2E; Playwright for UI-only tests | Playwright only | Only WebdriverIO drives a Tauri app on both OSes. Trade-off: two test runners |
 | ADR-011 | Cargo workspace: one crate per Rust module; `sidekick-core` for shared types; `src-tauri` is a thin shell | One crate with modules | Compiler-enforced boundaries, crates testable without Tauri, faster incremental builds. Trade-off: more `Cargo.toml` files |
 | ADR-012 | Frontend features expose a public `index.ts`; all Rust calls through `@/ipc`; enforced by ESLint | Convention only; eslint-plugin-boundaries | Features can change freely behind their API; UI runs in a browser with mocks. Trade-off: relative cross-feature imports aren't caught, so use the `@/features/<name>` alias |
+| ADR-013 | Embeddings behind their own `EmbeddingProvider`; default OpenAI `text-embedding-3-small`; vector table sized per model | Embed on `LlmProvider`; fixed 1024 dims | Anthropic has no embeddings API; any model can be used without a schema migration. Trade-off: changing model means re-embedding |
+| ADR-014 | Audio capture with cpal (WASAPI loopback, Core Audio tap); macOS system audio needs 14.6+; energy VAD first | ScreenCaptureKit (macOS 13+); Silero VAD now | One tested code path; smaller installer. Trade-off: macOS 13.0–14.5 transcribe the user only |
 
 Each decision has its own file in [`docs/adr/`](adr/README.md). New decisions get the next ADR number (copy [`docs/adr/template.md`](adr/template.md)) and are added here in the same pull request as the code change.
 
@@ -312,12 +317,13 @@ Each decision has its own file in [`docs/adr/`](adr/README.md). New decisions ge
 
 | Service | Protocol | Auth | Used for |
 | --- | --- | --- | --- |
-| Deepgram | WebSocket (streaming) | API key in header | Default live STT |
+| Deepgram | WebSocket (streaming, `wss://api.deepgram.com/v1/listen`, Nova-3, linear16 16 kHz) | `Authorization: Token <key>`; key check via `GET /v1/projects` | Default live STT |
 | AssemblyAI | WebSocket (streaming) | API key in header | Alternative STT |
 | Soniox | WebSocket (streaming) | API key | Alternative STT, multilingual |
-| Anthropic | HTTPS + server-sent events | API key header | LLM answers, vision |
-| OpenAI | HTTPS + server-sent events | Bearer token | LLM answers, vision, embeddings |
-| Google Gemini | HTTPS streaming | API key header | LLM answers, vision |
+| Anthropic | HTTPS + server-sent events (`anthropic-version: 2026-10-21`, so no sampling parameters) | `x-api-key` header | LLM answers, vision. Defaults: `claude-opus-5-5` for full answers, `claude-haiku-5-5` for cues (MOD-3). Server-side refusal fallback (`fallbacks: "default"`, beta `server-side-fallback-2026-07-01`) is on for models that support it; a final `refusal` stop reason is shown as a neutral notice |
+| OpenAI | HTTPS + server-sent events | Bearer token | LLM answers, vision, embeddings (default: `text-embedding-3-small`, 1536 dims) |
+| Voyage AI | HTTPS | Bearer token | Embeddings (Anthropic's recommended partner; Anthropic has no embeddings API) |
+| Google Gemini | HTTPS streaming | API key header | LLM answers, vision, embeddings |
 | Ollama | HTTP on localhost:11434 | None | Local LLM and embeddings |
 | Tavily / Brave | HTTPS | API key | Web search tool |
 | OS keychain | OS API | User login | Secret storage |
@@ -405,11 +411,25 @@ CREATE TABLE chunks (
 );
 CREATE INDEX idx_chunks_document ON chunks(document_id, ord);
 
-CREATE VIRTUAL TABLE chunk_vectors USING vec0(
-  chunk_id  INTEGER PRIMARY KEY,
-  embedding float[1024]                         -- dimension fixed per embedding model
-);
+-- chunk_vectors is NOT created by this migration: its size depends on the active
+-- embedding model (ADR-013). The store creates it on first use:
+--   CREATE VIRTUAL TABLE chunk_vectors USING vec0(chunk_id INTEGER PRIMARY KEY, embedding float[<dims>]);
+-- and records the dimension in settings key 'embedding.dims'. Changing model drops
+-- and recreates it, then the re-embedding job refills it (section 4.5).
+
 CREATE VIRTUAL TABLE chunks_fts USING fts5(text, content='chunks', content_rowid='id');
+
+-- Keep the external-content FTS table in sync with chunks.
+CREATE TRIGGER chunks_ai AFTER INSERT ON chunks BEGIN
+  INSERT INTO chunks_fts(rowid, text) VALUES (new.id, new.text);
+END;
+CREATE TRIGGER chunks_ad AFTER DELETE ON chunks BEGIN
+  INSERT INTO chunks_fts(chunks_fts, rowid, text) VALUES ('delete', old.id, old.text);
+END;
+CREATE TRIGGER chunks_au AFTER UPDATE ON chunks BEGIN
+  INSERT INTO chunks_fts(chunks_fts, rowid, text) VALUES ('delete', old.id, old.text);
+  INSERT INTO chunks_fts(rowid, text) VALUES (new.id, new.text);
+END;
 
 CREATE TABLE transcript_segments (
   id            INTEGER PRIMARY KEY,
@@ -507,7 +527,7 @@ Foreign keys are enforced (`PRAGMA foreign_keys = ON`), and the database runs in
 | `sessions.status` | TEXT | Lifecycle state | `live` |
 | `sessions.retention` | TEXT | How long data is kept after the session ends | `30d` |
 | `documents.sha256` | TEXT | Hash of the file, to skip duplicate uploads | `9f86d0...` |
-| `documents.embedding_model` | TEXT | Model used for this document's vectors; re-embed if it changes | `voyage-3` |
+| `documents.embedding_model` | TEXT | Model used for this document's vectors; re-embed if it changes | `openai/text-embedding-3-small` |
 | `chunks.page` | INTEGER | Source page, used in citations | `14` |
 | `transcript_segments.start_ms` | INTEGER | Milliseconds from session start, used in citations | `754000` |
 | `transcript_segments.is_user` | INTEGER (0/1) | 1 if the segment came from the user's microphone | `0` |
@@ -516,7 +536,7 @@ Foreign keys are enforced (`PRAGMA foreign_keys = ON`), and the database runs in
 | `answers.latency_ms` | INTEGER | Question end to first answer token | `1840` |
 | `consent_log.option` | TEXT | Consent choice made at session start | `participants_agreed` |
 | `usage.cost_estimate_usd` | REAL | Estimated cost using rates in settings | `0.0042` |
-| `settings.key` | TEXT | Setting name | `llm.active_provider` |
+| `settings.key` | TEXT | Section name; the value is that section as JSON | `llm` → `{"provider":"anthropic","model":null}` |
 
 ### 4.4 Retention, archival and deletion
 
@@ -533,8 +553,8 @@ A cleanup job runs at app start and every 6 hours (section 10.7). "Delete sessio
 
 ### 4.5 Migrations and seed data
 
-- Migrations use the `rusqlite_migration` crate with numbered SQL files in `src-tauri/migrations/` (`0001_init.sql`, `0002_...`).
-- Migrations are forward-only. Each runs inside a transaction at app start, after an automatic backup of the database file.
+- Migrations use the `rusqlite_migration` crate with numbered SQL files in `crates/store/migrations/` (`0001_init.sql`, `0002_...`), listed in order in `crates/store/src/migrations.rs`.
+- Migrations are forward-only. Pending migrations run inside one transaction at app start, after an automatic backup of the database file (`sidekick.db.bak-v<from>-<unix_ms>`, last 3 kept).
 - If a migration fails, the transaction rolls back, the backup is kept, and the app shows a recovery screen with "Restore backup" and "Export logs".
 - Changing embedding model requires re-embedding: a background job processes documents whose `embedding_model` differs from the active one.
 - Seed data on first run: built-in Skill templates (Interview Coach, Sales Discovery, Technical Architect, Teacher, Negotiation Coach) copied to the Skills folder, and default settings (Deepgram for STT, Auto-answer on, retention 30 days).
@@ -569,26 +589,29 @@ Commands are request/response calls from the frontend to Rust (`invoke`). All re
 | `retrieve_context` | `session_id, query, opts` | `ContextPack` | Transcript window, notes, top chunks, screenshot |
 | `llm_stream` | `request_id, provider?, model?, messages, tools?` | `()` (tokens arrive as events) | Start a streaming LLM call |
 | `cancel_stream` | `request_id` | `()` | Abort an in-flight LLM call |
+| `web_search` | `request_id, query, max_results?` | `SearchResult[]` | Run a web search for a model tool call; the orchestrator sends results back to the model |
 | `save_answer` | `Answer` | `AnswerId` | Persist a completed answer |
 | `rate_answer` | `answer_id, rating` | `()` | Thumbs up/down |
 | `save_notes` | `session_id, content_md, version` | `NotesVersion` | Update rolling notes (optimistic version check) |
-| `list_providers` | `kind: stt / llm / search` | `ProviderInfo[]` | Dropdown options, with key status |
+| `list_providers` | `kind: stt / llm / embed / search` | `ProviderInfo[]` | Dropdown options, with key status |
 | `set_api_key` | `provider, key` | `KeyStatus` | Test and store a key (key never returned) |
 | `test_api_key` | `provider` | `KeyStatus` | Re-test a stored key |
 | `delete_api_key` | `provider` | `()` | Remove a key from the keychain |
 | `list_models` | `provider` | `ModelInfo[]` | Models for the model dropdown |
-| `get_settings` / `update_settings` | `patch?` | `Settings` | Read or change preferences |
+| `open_settings` | none | `()` | Show and focus the Settings window (overlay only) |
+| `get_settings` / `update_settings` | `patch?` | `Settings` | Read or change preferences. A patch replaces only the sections it names; unknown fields are rejected; `search: null` disables web search |
 | `list_skills` / `save_skill` / `delete_skill` | `skill?` | `Skill[]` / `Skill` / `()` | Manage Skills |
 | `import_skill` / `export_skill` | `file_path` / `skill_id, file_path` | `Skill` / `()` | Share Skills as files |
 | `set_overlay` | `opacity?, click_through?, compact?` | `OverlayState` | Overlay appearance |
-| `get_capture_protection` | none | `ProtectionStatus` | Whether capture exclusion is active |
+| `get_capture_protection` | none | `ProtectionStatus` (`state`: protected / not_guaranteed / unavailable / disabled, plus a one-sentence `reason`) | Whether capture exclusion is active; shown as the shield in the overlay header |
 | `get_usage` | `range` | `UsageSummary` | Minutes, tokens and estimated cost |
-| `get_diagnostics` / `export_logs` | none / `file_path` | `Diagnostics` / `()` | Health and latency; log bundle |
+| `get_diagnostics` / `export_logs` | none / `file_path` | `Diagnostics` / `()` | App version, OS, protection status and per-stage latency stats; log bundle (T-031) |
+| `record_latency` | `stage, ms` | `()` | Overlay reports a measured stage (e.g. question → cue) |
 | `export_backup` / `restore_backup` | `file_path, passphrase` | `()` | Backup and restore |
 
 ### 5.2 Events
 
-Events are pushed from Rust to the frontend. Payloads are typed and versioned with the app.
+Events are pushed from Rust to the frontend. Payloads are typed and versioned with the app. Tauri event names can't contain dots, so the wire names use a dash (`answer-token`); the table keeps the dotted names for readability. In TypeScript, features subscribe through `answerEvents` from `@/ipc`, which also works with the browser mocks. Status: `answer.token`, `answer.done` and `answer.error` are implemented.
 
 | Event | Payload | When |
 | --- | --- | --- |
@@ -637,7 +660,7 @@ Every error crossing IPC is a `SidekickError` with a stable `code`, a user-facin
 | Code | Meaning | Retryable | UI behaviour |
 | --- | --- | --- | --- |
 | `CONSENT_REQUIRED` | Session started without consent confirmation | No | Show consent dialog |
-| `PERMISSION_DENIED` | Microphone or Screen Recording permission missing | No | Open permission help with a link to OS settings |
+| `PERMISSION_DENIED` | Microphone, System Audio Recording or Screen Recording permission missing, or no device | No | Open permission help with a link to OS settings |
 | `KEY_MISSING` | No key saved for the selected provider | No | Open Settings at that provider |
 | `KEY_INVALID` | Provider rejected the key (401/403) | No | Mark key invalid in Settings |
 | `RATE_LIMITED` | Provider returned 429 | Yes | Retry with backoff; show "busy" hint |
@@ -654,7 +677,7 @@ Every error crossing IPC is a `SidekickError` with a stable `code`, a user-facin
 ### 5.5 Rate limits, pagination and versioning
 
 - **Provider rate limits:** the gateway retries `RATE_LIMITED` and `PROVIDER_UNAVAILABLE` up to 3 times with exponential backoff and jitter (0.5 s, 1 s, 2 s), respecting any `Retry-After` header.
-- **Internal throttling:** at most 2 concurrent LLM answer streams; a new detected question cancels the oldest unfinished one. Detection is debounced 600 ms after a segment ends.
+- **Internal throttling:** at most 2 questions in flight (each uses up to 2 streams: cue and full answer, so at most 4 streams); a new detected question cancels the oldest unfinished question's streams. Detection is debounced 600 ms after a segment ends.
 - **Pagination:** list commands use an opaque `cursor` and a `limit` (default 50, max 200).
 - **Versioning:** the IPC contract ships with the app, so frontend and backend always match; there is no separate API version. Breaking changes are allowed between releases but must regenerate bindings (section 5.6). Skill files carry `schema_version`; the database uses `user_version`.
 - **Deprecation:** settings keys and Skill fields are kept readable for 2 minor releases after being renamed, with a migration in between.
@@ -666,10 +689,18 @@ Every error crossing IPC is a `SidekickError` with a stable `code`, a user-facin
 - Provider adapters implement these Rust traits:
 
 ```rust
+// In crates/stt: one call transcribes one audio stream until it ends.
 #[async_trait]
 pub trait SttProvider: Send + Sync {
-    fn id(&self) -> ProviderId;
-    async fn connect(&self, cfg: SttConfig, key: Option<SecretString>) -> Result<SttStream, SidekickError>;
+    fn id(&self) -> &'static str;
+    async fn run(&self, config: SttConfig, key: Option<SecretString>, frames: Receiver<AudioFrame>,
+                 sink: Arc<dyn SttSink>, cancel: CancellationToken) -> SidekickResult<()>;
+}
+
+// In sidekick-core: how the gateway checks non-LLM keys before saving them.
+#[async_trait]
+pub trait KeyVerifier: Send + Sync {
+    async fn verify(&self, key: &SecretString) -> SidekickResult<()>;
 }
 
 #[async_trait]
@@ -677,7 +708,15 @@ pub trait LlmProvider: Send + Sync {
     fn id(&self) -> ProviderId;
     async fn list_models(&self, key: &SecretString) -> Result<Vec<ModelInfo>, SidekickError>;
     async fn stream(&self, req: LlmRequest, key: &SecretString) -> Result<TokenStream, SidekickError>;
-    async fn embed(&self, texts: &[String], key: &SecretString) -> Result<Vec<Vec<f32>>, SidekickError>;
+}
+
+/// Separate from LlmProvider because not every LLM vendor offers embeddings (ADR-013).
+#[async_trait]
+pub trait EmbeddingProvider: Send + Sync {
+    fn id(&self) -> ProviderId;
+    fn model(&self) -> &str;
+    fn dims(&self) -> usize;
+    async fn embed(&self, texts: &[String], key: Option<&SecretString>) -> Result<Vec<Vec<f32>>, SidekickError>;
 }
 
 #[async_trait]
@@ -709,7 +748,7 @@ There are no users or roles; access control is about which window may call which
 
 | Window | Allowed commands |
 | --- | --- |
-| Overlay | Session, capture, retrieval, LLM, answers, notes, overlay, protection status |
+| Overlay | Session, capture, retrieval, LLM, web search, answers, notes, overlay, protection status |
 | Settings | Providers, keys, models, settings, skills, usage, diagnostics, backup |
 
 Key commands (`set_api_key`, `delete_api_key`) are only exposed to the Settings window. No window gets filesystem or shell access beyond the dialogs it needs.
@@ -734,7 +773,7 @@ This section is for developers building Sidekick from source. End-user installat
 **Linux (development and CI only).** Linux isn't a supported target (section 1.2), but the app builds and runs there, which CI and cloud development use. Install the Tauri system libraries first:
 
 ```bash
-sudo apt-get install -y libwebkit2gtk-4.1-dev libgtk-3-dev librsvg2-dev libssl-dev
+sudo apt-get install -y libwebkit2gtk-4.1-dev libgtk-3-dev librsvg2-dev libssl-dev libasound2-dev
 ```
 
 ### 6.2 Local environment setup
@@ -750,7 +789,7 @@ pnpm install
 
 # 3. Fetch Rust dependencies and models
 cargo fetch
-pnpm run models:download     # Silero VAD model; optional Whisper model (added with the audio crate)
+pnpm run models:download     # Optional Whisper model (added with local Whisper, T-027)
 
 # 4. Local config
 cp .env.example .env.local
@@ -759,7 +798,7 @@ cp .env.example .env.local
 pnpm tauri dev
 ```
 
-On first launch, grant Microphone (and on macOS, Screen Recording) permission, then add at least one STT and one LLM key in Settings, or set `SIDEKICK_MOCK_PROVIDERS=1` to work without keys.
+On first launch, grant Microphone (and on macOS, System Audio Recording) permission, then add at least one STT and one LLM key in Settings, or set `SIDEKICK_MOCK_PROVIDERS=1` to work without keys.
 
 ### 6.3 Dependency installation and version pinning
 
@@ -819,7 +858,7 @@ Run from the repository root. Cargo commands apply to the whole workspace.
 | `linker 'link.exe' not found` (Windows) | C++ Build Tools missing | Install "Desktop development with C++" workload |
 | whisper-rs build fails | CMake or Clang missing | Install CMake and LLVM/Clang; restart the terminal |
 | Blank window on Windows 10 | WebView2 runtime missing | Install the WebView2 Evergreen runtime |
-| No system audio on macOS | Screen Recording permission not granted to the dev build | System Settings → Privacy & Security → Screen Recording → enable the terminal or app, then restart it |
+| No system audio on macOS | macOS older than 14.6, or System Audio Recording permission not granted to the dev build | Update macOS; System Settings → Privacy & Security → Screen & System Audio Recording → enable the terminal or app under System Audio Recording, then restart it |
 | Keychain prompts every launch (macOS dev) | Unsigned dev builds get a new identity each build | Click "Always Allow", or sign dev builds with a local certificate |
 | `bindings.ts is out of date` in CI | Command signatures changed | Run `pnpm ipc:gen` and commit |
 | Database locked errors | Two dev instances using the same data folder | Close the other instance or set `SIDEKICK_DATA_DIR` |
@@ -850,6 +889,7 @@ sidekick/
 │   └── test/                 # Test setup
 ├── crates/                   # Rust domain crates, one per module (ADR-011)
 │   ├── core/                 # sidekick-core: SidekickError, IDs, provider traits
+│   ├── store/migrations/     # 0001_init.sql, ... (SQL migrations live with the store crate)
 │   └── <module>/             # sidekick-<module>: audio, stt, store, gateway, ...
 │       ├── Cargo.toml
 │       ├── src/lib.rs        # Small public API
@@ -861,7 +901,6 @@ sidekick/
 │   │   ├── commands/         # One file per command group; thin wrappers over crates
 │   │   └── logging.rs
 │   ├── build.rs              # Declares app commands for capability checks
-│   ├── migrations/           # 0001_init.sql, ... (with the store crate)
 │   ├── capabilities/         # Window permissions (5.8)
 │   ├── icons/
 │   └── tauri.conf.json
@@ -899,7 +938,7 @@ Folders are created when their first file lands; the tree shows where things go,
 - Tailwind for styling; no inline style objects except dynamic values like opacity.
 - Accessible by default: every interactive element has a label and keyboard support.
 
-**Naming:** Rust `snake_case`, TypeScript `camelCase`, React components `PascalCase`, events `domain.action` (e.g. `answer.token`).
+**Naming:** Rust `snake_case`, TypeScript `camelCase`, React components `PascalCase`, events `domain-action` on the wire (e.g. `answer-token`; Tauri rejects dots), generated from Rust structs named `DomainAction` (e.g. `AnswerToken`).
 
 ### 7.3 Branching and commits
 
@@ -937,7 +976,7 @@ Every change goes through a pull request, even as a solo developer, so CI runs a
 
 **A database change**
 
-1. Add the next numbered file in `src-tauri/migrations/`; never edit a released migration.
+1. Add the next numbered file in `crates/store/migrations/` and append it to `MIGRATIONS` in `crates/store/src/migrations.rs`; never edit a released migration.
 2. Update repository functions and tests; add a migration test using a fixture database from the previous version.
 3. Update sections 4.2 and 4.3.
 
@@ -982,7 +1021,7 @@ These rules keep each part replaceable on its own. The compiler (Rust) and ESLin
 | --- | --- |
 | Import another feature only through `@/features/<name>` (its `index.ts`) | *Enforced* (`no-restricted-imports`) |
 | Only `src/ipc` imports `@tauri-apps/api/core`; everything else uses `@/ipc` | *Enforced* |
-| Nothing imports `src/ipc/bindings` or `src/ipc/mock` directly | *Enforced* |
+| Nothing imports `src/ipc/bindings` or `src/ipc/mock` directly; tests use `@/ipc/testing`, which non-test files may not import | *Enforced* |
 | Feature state lives in the feature; `src/stores/` only for state shared by several features | Code review |
 | Every command in `bindings.ts` has a mock in `src/ipc/mock.ts` | *Enforced* by the type checker |
 
@@ -1052,7 +1091,7 @@ All fixtures use invented content; no real meeting recordings or personal data. 
 | Speaker separation is approximate | Speaker labels may merge or split | User can rename and merge speakers |
 | Brute-force vector search | Slows beyond about 100k chunks | Per-session indexes; revisit ADR-004 if needed |
 | Hinglish accuracy varies by provider | Some missed words | Provider choice in Settings; custom vocabulary |
-| macOS requires Screen Recording permission for system audio | Extra setup step | Onboarding walkthrough |
+| macOS needs 14.6+ and the System Audio Recording permission for system audio | Extra setup step; older macOS transcribes the user only | Onboarding walkthrough; ScreenCaptureKit path if needed (ADR-014) |
 
 ## 9. Deployment and release
 
@@ -1183,7 +1222,7 @@ There's no on-call; alerts are in-app notices shown to the user:
 | Symptom | Check | Fix |
 | --- | --- | --- |
 | No transcript at all | Diagnostics: STT state; Settings: key status; OS microphone permission | Re-test key; grant permission; switch provider; check internet |
-| Only my voice transcribed, not others | macOS Screen Recording permission; Windows output device | Grant permission and restart the app; make sure the meeting audio plays through the default output device |
+| Only my voice transcribed, not others | macOS version (14.6+) and System Audio Recording permission; Windows output device | Grant permission and restart the app; make sure the meeting audio plays through the default output device |
 | Overlay visible in screen share | Diagnostics: capture exclusion status; OS version | Update OS; enable auto-hide on share; use second-device mode; report the meeting app and OS version |
 | Answers slow | Diagnostics latency; model chosen; context size | Pick a faster model for cues; reduce attached documents; check provider status page |
 | Answers wrong or uncited | Document status is "ready"; question in transcript is correct | Re-ingest the document; check transcript accuracy; rate the answer down for eval |
@@ -1249,7 +1288,8 @@ Sidekick is single-user, so there is no role matrix. The permission model that m
 | Permission | Why it's needed | When requested |
 | --- | --- | --- |
 | Microphone | Capture the user's voice | First session start |
-| Screen Recording (macOS) | System audio capture and screenshots | First session start or first screenshot |
+| System Audio Recording (macOS 14.6+) | System audio capture | First session start |
+| Screen Recording (macOS) | Screenshots | First screenshot |
 | Keychain access | Store and read API keys and the database key | First key save |
 | Network | Call providers and check updates | Always (no prompt) |
 | File access (dialogs only) | Upload documents, import/export Skills and backups | When the user picks a file |
@@ -1316,7 +1356,7 @@ This is not legal advice; confirm requirements with legal counsel before any pub
 ### 12.1 Install and first run
 
 1. Download the installer for your system (`.exe` or `.msi` for Windows, `.dmg` for macOS) and run it.
-2. Open Sidekick. The onboarding screen asks for Microphone permission, and on macOS, Screen Recording permission. Grant both and restart Sidekick if macOS asks.
+2. Open Sidekick. The onboarding screen asks for Microphone permission, and on macOS, System Audio Recording permission (macOS 14.6 or later). Grant both and restart Sidekick if macOS asks.
 3. Open **Settings → Providers**. Choose a speech-to-text provider (Deepgram is the default), paste your key, and click **Test connection**. Do the same for an LLM provider and pick a model.
 4. Optional: add a web search key (Tavily or Brave).
 
@@ -1375,7 +1415,7 @@ All shortcuts can be changed in Settings → Shortcuts.
 
 **Does Sidekick record audio?** No. Audio is streamed for transcription and not saved.
 
-**Why does it only transcribe me?** On macOS, Screen Recording permission is needed to hear other participants. Also check you didn't choose "Transcribe me only".
+**Why does it only transcribe me?** On macOS, hearing other participants needs macOS 14.6 or later and the System Audio Recording permission. Also check you didn't choose "Transcribe me only".
 
 **How much will it cost?** You pay providers directly for what you use. See Settings → Usage for estimates.
 
@@ -1462,11 +1502,11 @@ There's no service, so these are product-quality objectives measured locally (an
 The phased roadmap (Prototype, MVP, V1 launch, V2) and its gates are maintained in the PRD, section 10, so there is one source of truth. Engineering work is broken into tasks with tests and status in [Task.md](Task.md). Phase 0 milestones:
 
 - [x] Tauri 2 project scaffolded (Cargo workspace, React frontend, typed IPC, lint and test setup).
-- [ ] CI green on Windows and macOS (workflow added; confirm on first run).
-- [ ] Audio capture (system + mic) working on both OSes.
+- [x] CI green on Windows and macOS.
+- [ ] Audio capture (system + mic) working on both OSes (code and fixture tests done; device check pending).
 - [ ] Deepgram streaming with latency measured against NFR-1.
 - [ ] Capture exclusion tested on Teams, Zoom, Meet and Webex.
-- [ ] Settings screen with provider dropdowns and keychain storage.
+- [x] Settings screen with provider dropdowns and keychain storage.
 - [ ] Baselines recorded in section 13.2.
 
 ### 14.2 Ownership and contacts
@@ -1490,7 +1530,7 @@ Sidekick's own license is to be decided (private repository for now). All depend
 | SQLCipher (community edition) | BSD-style |
 | sqlite-vec | MIT or Apache-2.0 |
 | whisper.cpp and Whisper models | MIT |
-| Silero VAD | MIT |
+| cpal, hound | Apache-2.0 |
 | Tokio, reqwest, rusqlite, keyring (most Rust crates) | MIT or Apache-2.0 |
 | Playwright | Apache-2.0 |
 | WebdriverIO | MIT |
@@ -1517,17 +1557,19 @@ Provider APIs (Deepgram, AssemblyAI, Soniox, Anthropic, OpenAI, Google, Tavily, 
 | Nov 5, 2026 | User confirms consent before each session; no automatic notice | PRD section 8 |
 | Nov 5, 2026 | Cargo workspace, one crate per Rust module | ADR-011 |
 | Nov 5, 2026 | Frontend feature boundaries enforced by lint | ADR-012 |
+| Nov 5, 2026 | Separate embeddings provider; OpenAI text-embedding-3-small default | ADR-013 |
+| Nov 5, 2026 | Audio via cpal; macOS system audio 14.6+; energy VAD first | ADR-014 |
 
 ### 14.6 Open issues
 
 - [ ] Compare Deepgram, Soniox and local Whisper on real Hinglish audio; confirm default.
-- [ ] Choose embeddings provider and dimension (affects `chunk_vectors` schema).
+- [x] Choose embeddings provider and dimension: OpenAI `text-embedding-3-small` default, dimension per model (ADR-013).
 - [ ] Decide Sidekick's own license.
 - [ ] Verify capture exclusion behaviour on the latest macOS and Windows releases.
 - [ ] Confirm the consent flow with legal counsel before any public release.
 - [ ] Fill in the PRD roadmap (section 10): the original diagram didn't survive export.
 
-**Proposed changes awaiting owner approval.** Found while reviewing this document; each will update the sections named when approved.
+**Changes P1–P5 (applied in version 1.3).** Found while reviewing this document and applied with the recommended defaults so Phase 0 could proceed; revert any of them by editing the sections named.
 
 | # | Proposal | Sections affected |
 | --- | --- | --- |

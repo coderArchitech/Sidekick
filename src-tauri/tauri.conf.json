@@ -24,6 +24,18 @@
         "decorations": false,
         "alwaysOnTop": true,
         "skipTaskbar": false
+      },
+      {
+        "label": "settings",
+        "title": "Sidekick Settings",
+        "url": "index.html?window=settings",
+        "width": 720,
+        "height": 640,
+        "minWidth": 520,
+        "minHeight": 400,
+        "resizable": true,
+        "visible": false,
+        "center": true
       }
     ],
     "security": {

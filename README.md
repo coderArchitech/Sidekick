@@ -11,6 +11,7 @@
 | [Product requirements (PRD)](docs/PRD.md)                   | Problem, users, requirements with IDs (CTX, LIS, MEM, QA, SCR, MOD, SKL, UI, KEY), consent and ethics, roadmap |
 | [Technical documentation](docs/TECHNICAL.md)                | Architecture, data model, IPC contract, setup, coding standards, testing, release, security, operations        |
 | [Implementation tasks](docs/Task.md)                        | Every task to build Sidekick end to end, its tests and its current status                                      |
+| [Phase 0 manual checks](docs/phase-0-manual-checks.md)      | Step-by-step hardware checks that close Phase 0                                                                |
 | [Architecture decision records](docs/adr/README.md)         | One file per significant decision (ADR-001 onwards)                                                            |
 | [Module boundaries](docs/TECHNICAL.md#78-module-boundaries) | How the code is split and the rules that keep it modular                                                       |
 | [User guide](docs/TECHNICAL.md#12-user-guide)               | Install, first run, features, shortcuts, FAQs                                                                  |

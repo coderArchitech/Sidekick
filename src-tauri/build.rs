@@ -1,7 +1,22 @@
 //! Declares the app's own IPC commands so each window must be granted them
 //! explicitly in capabilities/*.json (tech doc 5.8). Add new commands here.
 
-const COMMANDS: &[&str] = &["app_info"];
+const COMMANDS: &[&str] = &[
+    "app_info",
+    "open_settings",
+    "get_capture_protection",
+    "get_settings",
+    "update_settings",
+    "list_providers",
+    "set_api_key",
+    "test_api_key",
+    "delete_api_key",
+    "list_models",
+    "llm_stream",
+    "cancel_stream",
+    "get_diagnostics",
+    "record_latency",
+];
 
 fn main() {
     let mut attributes = tauri_build::Attributes::new()
@@ -19,7 +34,6 @@ fn main() {
         println!("cargo:rerun-if-changed={}", manifest.display());
         println!("cargo:rustc-link-arg=/MANIFEST:EMBED");
         println!("cargo:rustc-link-arg=/MANIFESTINPUT:{}", manifest.display());
-        println!("cargo:rustc-link-arg=/WX");
     }
 
     #[allow(clippy::expect_used)] // Build script: failing loudly is the right behaviour.
