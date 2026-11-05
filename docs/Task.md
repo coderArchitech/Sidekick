@@ -66,7 +66,7 @@ All Phase 0 code and automated tests are done and green on Linux, Windows and ma
 | T-024 | Rolling notes | ✅ Done | Summary written by the overlay after End; quality checked in T-039 |
 | T-025 | `capture` crate: screenshots and answer from screen | 🟡 In progress: testing | 🖥️ Code and automated tests done. Waiting on: real capture on Windows/macOS during a live call (doesn't notify the meeting app), macOS Screen Recording prompt |
 | T-026 | More LLM providers: OpenAI, Gemini, Ollama | ✅ Done | Default model names may need refreshing as providers release new ones; live-key check in T-039 |
-| T-027 | More STT providers: AssemblyAI, Soniox, local Whisper | ⬜ To do | |
+| T-027 | More STT providers: AssemblyAI, Soniox, local Whisper | 🟡 In progress: testing | Code and automated tests done. Waiting on: Whisper accuracy run with a real model (Hugging Face is blocked in the cloud dev environment), live AssemblyAI/Soniox checks, Hinglish comparison (PRD open question). Whisper ships behind the `local-whisper` cargo feature |
 | T-028 | `skills` crate and Skill builder | ⬜ To do | |
 | T-029 | Overlay controls and private display | ⬜ To do | 🖥️ |
 | T-030 | Data control: retention, delete session | ⬜ To do | |
@@ -472,9 +472,9 @@ All Phase 0 code and automated tests are done and green on Linux, Windows and ma
 **Scope:** Adapters behind `SttProvider`; whisper-rs in `spawn_blocking` behind the `local-whisper` feature flag; model download with hash check.
 
 **Tests**
-- [ ] Unit (each provider): message parsing and error mapping from fixtures.
-- [ ] Integration: Whisper transcribes the short English fixture within tolerance.
-- [ ] Unit: model download rejects a file with the wrong SHA-256.
+- [x] Unit (each provider): message parsing and error mapping from fixtures; AssemblyAI and Soniox also end to end against a local WebSocket server (auth, results, speakers, finish message, rejected key).
+- [ ] Integration: Whisper transcribes the short English fixture within tolerance (opt-in test `crates/stt/tests/whisper.rs`, at least 80% word recall; needs a model and a recording).
+- [x] Unit: model download rejects a file with the wrong SHA-256 (and SHA-1, which whisper.cpp publishes) and leaves nothing behind.
 - [ ] Manual: Hinglish comparison across providers recorded (PRD open question).
 
 ### T-028 `skills` crate and Skill builder

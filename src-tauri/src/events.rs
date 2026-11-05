@@ -205,3 +205,12 @@ pub struct IngestProgress {
 pub struct ScreenshotCaptured {
     pub screenshot: sidekick_capture::Screenshot,
 }
+
+/// Whisper model download progress (Settings).
+#[derive(Debug, Clone, Serialize, specta::Type, Event)]
+#[serde(rename_all = "camelCase")]
+pub struct ModelDownloadProgress {
+    pub name: String,
+    pub done_bytes: f64,
+    pub total_bytes: Option<f64>,
+}

@@ -7,6 +7,7 @@ import {
   type ProviderKind,
 } from "@/ipc";
 import { KeyField } from "./KeyField";
+import { WhisperModels } from "./WhisperModels";
 
 interface Props {
   kind: ProviderKind;
@@ -133,7 +134,13 @@ export function ProviderSection({ kind, title, description, choice, allowOff, on
           </select>
         </div>
       )}
-      {kind !== "llm" && choice?.model && (
+      {selected?.id === "whisper-local" && choice && (
+        <WhisperModels
+          model={choice.model}
+          onChoose={(model) => onChoose({ provider: choice.provider, model })}
+        />
+      )}
+      {kind !== "llm" && selected?.id !== "whisper-local" && choice?.model && (
         <p className="mt-3 text-sm text-slate-400">Model: {choice.model}</p>
       )}
     </section>

@@ -48,6 +48,8 @@ pub fn builder() -> Builder<tauri::Wry> {
             commands::capture::preview_screen,
             commands::capture::list_screenshots,
             commands::capture::screenshot_image,
+            commands::stt::whisper_models,
+            commands::stt::download_whisper_model,
             commands::documents::ingest_document,
             commands::documents::ingest_url,
             commands::documents::list_documents,
@@ -65,6 +67,7 @@ pub fn builder() -> Builder<tauri::Wry> {
             events::HotkeyPressed,
             events::IngestProgress,
             events::ScreenshotCaptured,
+            events::ModelDownloadProgress,
         ])
 }
 

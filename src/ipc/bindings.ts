@@ -391,6 +391,24 @@ export const commands = {
     }
   },
   /**
+   * Whisper models and which are downloaded.
+   */
+  async whisperModels(): Promise<WhisperModelEntry[]> {
+    return await TAURI_INVOKE("whisper_models");
+  },
+  /**
+   * Downloads a model, emitting `model-download-progress`; the file is kept only
+   * if its checksum matches.
+   */
+  async downloadWhisperModel(name: string): Promise<Result<null, SidekickError>> {
+    try {
+      return { status: "ok", data: await TAURI_INVOKE("download_whisper_model", { name }) };
+    } catch (e) {
+      if (e instanceof Error) throw e;
+      else return { status: "error", error: e as any };
+    }
+  },
+  /**
    * Queues a file for parsing and embedding.
    */
   async ingestDocument(sessionId: string, path: string): Promise<Result<null, SidekickError>> {
@@ -453,6 +471,7 @@ export const events = __makeEvents__<{
   answerToken: AnswerToken;
   hotkeyPressed: HotkeyPressed;
   ingestProgress: IngestProgress;
+  modelDownloadProgress: ModelDownloadProgress;
   screenshotCaptured: ScreenshotCaptured;
   sessionChanged: SessionChanged;
   sttStatusChanged: SttStatusChanged;
@@ -464,6 +483,7 @@ export const events = __makeEvents__<{
   answerToken: "answer-token",
   hotkeyPressed: "hotkey-pressed",
   ingestProgress: "ingest-progress",
+  modelDownloadProgress: "model-download-progress",
   screenshotCaptured: "screenshot-captured",
   sessionChanged: "session-changed",
   sttStatusChanged: "stt-status-changed",
@@ -683,6 +703,10 @@ export type LlmRequest = {
   maxTokens: number;
   effort: Effort | null;
 };
+/**
+ * Whisper model download progress (Settings).
+ */
+export type ModelDownloadProgress = { name: string; doneBytes: number; totalBytes: number | null };
 /**
  * A model the user can pick.
  */
@@ -1010,6 +1034,20 @@ export type TranscriptSegment = {
  * Token counts reported by the provider.
  */
 export type Usage = { inputTokens: number; outputTokens: number };
+/**
+ * A model and whether it's on this computer.
+ */
+export type WhisperModelEntry = {
+  /**
+   * `tiny.en`, `base`, ...
+   */
+  name: string;
+  sizeMb: number;
+  /**
+   * English only, or multilingual (Hinglish needs multilingual).
+   */
+  englishOnly: boolean;
+} & { downloaded: boolean };
 /**
  * A window the user can pick.
  */

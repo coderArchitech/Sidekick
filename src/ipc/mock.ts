@@ -75,6 +75,14 @@ const sessions = new Map<string, Session>();
 const transcripts = new Map<string, TranscriptLine[]>();
 const bookmarks = new Map<string, Bookmark[]>();
 const notesBySession = new Map<string, Notes>();
+/** Mirrors crates/stt/src/models.rs. */
+const WHISPER_MODELS = [
+  { name: "tiny.en", sizeMb: 75, englishOnly: true },
+  { name: "base.en", sizeMb: 142, englishOnly: true },
+  { name: "base", sizeMb: 142, englishOnly: false },
+  { name: "small", sizeMb: 466, englishOnly: false },
+];
+const downloadedModels = new Set<string>();
 const screenshots: Screenshot[] = [];
 /** A 16:9 synthetic "screen" (SVG data URL); the mocks never hold real pixels. */
 export const MOCK_IMAGE_URL = `data:image/svg+xml;base64,${btoa(
@@ -289,6 +297,7 @@ export function resetMocks(): void {
   mockFiles.picked = [];
   bookmarks.clear();
   notesBySession.clear();
+  downloadedModels.clear();
   screenshots.length = 0;
   nextLineId = 1;
   liveSessionId = null;
@@ -614,6 +623,21 @@ export const mockCommands: Commands = {
         ? { status: "ok", data: MOCK_IMAGE_URL }
         : err("INTERNAL", "That screenshot no longer exists."),
     ),
+  whisperModels: () =>
+    Promise.resolve(
+      WHISPER_MODELS.map((m) => ({ ...m, downloaded: downloadedModels.has(m.name) })),
+    ),
+  downloadWhisperModel: async (name) => {
+    if (!WHISPER_MODELS.some((m) => m.name === name))
+      return err("INTERNAL", `Unknown Whisper model ${name}.`);
+    const total = 1_000_000;
+    for (const done of [250_000, 500_000, 1_000_000]) {
+      await Promise.resolve();
+      mockSessionBus.emit("model", { name, doneBytes: done, totalBytes: total });
+    }
+    downloadedModels.add(name);
+    return { status: "ok", data: null };
+  },
   rateAnswer: (answerId, rating) => {
     const a = savedAnswers.find((x) => x.id === answerId);
     if (!a) return Promise.resolve(err("INTERNAL", "That answer no longer exists."));

@@ -21,6 +21,8 @@ pub struct AppState {
     pub live: tokio::sync::Mutex<Option<(String, sidekick_session::LiveSession)>>,
     /// Screenshots: the OS, or a synthetic screen in mock mode.
     pub capturer: Arc<dyn sidekick_capture::Capturer>,
+    /// The app data folder (database, Whisper models).
+    pub data_dir: PathBuf,
     pub mock: bool,
 }
 
@@ -52,10 +54,22 @@ impl AppState {
         let mut gateway =
             Gateway::new(Arc::clone(&keys), mock).with_recorder(Arc::clone(&diagnostics));
         if !mock {
-            gateway = gateway.with_verifier(
-                "deepgram",
-                Arc::new(sidekick_stt::DeepgramVerifier::default()),
-            );
+            gateway = gateway
+                .with_verifier(
+                    "deepgram",
+                    Arc::new(sidekick_stt::DeepgramVerifier::default()),
+                )
+                .with_verifier(
+                    "assemblyai",
+                    Arc::new(sidekick_stt::providers::assemblyai::AssemblyAiVerifier::default()),
+                )
+                .with_verifier(
+                    "soniox",
+                    Arc::new(sidekick_stt::providers::soniox::SonioxVerifier::default()),
+                );
+        }
+        if cfg!(feature = "local-whisper") {
+            gateway = gateway.with_local("whisper-local");
         }
         Ok(Self {
             db: Arc::new(Mutex::new(db)),
@@ -69,6 +83,7 @@ impl AppState {
             } else {
                 Arc::new(sidekick_capture::OsCapturer)
             },
+            data_dir,
             mock,
         })
     }

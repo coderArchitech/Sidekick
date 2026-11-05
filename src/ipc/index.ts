@@ -51,6 +51,7 @@ export type {
   Effort,
   ErrorCode,
   IngestProgress,
+  ModelDownloadProgress,
   FinishReason,
   KeyCheck,
   KeyStatus,
@@ -86,6 +87,7 @@ export type {
   TranscriptPartial,
   TranscriptSegment,
   Usage,
+  WhisperModelEntry,
   WindowInfo,
 } from "./bindings";
 
@@ -109,6 +111,7 @@ const tauriSessionEvents: SessionEvents = {
   onHotkey: (cb) => tauriEvents.hotkeyPressed.listen((e) => cb(e.payload)),
   onIngestProgress: (cb) => tauriEvents.ingestProgress.listen((e) => cb(e.payload)),
   onScreenshotCaptured: (cb) => tauriEvents.screenshotCaptured.listen((e) => cb(e.payload)),
+  onModelDownloadProgress: (cb) => tauriEvents.modelDownloadProgress.listen((e) => cb(e.payload)),
   onFileDrop: (cb) => onFileDrop(cb),
 };
 
