@@ -222,7 +222,7 @@ Each module below is its own crate at `crates/<module>/`, named `sidekick-<modul
 | Module | Responsibility |
 | --- | --- |
 | `overlay` | Window chrome: opacity, font size, compact/expanded, protection indicator, tabs |
-| `answers` | Live Answers tab: cue, full answer, sources, follow-up chips, code blocks |
+| `answers` | Live Answers tab, newest first: cue line (Stop while streaming), expandable full answer (open by default when the question used your name), numbered sources, thumbs up/down (`rate_answer`, click again to clear). Markdown via `react-markdown` with raw HTML skipped and links shown as text, never opened. Fenced code uses Shiki, loaded lazily on first code block with 13 languages and the JavaScript regex engine (no WASM); unknown languages fall back to plain text. Copy writes only the code, only on click. Follow-up chips are not built yet |
 | `chat` | Chat tab: user questions with session context |
 | `transcript` | Transcript tab: loads saved lines, applies live `transcript-partial` / `transcript-segment` events batched every 50 ms (`lib/batcher`), shows partial text until the final line arrives, rename/merge speakers, bookmarks, listening indicator |
 | `notes` | Rolling notes, decisions, action items |
