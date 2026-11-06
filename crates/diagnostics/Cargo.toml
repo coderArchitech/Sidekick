@@ -11,10 +11,15 @@ specta = ["dep:specta"]
 
 [dependencies]
 serde.workspace = true
+regex = "1"
+tracing-subscriber.workspace = true
+zip.workspace = true
 specta = { workspace = true, optional = true }
 
 [dev-dependencies]
 serde_json.workspace = true
+tempfile.workspace = true
+tracing.workspace = true
 
 [lints]
 workspace = true

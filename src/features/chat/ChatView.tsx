@@ -108,7 +108,7 @@ function ChatTurn({ turn }: { turn: AnswerView }) {
             {turn.error}
           </p>
         )}
-        {turn.status === "cancelled" && <p className="text-xs text-slate-500">Stopped.</p>}
+        {turn.status === "cancelled" && <p className="text-xs text-slate-400">Stopped.</p>}
         {streaming && (
           <button
             type="button"

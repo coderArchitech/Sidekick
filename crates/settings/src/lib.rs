@@ -20,19 +20,7 @@ pub struct ProviderChoice {
     pub model: Option<String>,
 }
 
-/// How long session data is kept after a session ends (tech doc 4.4).
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
-#[cfg_attr(feature = "specta", derive(specta::Type))]
-pub enum Retention {
-    #[serde(rename = "session")]
-    SessionOnly,
-    #[serde(rename = "7d")]
-    SevenDays,
-    #[serde(rename = "30d")]
-    ThirtyDays,
-    #[serde(rename = "forever")]
-    Forever,
-}
+pub use sidekick_core::retention::Retention;
 
 /// Who the user is, for directed questions and STT boosts (PRD QA-2, LIS-5a).
 #[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
@@ -68,6 +56,49 @@ impl Profile {
     }
 }
 
+/// How the overlay looks and where it sits (PRD UI-1 to UI-3).
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[cfg_attr(feature = "specta", derive(specta::Type))]
+#[serde(rename_all = "camelCase")]
+pub struct OverlayPrefs {
+    /// Percent, 20 to 100.
+    pub opacity: u8,
+    /// Text size in px, 12 to 20.
+    pub font_size: u8,
+    pub compact: bool,
+    /// One per monitor, most recent first (managed by the app shell).
+    pub positions: Vec<sidekick_window::placement::SavedPosition>,
+}
+
+impl Default for OverlayPrefs {
+    fn default() -> Self {
+        Self {
+            opacity: 90,
+            font_size: 14,
+            compact: false,
+            positions: Vec::new(),
+        }
+    }
+}
+
+impl OverlayPrefs {
+    pub const OPACITY: std::ops::RangeInclusive<u8> = 20..=100;
+    pub const FONT_SIZE: std::ops::RangeInclusive<u8> = 12..=20;
+
+    fn validate(&self) -> SidekickResult<()> {
+        if !Self::OPACITY.contains(&self.opacity) || !Self::FONT_SIZE.contains(&self.font_size) {
+            return Err(SidekickError::new(
+                ErrorCode::Internal,
+                "Opacity must be 20 to 100% and text size 12 to 20 px.",
+            ));
+        }
+        if self.positions.len() > sidekick_window::placement::MAX_SAVED {
+            return Err(SidekickError::internal("Too many saved overlay positions."));
+        }
+        Ok(())
+    }
+}
+
 /// All user settings.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[cfg_attr(feature = "specta", derive(specta::Type))]
@@ -83,6 +114,7 @@ pub struct Settings {
     /// Global shortcuts, one per action (tech doc 12.3).
     pub shortcuts: Vec<Binding>,
     pub profile: Profile,
+    pub overlay: OverlayPrefs,
 }
 
 impl Default for Settings {
@@ -106,6 +138,7 @@ impl Default for Settings {
             retention: Retention::ThirtyDays,
             shortcuts: sidekick_hotkeys::defaults(),
             profile: Profile::default(),
+            overlay: OverlayPrefs::default(),
         }
     }
 }
@@ -135,6 +168,8 @@ pub struct SettingsPatch {
     pub shortcuts: Option<Vec<Binding>>,
     #[serde(default)]
     pub profile: Option<Profile>,
+    #[serde(default)]
+    pub overlay: Option<OverlayPrefs>,
 }
 
 impl Settings {
@@ -171,6 +206,10 @@ impl Settings {
                     .skip(usize::from(!v.name.trim().is_empty()))
                     .collect(),
             };
+        }
+        if let Some(v) = patch.overlay {
+            v.validate()?;
+            self.overlay = v;
         }
         self.validate()?;
         Ok(self)
@@ -215,6 +254,9 @@ pub fn load(db: &Database) -> SidekickResult<Settings> {
             .and_then(|b| sidekick_hotkeys::validate(&b).ok())
             .unwrap_or(d.shortcuts),
         profile: section(db, "profile")?.unwrap_or(d.profile),
+        overlay: section::<OverlayPrefs>(db, "overlay")?
+            .filter(|o| o.validate().is_ok())
+            .unwrap_or(d.overlay),
     })
 }
 
@@ -244,6 +286,9 @@ pub fn update(db: &Database, patch: SettingsPatch) -> SidekickResult<Settings> {
     }
     if patch.profile.is_some() {
         raw::set(db, "profile", &to_json(&updated.profile)?)?;
+    }
+    if patch.overlay.is_some() {
+        raw::set(db, "overlay", &to_json(&updated.overlay)?)?;
     }
     Ok(updated)
 }
@@ -499,5 +544,61 @@ mod tests {
         }
         let db = Database::open(&path, &key).unwrap();
         assert!(!load(&db).unwrap().auto_answer);
+    }
+
+    #[test]
+    fn overlay_prefs_validate_and_persist() {
+        let db = db();
+        assert_eq!(load(&db).unwrap().overlay, OverlayPrefs::default());
+        let prefs = OverlayPrefs {
+            opacity: 60,
+            font_size: 18,
+            compact: true,
+            positions: sidekick_window::placement::remember(
+                &[],
+                "Built-in@2880x1800",
+                sidekick_window::placement::Rect {
+                    x: 10,
+                    y: 20,
+                    width: 400,
+                    height: 600,
+                },
+            ),
+        };
+        let patch = |o: OverlayPrefs| SettingsPatch {
+            overlay: Some(o),
+            ..SettingsPatch::default()
+        };
+        assert_eq!(update(&db, patch(prefs.clone())).unwrap().overlay, prefs);
+        assert_eq!(load(&db).unwrap().overlay, prefs);
+        for bad in [
+            OverlayPrefs {
+                opacity: 10,
+                ..prefs.clone()
+            },
+            OverlayPrefs {
+                opacity: 101,
+                ..prefs.clone()
+            },
+            OverlayPrefs {
+                font_size: 30,
+                ..prefs.clone()
+            },
+        ] {
+            assert!(update(&db, patch(bad)).is_err());
+        }
+        assert_eq!(
+            load(&db).unwrap().overlay,
+            prefs,
+            "invalid patches change nothing"
+        );
+        // A stored section that no longer validates falls back to defaults.
+        raw::set(
+            &db,
+            "overlay",
+            &serde_json::json!({ "opacity": 5, "fontSize": 14, "compact": false, "positions": [] }),
+        )
+        .unwrap();
+        assert_eq!(load(&db).unwrap().overlay, OverlayPrefs::default());
     }
 }

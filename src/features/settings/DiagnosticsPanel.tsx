@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from "react";
-import { commands, type Diagnostics, type Stage } from "@/ipc";
+import { chooseLogExportPath, commands, type Diagnostics, type Stage } from "@/ipc";
 
 const STAGE_LABELS: Record<Stage, string> = {
   transcript_lag: "Transcript lag",
@@ -16,6 +16,22 @@ export function DiagnosticsPanel() {
   const [data, setData] = useState<Diagnostics | null>(null);
   const [version, setVersion] = useState(0);
   const refresh = useCallback(() => setVersion((v) => v + 1), []);
+  const [exported, setExported] = useState<{ text: string; error: boolean } | null>(null);
+
+  async function exportLogs() {
+    setExported(null);
+    const path = await chooseLogExportPath();
+    if (!path) return;
+    const r = await commands.exportLogs(path);
+    setExported(
+      r.status === "ok"
+        ? {
+            text: `Saved the log bundle (${r.data} log ${r.data === 1 ? "file" : "files"} and diagnostics).`,
+            error: false,
+          }
+        : { text: r.error.message, error: true },
+    );
+  }
 
   useEffect(() => {
     let cancelled = false;
@@ -36,16 +52,34 @@ export function DiagnosticsPanel() {
         <h2 id="diagnostics-heading" className="text-base font-semibold">
           Diagnostics
         </h2>
-        <button
-          type="button"
-          className="rounded-md border border-slate-600 px-2.5 py-1 text-sm hover:bg-slate-700"
-          onClick={refresh}
-        >
-          Refresh
-        </button>
+        <div className="flex gap-2">
+          <button
+            type="button"
+            className="rounded-md border border-slate-600 px-2.5 py-1 text-sm hover:bg-slate-700"
+            onClick={() => void exportLogs()}
+          >
+            Export logs…
+          </button>
+          <button
+            type="button"
+            className="rounded-md border border-slate-600 px-2.5 py-1 text-sm hover:bg-slate-700"
+            onClick={refresh}
+          >
+            Refresh
+          </button>
+        </div>
       </div>
+      {exported && (
+        <p
+          role={exported.error ? "alert" : "status"}
+          className={`text-sm ${exported.error ? "text-red-300" : "text-emerald-300"}`}
+        >
+          {exported.text}
+        </p>
+      )}
       <p className="mb-3 text-sm text-slate-400">
-        Measured on this computer over the last 15 minutes. Nothing here is sent anywhere.
+        Measured on this computer over the last 15 minutes. Nothing here is sent anywhere. The log
+        bundle holds logs (no keys, transcripts or answers) and these numbers, for a bug report.
       </p>
       {data && (
         <>

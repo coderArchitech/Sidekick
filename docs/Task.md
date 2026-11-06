@@ -52,7 +52,7 @@ All Phase 0 code and automated tests are done and green on Linux, Windows and ma
 
 | ID | Task | Status | Notes |
 | --- | --- | --- | --- |
-| T-013 | Sessions and consent | 🟡 In progress: testing | Waiting on dependency: E2E needs the WebdriverIO harness (T-033). Everything else done, including a real-app run |
+| T-013 | Sessions and consent | ✅ Done | E2E passes with the T-033 suite |
 | T-014 | Live transcript tab | ✅ Done | Verified in the real app with fixture audio |
 | T-015 | `hotkeys` crate: global shortcuts | 🟡 In progress: testing | 🖥️ Waiting on hardware: verified on Linux (X11); needs a check on Windows and macOS. All actions are wired |
 | T-016 | Profile: name and nicknames | ✅ Done | Detection use lands in T-020 |
@@ -68,11 +68,11 @@ All Phase 0 code and automated tests are done and green on Linux, Windows and ma
 | T-026 | More LLM providers: OpenAI, Gemini, Ollama | ✅ Done | Default model names may need refreshing as providers release new ones; live-key check in T-039 |
 | T-027 | More STT providers: AssemblyAI, Soniox, local Whisper | 🟡 In progress: testing | Code and automated tests done. Waiting on: Whisper accuracy run with a real model (Hugging Face is blocked in the cloud dev environment), live AssemblyAI/Soniox checks, Hinglish comparison (PRD open question). Whisper ships behind the `local-whisper` cargo feature |
 | T-028 | `skills` crate and Skill builder | ✅ Done | Golden cases run against live models in T-039; tool use itself comes with Agents (T-045) |
-| T-029 | Overlay controls and private display | ⬜ To do | 🖥️ |
-| T-030 | Data control: retention, delete session | ⬜ To do | |
-| T-031 | Logging to file and log export | ⬜ To do | |
-| T-032 | UI test suite (Playwright) | ⬜ To do | |
-| T-033 | End-to-end test suite (WebdriverIO) | ⬜ To do | |
+| T-029 | Overlay controls and private display | 🟡 In progress: testing | 🖥️ Waiting on hardware: multi-monitor restore on Windows/macOS. Snap and restore verified in the real app on Linux (Xvfb, one monitor) |
+| T-030 | Data control: retention, delete session | ✅ Done | Also fixed: deleting a session now deletes its vectors (they have no foreign key) |
+| T-031 | Logging to file and log export | ✅ Done | Log scan runs after every E2E pass |
+| T-032 | UI test suite (Playwright) | ✅ Done | 16 specs; UI job green in CI. axe found and fixed: A−/A+ names, low-contrast grey text |
+| T-033 | End-to-end test suite (WebdriverIO) | ✅ Done | Green on Ubuntu, Windows (WebView2) and macOS (WebKit) in CI; one suite on every PR (about a minute once built), no separate nightly |
 | T-034 | MVP acceptance pass | ⬜ To do | 🖥️ TECHNICAL.md 2.6 |
 
 ### Phase 2: V1 launch readiness
@@ -294,7 +294,7 @@ All Phase 0 code and automated tests are done and green on Linux, Windows and ma
 - [x] Integration: pause drops audio and splits the transcript; stop flushes STT.
 - [x] Component: session bar creates, starts, pauses, resumes and ends; consent dialog needs a choice, Cancel/Escape start nothing, focus starts on the first option; errors shown; axe passes.
 - [x] Manual: real app (Linux, Xvfb, driven with xdotool) with `SIDEKICK_MOCK_PROVIDERS=1` and `SIDEKICK_AUDIO_FIXTURE`: created a session, consent dialog shown, went live ("Listening"), ended cleanly; no errors in the log.
-- [ ] E2E: create session → consent → start with fixture audio → transcript appears → end (needs the WebdriverIO harness, T-033).
+- [x] E2E: create session → consent → start with fixture audio → transcript appears → end (`tests/e2e/specs/session.e2e.ts`).
 
 ### T-014 Live transcript tab
 
@@ -495,10 +495,10 @@ All Phase 0 code and automated tests are done and green on Linux, Windows and ma
 **Scope:** Opacity slider (done in T-001), resize, drag, snap to edges, remember position per monitor, font size, compact/expanded, shield indicator wired to T-011, show/hide.
 
 **Tests**
-- [ ] Unit: snapping and per-monitor position persistence logic.
-- [ ] Component: font size and compact mode change layout; shield colour follows protection status.
-- [ ] Accessibility (axe): overlay has no violations.
-- [ ] Manual: position restored across restarts on multi-monitor setups.
+- [x] Unit: snapping and per-monitor position persistence logic (`sidekick_window::placement`, settings validation).
+- [x] Component: font size and compact mode change layout and are saved; shield colour follows protection status (T-011 tests).
+- [x] Accessibility (axe): overlay has no violations.
+- [ ] Manual: position restored across restarts on multi-monitor setups. (Linux, one monitor: moved to 1490,15 → snapped to 1500,0; moved to 700,250, restarted → restored at 700,250.)
 
 ### T-030 Data control: retention, delete session
 
@@ -506,9 +506,9 @@ All Phase 0 code and automated tests are done and green on Linux, Windows and ma
 **Scope:** Retention job at startup and every 6 hours; per-session retention setting; delete everything button; VACUUM when idle; consent log kept 1 year.
 
 **Tests**
-- [ ] Unit: retention cut-off per option (session, 7d, 30d, forever).
-- [ ] Integration: expired sessions deleted with all child rows; consent log kept.
-- [ ] Integration: after delete and VACUUM, deleted text isn't found in the database file.
+- [x] Unit: retention cut-off per option (session, 7d, 30d, forever).
+- [x] Integration: expired sessions deleted with all child rows; consent log kept.
+- [x] Integration: after delete and VACUUM, deleted text isn't found in the database file.
 
 ### T-031 Logging to file and log export
 
@@ -516,9 +516,9 @@ All Phase 0 code and automated tests are done and green on Linux, Windows and ma
 **Scope:** JSON-line logs with daily rotation (14 days, 50 MB); frontend `log` command; correlation IDs; Export logs zip with diagnostics snapshot.
 
 **Tests**
-- [ ] Unit: rotation and size cap.
-- [ ] Integration: log scan finds no key patterns or fixture phrases after a full E2E run.
-- [ ] Integration: export zip contains logs and diagnostics, no database.
+- [x] Unit: rotation (daily, by size) and the 14-day / 50 MB caps; redaction of key-shaped strings.
+- [x] Integration: log scan finds no key patterns or fixture phrases after a full E2E run (T-033, runs after every E2E pass). `scripts/scan-logs.mjs` is ready and passed on a real-app run: create, consent, live with fixture audio, Chat question, end, notes and summary.
+- [x] Integration: export zip contains logs and diagnostics, no database.
 
 ### T-032 UI test suite (Playwright)
 
@@ -526,8 +526,8 @@ All Phase 0 code and automated tests are done and green on Linux, Windows and ma
 **Scope:** `tests/ui/` with mocked IPC events; flows: Auto-answer toggle, Chat, code copy, settings dropdowns, consent dialog; axe checks; added to CI.
 
 **Tests**
-- [ ] UI: each flow above has a spec; axe passes on every screen.
-- [ ] CI: UI job green.
+- [x] UI: each flow above has a spec; axe passes on every screen.
+- [x] CI: UI job green.
 
 ### T-033 End-to-end test suite (WebdriverIO)
 
@@ -535,11 +535,11 @@ All Phase 0 code and automated tests are done and green on Linux, Windows and ma
 **Scope:** `tests/e2e/` with @wdio/tauri-service; mock providers and fixture audio; smoke suite on every PR (Windows, macOS), full suite nightly.
 
 **Tests**
-- [ ] E2E: session start with consent → fixture audio → transcript → detected question → cited answer.
-- [ ] E2E: screenshot capture and ask.
-- [ ] E2E: settings: add, test and remove a key (mock provider).
-- [ ] E2E: LLM failure keeps transcript running (NFR-5).
-- [ ] CI: smoke suite green on Windows and macOS.
+- [x] E2E: session start with consent → fixture audio → transcript → detected question → cited answer.
+- [x] E2E: screenshot capture and ask.
+- [x] E2E: settings: add, test and remove a key (mock provider).
+- [x] E2E: LLM failure keeps transcript running (NFR-5).
+- [x] CI: suite green on Windows and macOS (and Ubuntu).
 
 ### T-034 MVP acceptance pass 🖥️
 

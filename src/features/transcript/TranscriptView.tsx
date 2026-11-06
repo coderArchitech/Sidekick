@@ -95,7 +95,7 @@ export function TranscriptView() {
       <ol aria-label="Transcript" className="space-y-1.5">
         {lines.map((l) => (
           <li key={l.id} className="leading-snug">
-            <span className="mr-1 text-xs text-slate-500">{clock(l.startMs)}</span>
+            <span className="mr-1 text-xs text-slate-400">{clock(l.startMs)}</span>
             {editing === l.speakerLabel ? (
               <form
                 className="inline"

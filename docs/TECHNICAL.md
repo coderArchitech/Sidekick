@@ -202,7 +202,7 @@ Each module below is its own crate at `crates/<module>/`, named `sidekick-<modul
 | `audio` | Microphone and system audio as separate 16 kHz mono streams of 50 ms frames via cpal (WASAPI loopback on Windows, Core Audio tap on macOS 14.6+); windowed-sinc resampler; energy VAD flag per frame; pause/resume/stop; WAV `FixtureSource` for tests and `SIDEKICK_AUDIO_FIXTURE`; never writes audio (ADR-014) | Done (manual device checks pending) |
 | `stt` | `SttProvider` (one `run` per audio stream). WebSocket providers share one engine (`providers::ws`): silence not sent apart from a short tail, a `Timeline` mapping provider time back to meeting time, keep-alives, reconnect with backoff and replay of unfinalised and buffered audio (up to 10 s), flush at the end; each provider is a `Dialect` (URL and auth, first message, keep-alive and finish messages, a message parser). Adapters: Deepgram Nova-3 (interim + final, diarization, `keyterm`), AssemblyAI Universal Streaming v3 (formatted turns, `keyterms_prompt`, no streaming diarization), Soniox (word-piece tokens joined into words, `<end>` endpoints, diarization, `en`+`hi` hints for `multi`), and local Whisper behind the `local-whisper` cargo feature (utterances cut by the VAD at 600 ms of silence or 15 s, transcribed on a blocking thread while audio keeps flowing; names as the initial prompt). Key verifiers for the cloud providers; `models` lists Whisper models and downloads them to `<data>/models`, kept only if the checksum matches; mock provider; speaker labels `me` / `speaker_N` | Done (live checks pending) |
 | `capture` | Full screen (main display), one window (other apps only, not minimised) or a region (fractions of the main display, chosen on an unsaved 800 px preview and captured afresh); downscale to 1568 px on the long side and JPEG at quality 85 (about 200 KB); SQL for `screenshots` (image BLOB in the encrypted database, never on disk, the clipboard or shared folders). Real capture uses `xcap` on Windows and macOS only; Linux (dev/CI) and mock mode use `MockCapturer`, a synthetic 2560 x 1440 screen. A failed capture maps to `PERMISSION_DENIED` with the macOS Screen Recording hint | Done (manual check on a live call pending) |
-| `window` | Capture-exclusion status rules per OS and version (Windows build 19041+ protected; macOS 13–14 protected, 15+ not guaranteed because ScreenCaptureKit can bypass it; Linux unavailable) and the auto-hide rule. Pure logic: the shell applies `set_content_protected(true)` to every window at startup. Transparency, click-through and screen-share detection still to come (T-029) | Started (status done; manual checklist pending) |
+| `window` | Capture-exclusion status rules per OS and version (Windows build 19041+ protected; macOS 13–14 protected, 15+ not guaranteed because ScreenCaptureKit can bypass it; Linux unavailable) and the auto-hide rule. Pure logic: the shell applies `set_content_protected(true)` to every window at startup. `placement`: snap to work-area edges within 24 px, keep the window on screen (shrinking it if needed), find the monitor under the window's centre, and remember one position per monitor (`<name>@<width>x<height>`, up to 8, most recent first) and restore the most recent one whose monitor is connected. The shell restores at startup and, 500 ms after the last move or resize, snaps and saves. Click-through (T-048) and screen-share detection (ADR-015) still to come | Started (status and placement done; manual checks pending) |
 | `hotkeys` | Actions, defaults (12.3) and validation (normalise, one modifier minimum, no duplicates, every action once). The shell registers them with `tauri-plugin-global-shortcut`, handles show/hide itself, emits `hotkey-pressed`, and only saves a new set after the OS accepts it | Done (Linux verified; Windows/macOS check pending) |
 | `ingest` | Parsers (PDF via pdf-extract, DOCX/PPTX via zip + quick-xml, spreadsheets via calamine, text/Markdown, web pages), chunker (~500 tokens ≈ 2,000 chars, 50 overlap, within a page), SHA-256 duplicate check, batched embeddings (100 per request, retries), progress events; at most 3 documents at once. Owns the SQL for `documents` and `chunks`. Images wait for vision providers (T-026) | Done (images pending) |
 | `store` | SQLCipher database (raw 256-bit key from `secrets`), WAL, foreign keys; migrations with pre-migration backups; sqlite-vec registered for every connection; `settings` (raw JSON) and `vectors` (per-model `chunk_vectors`) modules; repository modules added per feature | Done |
@@ -221,7 +221,7 @@ Each module below is its own crate at `crates/<module>/`, named `sidekick-<modul
 
 | Module | Responsibility |
 | --- | --- |
-| `overlay` | Window chrome: opacity, font size, compact/expanded, protection indicator, tabs |
+| `overlay` | Window chrome: drag region, opacity slider (saved once it settles), text size A−/A+ (12–20 px; scales the overlay webview's root so rem-based sizes follow, 14 px = the default 16 px root), Compact (hides the session bar and documents), protection shield, Settings, tabs. Appearance loads from `settings.overlay` and saves with `set_overlay` |
 | `answers` | Live Answers tab, newest first: cue line (Stop while streaming), expandable full answer (open by default when the question used your name), numbered sources, thumbs up/down (`rate_answer`, click again to clear). Markdown via `react-markdown` with raw HTML skipped and links shown as text, never opened. Fenced code uses Shiki, loaded lazily on first code block with 13 languages and the JavaScript regex engine (no WASM); unknown languages fall back to plain text. Copy writes only the code, only on click. Follow-up chips are not built yet |
 | `chat` | Chat tab: **Screenshot** menu (Full screen, A window…, An area… with a drag-to-select preview) for capture-and-ask: the capture shows as an attached thumbnail and the next question is asked with `source = screenshot`, so both cue and full answer see the image. Typed questions answered through the same `AnswerRouter` with `source = chat` and the session context (transcript, notes, documents), plus the last 3 finished exchanges as history so follow-ups make sense. Enter sends, Shift+Enter adds a line, Stop cancels. History is per session: saved chat and screenshot answers reload with `list_answers`. The Ask hotkey shows and focuses the overlay, switches to Chat and focuses the input. A chat question shares the 2-in-flight limit, so it can stop the oldest detected answer. Voice input arrives later |
 | `transcript` | Transcript tab: loads saved lines, applies live `transcript-partial` / `transcript-segment` events batched every 50 ms (`lib/batcher`), shows partial text until the final line arrives, rename/merge speakers, bookmarks, listening indicator |
@@ -560,7 +560,7 @@ Foreign keys are enforced (`PRAGMA foreign_keys = ON`), and the database runs in
 | Usage records | 12 months | Aggregated monthly after that |
 | Logs | 14 days, max 50 MB | Rotated daily |
 
-A cleanup job runs at app start and every 6 hours (section 10.7). "Delete session" removes all its rows immediately via cascading deletes, then runs `VACUUM` on the next idle period so deleted data is not left in free pages. There is no archival tier: deleted means gone.
+A cleanup job runs at app start and every 6 hours (section 10.7). Each session stores its own retention (from Settings at creation; changeable after the meeting from the session bar, which also offers "Delete session…"). The database runs with `secure_delete` on, and Settings → Your data has "Delete everything…" (type DELETE to confirm). Vectors live in a virtual table without foreign keys, so deletion removes them by owner explicitly; the keyword index is cleaned by triggers. "Delete session" removes all its rows immediately via cascading deletes, then runs `VACUUM` on the next idle period so deleted data is not left in free pages. There is no archival tier: deleted means gone.
 
 ### 4.5 Migrations and seed data
 
@@ -593,7 +593,9 @@ Commands are request/response calls from the frontend to Rust (`invoke`). All re
 | `start_session` | `session_id` | `SessionStarted` (`session`, `warnings`) | Start audio capture and STT for the streams the consent allows; `CONSENT_REQUIRED` without consent; one live session at a time. With `SIDEKICK_AUDIO_FIXTURE`, the file plays as a single stream |
 | `pause_session` / `resume_session` | `session_id` | `Session` | Pause or resume listening (paused audio is dropped, never sent) |
 | `end_session` | `session_id` | `Session` | Stop capture and let STT flush; the overlay then writes the summary (`save_summary`) |
-| `delete_session` | `session_id` | `()` | Delete all session data (the consent record is kept, 4.4) |
+| `delete_session` | `session_id` | `()` | Delete all session data, including its vectors (the consent record is kept, 4.4); VACUUM follows when idle |
+| `set_session_retention` | `session_id, retention` (`session`, `7d`, `30d`, `forever`) | `Session` | How long this session is kept after it ends; `session` on an ended session deletes it now (overlay) |
+| `delete_all_data` | none | `u32` (sessions deleted) | Delete every session and knowledge pack; settings, keys, Skills and the consent log stay; stops a live session first (Settings window) |
 | `list_sessions` | `cursor?, limit?` | `SessionPage` (`items`, `nextCursor`) | Session history, newest first |
 | `get_transcript` | `session_id` | `Transcript` (`lines`, `bookmarks`) | Saved transcript in time order, for opening the Transcript tab |
 | `rename_speaker` | `session_id, from, to` | `u32` (lines changed) | Rename a speaker in every line; renaming to an existing name merges (LIS-3) |
@@ -629,10 +631,11 @@ Commands are request/response calls from the frontend to Rust (`invoke`). All re
 | `save_skill` / `set_skill_enabled` / `delete_skill` | `skill` / `skill_id, enabled` / `skill_id` | `SkillEntry` / `SkillEntry` / `()` | Manage Skills (Settings); deleting clears it from sessions |
 | `import_skill` / `export_skill` | `file_path` / `skill_id, file_path` | `ImportPreview` (`skill`, `requestedTools`, `replacesExisting`) / `()` | Share Skills as files; import saves nothing until the user approves the tools (then `save_skill`) |
 | `set_session_skill` | `session_id, skill_id?` | `Session` | The session's active Skill (overlay picker, Switch Skill shortcut) |
-| `set_overlay` | `opacity?, click_through?, compact?` | `OverlayState` | Overlay appearance |
+| `set_overlay` | `OverlayPatch` (`opacity?` 20–100, `fontSize?` 12–20, `compact?`) | `OverlayPrefs` (also `positions`) | Overlay appearance (overlay window; positions are saved by the shell). Click-through arrives with T-048 |
 | `get_capture_protection` | none | `ProtectionStatus` (`state`: protected / not_guaranteed / unavailable / disabled, plus a one-sentence `reason`) | Whether capture exclusion is active; shown as the shield in the overlay header |
 | `get_usage` | `range` | `UsageSummary` | Minutes, tokens and estimated cost |
-| `get_diagnostics` / `export_logs` | none / `file_path` | `Diagnostics` / `()` | App version, OS, protection status and per-stage latency stats; log bundle (T-031) |
+| `get_diagnostics` / `export_logs` | none / `file_path` | `Diagnostics` / `u32` (log files included) | App version, OS, protection status and per-stage latency stats; a zip with `logs/*.log` and `diagnostics.json`, never the database, settings or keys (Settings window) |
+| `log` | `level` (`error`/`warn`/`info`/`debug`), `message` (≤ 500 chars), `request_id?`, `session_id?` | `()` | Frontend lines into the same log file, target `frontend`. Messages are Sidekick's own wording, never content; uncaught errors are logged by type and first stack frame only |
 | `record_latency` | `stage, ms` | `()` | Overlay reports a measured stage (e.g. question → cue) |
 | `export_backup` / `restore_backup` | `file_path, passphrase` | `()` | Backup and restore |
 
@@ -854,7 +857,9 @@ On first launch, grant Microphone (and on macOS, System Audio Recording) permiss
 | --- | --- | --- | --- |
 | `SIDEKICK_LOG` | `info` | No | Log level: `error`, `warn`, `info`, `debug`, `trace` |
 | `SIDEKICK_DATA_DIR` | OS app data folder | No | Use a separate data folder for development |
-| `SIDEKICK_MOCK_PROVIDERS` | `0` | No | `1` replaces all providers with deterministic mocks (used in tests) |
+| `SIDEKICK_MOCK_TRANSCRIPT` | unset | No | Mock mode: a text file, one line per utterance; each burst of fixture audio becomes the next line (E2E) |
+| `SIDEKICK_MOCK_LLM_FAIL` | `0` | No | Mock mode: `1` makes every answer fail like an outage (E2E, NFR-5) |
+| `SIDEKICK_MOCK_PROVIDERS` | `0` | No | `1` replaces all providers with deterministic mocks (used in tests). Keys stay in memory, and the database key is a fixed test value so a mock `SIDEKICK_DATA_DIR` reopens after a restart |
 | `SIDEKICK_AUDIO_FIXTURE` | unset | No | Path to a WAV file played instead of live audio (tests and demos) |
 | `SIDEKICK_DISABLE_EXCLUSION` | `0` | No | `1` disables capture exclusion so the overlay can be screenshotted for docs |
 | `SIDEKICK_UPDATE_CHANNEL` | `stable` | No | `beta` or `stable` (release builds only) |
@@ -873,7 +878,8 @@ Run from the repository root. Cargo commands apply to the whole workspace.
 | Rust unit and integration tests | `cargo test --workspace` (one crate: `cargo test -p sidekick-<name>`) | Yes |
 | Frontend unit and component tests | `pnpm test` | Yes |
 | Type check | `pnpm typecheck` | Yes |
-| UI tests (Playwright, mocked backend) | `pnpm test:ui` | Not yet |
+| UI tests (Playwright, mocked backend) | `pnpm test:ui` (first time: `pnpm exec playwright install chromium`) | Yes (`UI` job) |
+| End-to-end tests (WebdriverIO, real app) | `pnpm build:e2e`, then `pnpm test:e2e` (Linux without a display: `xvfb-run -a pnpm test:e2e`) | Yes (`E2E` job) |
 | Full-app end-to-end tests | `pnpm test:e2e` (builds a debug app first) | Not yet |
 | Lint and format check | `pnpm lint`, `cargo clippy --workspace --all-targets -- -D warnings`, `cargo fmt --all --check` | Yes |
 | Format everything | `pnpm format` and `cargo fmt --all` | Yes |
@@ -1072,8 +1078,8 @@ These rules keep each part replaceable on its own. The compiler (Rust) and ESLin
 | Rust unit | `cargo test` | Chunking, retrieval ranking, provider request/response mapping, error mapping, consent rules, retention logic | Every PR |
 | Rust integration | `cargo test` (tests/ folder) | Database migrations, ingest pipeline end to end with fixture files, gateway with a mock HTTP server (`wiremock`) | Every PR |
 | Frontend unit and component | Vitest + React Testing Library | Orchestrator logic (detection, prompt building, routing), stores, components | Every PR |
-| UI | Playwright with mocked IPC | Overlay flows: Auto-answer toggle, Chat, code copy, settings dropdowns, accessibility (axe) | Every PR |
-| End-to-end | WebdriverIO + @wdio/tauri-service | Real app on Windows and macOS: session start with consent, fixture audio → transcript → answer, screenshot ask, settings and keys (mock providers) | Every PR (smoke), nightly (full) |
+| UI | Playwright with mocked IPC (`tests/ui/`, Chromium at the overlay's 420 x 640 and the Settings window's size) | Consent dialog (mouse and keyboard), Auto-answer on/off with directed questions, Chat with follow-ups and capture-and-ask, Ask and Auto shortcuts, code highlighting and copy-on-click (real clipboard), settings dropdowns, keys masked, Whisper download, and axe (WCAG 2.1 A/AA, contrast included) on every tab and dialog. The app runs with `vite --mode uitest`: mocks without the demo transcript, plus `window.__sidekickTest` to emit events and add transcript lines | Every PR |
+| End-to-end | WebdriverIO 9 + @wdio/tauri-service, embedded WebDriver (`tests/e2e/`, see its README) | Real app with mock providers, fixture audio and a scripted mock transcript: consent → transcript → detected question → cited answer; screenshot capture and ask; add, test and remove a key in Settings; an LLM outage keeps the transcript running (NFR-5); log scan for keys and content after each run. Built with `pnpm build:e2e` (cargo feature `e2e` + `tauri.e2e.conf.json`, never in releases) | Every PR on Ubuntu, Windows and macOS (`E2E` job) |
 | Answer quality | Custom eval script | Golden question set against fixture docs and transcripts with real providers; scores accuracy and citation correctness | Weekly and before release |
 | Performance | Soak script + diagnostics | 60-minute session with fixture audio: CPU, RAM, latency percentiles (section 13) | Nightly and before release |
 | Security | `cargo audit`, `cargo deny`, `pnpm audit`, log scan, secret scan | Vulnerable deps, licenses, keys in logs or repo | Every PR |
@@ -1139,7 +1145,7 @@ Two GitHub Actions workflows live in `.github/workflows/`. **Today only `ci.yml`
 | Checks | Ubuntu | Install with frozen lockfiles, lint, format check, type check, `bindings.ts` up to date, secret scan |
 | Unit and integration | Windows, macOS | `cargo test`, Vitest, coverage gates |
 | UI | Ubuntu | Playwright with mocked backend, axe accessibility checks |
-| E2E smoke | Windows, macOS | Debug build, WebdriverIO smoke suite with mock providers, log scan for secrets |
+| E2E | Ubuntu (Xvfb), Windows, macOS | `pnpm build:e2e` then `pnpm test:e2e`: the full suite with mock providers (about a minute once built), log scan for secrets and content; screenshots uploaded on failure |
 | Security | Ubuntu | `cargo audit`, `cargo deny`, `pnpm audit` |
 
 **`release.yml`: on a version tag (`v1.2.0`, `v1.3.0-beta.1`)**
@@ -1243,9 +1249,9 @@ There's no on-call; alerts are in-app notices shown to the user:
 | --- | --- |
 | Location (Windows) | `%APPDATA%/com.sidekick.app/logs/` |
 | Location (macOS) | `~/Library/Logs/com.sidekick.app/` |
-| Format | JSON lines: `timestamp`, `level`, `target` (module), `message`, `request_id`, `session_id`, plus structured fields |
-| Rotation | Daily, keep 14 days, max 50 MB total |
-| Content rules | No keys, prompts, transcript, document content or answers (section 7.7) |
+| Format | JSON lines (`tracing-subscriber` JSON): `timestamp`, `level`, `target` (module), `fields.message`, plus `request_id` (LLM streams: first token, done or failed with timing and token counts; frontend answer failures) or `session_id` (every session state change) |
+| Rotation | `sidekick-YYYY-MM-DD.log` per UTC day, a new `.1`, `.2`… part past 10 MB, files older than 14 days deleted, and the oldest deleted first above 50 MB in total (`sidekick_diagnostics::logfile`). With `SIDEKICK_DATA_DIR`, logs go to `<dir>/logs` |
+| Content rules | No keys, prompts, transcript, document content or answers (section 7.7). Every line also passes a redaction filter on its way to disk that masks key-shaped strings (`sk-…`, `AIza…`, `Bearer …`, 32+ hex characters). `node scripts/scan-logs.mjs <logs-dir>` checks a log folder for key patterns and fixture phrases; the E2E suite runs it (T-033) |
 | Export | Settings → Diagnostics → Export logs creates a zip with logs and a diagnostics snapshot for bug reports |
 
 ### 10.4 Runbooks
@@ -1287,8 +1293,8 @@ Escalation contact is the owner listed in section 14.2.
 
 | Job | When | What it does |
 | --- | --- | --- |
-| Retention cleanup | App start and every 6 hours | Deletes data past its retention period |
-| Vacuum | When idle after deletions | Reclaims space and clears deleted pages |
+| Retention cleanup | App start and every 6 hours | Deletes ended sessions past their own retention (`sessions.retention`, copied from Settings when created, changeable per session) and consent records older than a year (`crates/session/src/retention.rs`, `src-tauri/src/housekeeping.rs`) |
+| Vacuum | After deletions, when no session is live (checked every 5 minutes) | `VACUUM` plus a WAL checkpoint; with `secure_delete` on, deleted content is also overwritten in place |
 | Log rotation | Daily | Rotates and prunes logs |
 | Update check | App start and every 12 hours | Checks the update manifest for the user's channel |
 | Re-embedding | When embedding model changes | Re-embeds affected documents in the background |

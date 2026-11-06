@@ -42,6 +42,7 @@ export const DEFAULT_SETTINGS: Settings = {
     { action: "bookmark", keys: "CmdOrCtrl+Shift+B" },
   ],
   profile: { name: "", nicknames: [] },
+  overlay: { opacity: 90, fontSize: 14, compact: false, positions: [] },
 };
 
 type CatalogRow = [id: string, kind: ProviderKind, displayName: string, keyRequired: boolean];
@@ -180,6 +181,19 @@ const err = (code: SidekickError["code"], message: string) => ({
   error: { code, message, retryable: false },
 });
 
+/** Deletes a session and everything in it, like crates/session `repo::delete`. */
+function forgetSession(id: string) {
+  sessions.delete(id);
+  transcripts.delete(id);
+  bookmarks.delete(id);
+  documents.delete(id);
+  notesBySession.delete(id);
+  for (let i = screenshots.length - 1; i >= 0; i--)
+    if (screenshots[i]?.sessionId === id) screenshots.splice(i, 1);
+  for (let i = savedAnswers.length - 1; i >= 0; i--)
+    if (savedAnswers[i]?.answer.sessionId === id) savedAnswers.splice(i, 1);
+}
+
 function save(session: Session) {
   sessions.set(session.id, session);
   mockSessionBus.emit("session", { session: structuredClone(session) });
@@ -242,6 +256,9 @@ export const mockProtection: { status: ProtectionStatus } = {
   status: { state: "unavailable", reason: "Running in a browser: no screen-share protection." },
 };
 /** Paths the mock file picker returns next (tests set them). */
+/** Lines sent to the `log` command, for assertions. */
+export const mockLogs: { level: string; message: string; requestId: string | null }[] = [];
+
 export const mockFiles: { picked: string[]; saveAs: string[] } = { picked: [], saveAs: [] };
 /** Browser-demo switches; tests leave them off. */
 export const mockOptions = { demoTranscript: false, ingestStepMs: 5 };
@@ -297,6 +314,7 @@ export function resetMocks(): void {
   documents.clear();
   savedAnswers.length = 0;
   mockFiles.picked = [];
+  mockLogs.length = 0;
   mockFiles.saveAs = [];
   bookmarks.clear();
   notesBySession.clear();
@@ -458,6 +476,7 @@ export const mockCommands: Commands = {
       endedAt: null,
       consent: null,
       skillId: null,
+      retention: settings.retention,
     };
     return Promise.resolve(save(session));
   },
@@ -513,8 +532,22 @@ export const mockCommands: Commands = {
   },
   deleteSession: (sessionId) => {
     if (liveSessionId === sessionId) liveSessionId = null;
-    sessions.delete(sessionId);
+    forgetSession(sessionId);
     return Promise.resolve({ status: "ok", data: null });
+  },
+  setSessionRetention: (sessionId, retention) => {
+    const s = sessions.get(sessionId);
+    if (!s) return Promise.resolve(err("INTERNAL", "That session no longer exists."));
+    const updated = save({ ...s, retention });
+    // "Until the session ends" applies at once to an ended session.
+    if (s.status === "ended" && retention === "session") forgetSession(sessionId);
+    return Promise.resolve(updated);
+  },
+  deleteAllData: () => {
+    const n = sessions.size;
+    liveSessionId = null;
+    for (const id of [...sessions.keys()]) forgetSession(id);
+    return Promise.resolve({ status: "ok", data: n });
   },
   setAutoAnswer: (sessionId, on) => {
     const s = sessions.get(sessionId);
@@ -692,6 +725,29 @@ export const mockCommands: Commands = {
     if (skillId !== null && !mockSkills.has(skillId))
       return Promise.resolve(err("INTERNAL", "That Skill no longer exists."));
     return Promise.resolve(save({ ...s, skillId }));
+  },
+  setOverlay: (patch) => {
+    const o = settings.overlay;
+    const next = {
+      ...o,
+      opacity: patch.opacity ?? o.opacity,
+      fontSize: patch.fontSize ?? o.fontSize,
+      compact: patch.compact ?? o.compact,
+    };
+    if (next.opacity < 20 || next.opacity > 100 || next.fontSize < 12 || next.fontSize > 20)
+      return Promise.resolve(
+        err("INTERNAL", "Opacity must be 20 to 100% and text size 12 to 20 px."),
+      );
+    settings = { ...settings, overlay: next };
+    return Promise.resolve({ status: "ok", data: structuredClone(next) });
+  },
+  log: (level, message, requestId) => {
+    mockLogs.push({ level, message, requestId });
+    return Promise.resolve();
+  },
+  exportLogs: (path) => {
+    mockSkills.files.set(path, "zip: diagnostics.json, logs/");
+    return Promise.resolve({ status: "ok", data: 1 });
   },
   rateAnswer: (answerId, rating) => {
     const a = savedAnswers.find((x) => x.id === answerId);

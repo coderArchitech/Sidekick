@@ -16,10 +16,17 @@ pub struct MockProvider;
 pub fn mock_answer(req: &LlmRequest) -> String {
     let last = req.messages.iter().rev().find(|m| m.role == Role::User);
     let question = last.map_or("", |m| m.content.as_str());
-    if last.is_some_and(|m| m.image.is_some()) {
+    let answer = if last.is_some_and(|m| m.image.is_some()) {
         format!("Mock answer (with screenshot) to: {question}")
     } else {
         format!("Mock answer to: {question}")
+    };
+    // Full answers (answer-sized budgets, not one-line cues) cite the first
+    // source, so E2E tests see citations as with a real model.
+    if req.max_tokens > 100 {
+        format!("{answer} [1]")
+    } else {
+        answer
     }
 }
 
@@ -47,6 +54,13 @@ impl LlmProvider for MockProvider {
         req: LlmRequest,
         _key: Option<&SecretString>,
     ) -> SidekickResult<TokenStream> {
+        // E2E failure tests (NFR-5): every answer fails like an outage.
+        if std::env::var("SIDEKICK_MOCK_LLM_FAIL").as_deref() == Ok("1") {
+            return Err(sidekick_core::SidekickError::new(
+                sidekick_core::ErrorCode::ProviderUnavailable,
+                "The mock provider is down (SIDEKICK_MOCK_LLM_FAIL).",
+            ));
+        }
         let text = mock_answer(&req);
         Ok(async_stream(move |tx| async move {
             let words: Vec<String> = text.split_inclusive(' ').map(str::to_owned).collect();

@@ -34,6 +34,8 @@ pub struct NewSession<'a> {
     pub llm_provider: &'a str,
     pub llm_model: &'a str,
     pub auto_answer: bool,
+    /// From Settings; changeable per session.
+    pub retention: sidekick_core::retention::Retention,
 }
 
 pub fn create(db: &Database, new: &NewSession<'_>) -> SidekickResult<Session> {
@@ -47,9 +49,9 @@ pub fn create(db: &Database, new: &NewSession<'_>) -> SidekickResult<Session> {
     let id = uuid::Uuid::now_v7().to_string();
     db.conn()
         .execute(
-            "INSERT INTO sessions (id, title, status, stt_provider, llm_provider, llm_model, auto_answer, created_at)
-             VALUES (?1, ?2, 'draft', ?3, ?4, ?5, ?6, ?7)",
-            params![id, title, new.stt_provider, new.llm_provider, new.llm_model, new.auto_answer, now_ms()],
+            "INSERT INTO sessions (id, title, status, stt_provider, llm_provider, llm_model, auto_answer, retention, created_at)
+             VALUES (?1, ?2, 'draft', ?3, ?4, ?5, ?6, ?7, ?8)",
+            params![id, title, new.stt_provider, new.llm_provider, new.llm_model, new.auto_answer, new.retention.as_str(), now_ms()],
         )
         .map_err(|e| db_err("creating a session", &e))?;
     get(db, &id)
@@ -57,7 +59,7 @@ pub fn create(db: &Database, new: &NewSession<'_>) -> SidekickResult<Session> {
 
 const SELECT: &str = "SELECT s.id, s.title, s.status, s.auto_answer, s.created_at, s.started_at, s.ended_at,
     (SELECT c.option FROM consent_log c WHERE c.session_id = s.id ORDER BY c.confirmed_at DESC, c.rowid DESC LIMIT 1),
-    s.skill_id
+    s.skill_id, s.retention
     FROM sessions s";
 
 fn from_row(r: &Row<'_>) -> rusqlite::Result<(Session, String, Option<String>)> {
@@ -72,6 +74,7 @@ fn from_row(r: &Row<'_>) -> rusqlite::Result<(Session, String, Option<String>)> 
             ended_at: r.get(6)?,
             consent: None,
             skill_id: r.get(8)?,
+            retention: sidekick_core::retention::Retention::parse(&r.get::<_, String>(9)?),
         },
         r.get(2)?,
         r.get(7)?,
@@ -185,11 +188,35 @@ pub fn record_consent(
 }
 
 /// Deletes a session and everything in it. The consent log is kept (tech doc 4.4).
+/// Deletes the session and everything in it: rows cascade (transcript,
+/// documents, chunks and their search index, answers, notes, screenshots),
+/// and its vectors, which have no foreign key, are deleted explicitly. The
+/// consent record is kept (tech doc 4.4).
 pub fn delete(db: &Database, id: &str) -> SidekickResult<()> {
+    sidekick_store::vectors::delete_owner(db, &sidekick_store::vectors::session_owner(id))?;
     db.conn()
         .execute("DELETE FROM sessions WHERE id = ?1", [id])
         .map_err(|e| db_err("deleting a session", &e))?;
     Ok(())
+}
+
+/// Changes how long this session's data is kept.
+pub fn set_retention(
+    db: &Database,
+    session_id: &str,
+    retention: sidekick_core::retention::Retention,
+) -> SidekickResult<Session> {
+    let n = db
+        .conn()
+        .execute(
+            "UPDATE sessions SET retention = ?2 WHERE id = ?1",
+            params![session_id, retention.as_str()],
+        )
+        .map_err(|e| db_err("updating a session", &e))?;
+    if n == 0 {
+        return Err(SidekickError::internal("That session no longer exists."));
+    }
+    get(db, session_id)
 }
 
 /// Stores a finalised transcript segment and returns its row id.

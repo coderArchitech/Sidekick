@@ -400,7 +400,7 @@ async fn mock_provider_turns_speech_bursts_into_segments() {
     let (tx, rx) = tokio::sync::mpsc::channel(100);
     let s: Arc<dyn SttSink> = sink.clone();
     let task = tokio::spawn(async move {
-        MockSttProvider
+        MockSttProvider::default()
             .run(
                 SttConfig::new(StreamKind::Mic),
                 None,
@@ -447,7 +447,7 @@ async fn mock_provider_splits_on_a_time_gap() {
     let (tx, rx) = tokio::sync::mpsc::channel(100);
     let s: Arc<dyn SttSink> = sink.clone();
     let task = tokio::spawn(async move {
-        MockSttProvider
+        MockSttProvider::default()
             .run(
                 SttConfig::new(StreamKind::Mic),
                 None,
@@ -473,4 +473,40 @@ async fn mock_provider_splits_on_a_time_gap() {
         .map(|s| (s.start_ms, s.end_ms))
         .collect();
     assert_eq!(spans, [(0, 100), (500, 600)]);
+}
+
+#[tokio::test]
+async fn mock_provider_follows_a_script_then_falls_back() {
+    let sink = Arc::new(Sink::default());
+    let (tx, rx) = tokio::sync::mpsc::channel(100);
+    let s: Arc<dyn SttSink> = sink.clone();
+    let task = tokio::spawn(async move {
+        MockSttProvider::with_script(vec!["What's the rate limit for the Pro tier?".into()])
+            .run(
+                SttConfig::new(StreamKind::Mic),
+                None,
+                rx,
+                s,
+                CancellationToken::new(),
+            )
+            .await
+    });
+    for i in [0u64, 1, 10, 11] {
+        let mut f = frame(i, true);
+        f.kind = StreamKind::Mic;
+        tx.send(f).await.unwrap();
+    }
+    drop(tx);
+    task.await.unwrap().unwrap();
+    let texts: Vec<String> = sink
+        .segments
+        .lock()
+        .unwrap()
+        .iter()
+        .map(|s| s.text.clone())
+        .collect();
+    assert_eq!(
+        texts,
+        ["What's the rate limit for the Pro tier?", "Mock speech 2"]
+    );
 }

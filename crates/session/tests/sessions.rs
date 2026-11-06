@@ -31,6 +31,7 @@ fn new(title: &str) -> NewSession<'_> {
         llm_provider: "anthropic",
         llm_model: "claude-opus-5-5",
         auto_answer: true,
+        retention: sidekick_core::retention::Retention::ThirtyDays,
     }
 }
 
@@ -200,7 +201,7 @@ fn write_wav(path: &Path, pattern: &[(bool, f32)]) {
 
 fn plan() -> SttPlan {
     SttPlan {
-        provider: Arc::new(MockSttProvider),
+        provider: Arc::new(MockSttProvider::default()),
         key: None,
         language: "en".into(),
         keyterms: vec![],

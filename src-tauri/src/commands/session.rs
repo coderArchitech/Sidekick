@@ -30,6 +30,7 @@ pub struct SessionStarted {
 }
 
 pub(crate) fn changed(app: &AppHandle, session: &Session) {
+    tracing::info!(target: "session", session_id = %session.id, status = ?session.status, "session changed");
     let _ = SessionChanged {
         session: session.clone(),
     }
@@ -57,6 +58,7 @@ pub fn create_session(
                 .as_deref()
                 .unwrap_or(sidekick_gateway::DEFAULT_ANSWER_MODEL),
             auto_answer: settings.auto_answer,
+            retention: settings.retention,
         },
     )?;
     changed(&app, &session);
@@ -135,7 +137,7 @@ fn stt_plan(state: &AppState, choice: &ProviderChoice) -> SidekickResult<SttPlan
         })
     };
     let (provider, key): (Arc<dyn sidekick_stt::SttProvider>, _) = if state.mock {
-        (Arc::new(MockSttProvider), None)
+        (Arc::new(MockSttProvider::from_env()), None)
     } else {
         match choice.provider.as_str() {
             "deepgram" => (
@@ -241,7 +243,13 @@ pub async fn end_session(
 #[specta::specta]
 pub async fn delete_session(state: State<'_, AppState>, session_id: String) -> SidekickResult<()> {
     stop_if_live(&state, &session_id).await;
-    repo::delete(&state.db(), &session_id)
+    repo::delete(&state.db(), &session_id)?;
+    // Clear the deleted rows from free pages once idle (tech doc 4.4).
+    state
+        .vacuum_pending
+        .store(true, std::sync::atomic::Ordering::SeqCst);
+    crate::housekeeping::vacuum_if_idle(&state).await;
+    Ok(())
 }
 
 #[tauri::command]

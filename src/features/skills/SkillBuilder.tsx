@@ -90,7 +90,7 @@ export function SkillBuilder({ initial, editing, onSaved, onCancel }: Props) {
           className="mt-1 w-full rounded-md border border-slate-600 bg-slate-950 px-2 py-1"
         />
         {!editing && skill.name.trim() && (
-          <p className="text-xs text-slate-500">Saved as {slug(skill.name)}.md</p>
+          <p className="text-xs text-slate-400">Saved as {slug(skill.name)}.md</p>
         )}
         {fieldError("name")}
         {fieldError("id")}
@@ -111,7 +111,7 @@ export function SkillBuilder({ initial, editing, onSaved, onCancel }: Props) {
         <label htmlFor={`${base}-instr`} className="block text-slate-300">
           Instructions
         </label>
-        <p className="text-xs text-slate-500">
+        <p className="text-xs text-slate-400">
           How Sidekick should behave: persona, tone, answer format, what to avoid.
         </p>
         <textarea
@@ -148,7 +148,7 @@ export function SkillBuilder({ initial, editing, onSaved, onCancel }: Props) {
               onChange={() => set({ tools: toggle(skill.tools, t) })}
             />
             {TOOL_LABELS[t].label}
-            <span className="text-xs text-slate-500"> — {TOOL_LABELS[t].detail}</span>
+            <span className="text-xs text-slate-400"> — {TOOL_LABELS[t].detail}</span>
           </label>
         ))}
         {fieldError("tools")}

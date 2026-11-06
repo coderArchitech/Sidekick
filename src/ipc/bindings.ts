@@ -506,6 +506,68 @@ export const commands = {
       else return { status: "error", error: e as any };
     }
   },
+  async setOverlay(patch: OverlayPatch): Promise<Result<OverlayPrefs, SidekickError>> {
+    try {
+      return { status: "ok", data: await TAURI_INVOKE("set_overlay", { patch }) };
+    } catch (e) {
+      if (e instanceof Error) throw e;
+      else return { status: "error", error: e as any };
+    }
+  },
+  /**
+   * How long one session's data is kept after it ends (overlay).
+   */
+  async setSessionRetention(
+    sessionId: string,
+    retention: Retention,
+  ): Promise<Result<Session, SidekickError>> {
+    try {
+      return {
+        status: "ok",
+        data: await TAURI_INVOKE("set_session_retention", { sessionId, retention }),
+      };
+    } catch (e) {
+      if (e instanceof Error) throw e;
+      else return { status: "error", error: e as any };
+    }
+  },
+  /**
+   * Deletes every session and knowledge pack (Settings window). Settings,
+   * keys, Skills and the consent log stay. Returns the number of sessions.
+   */
+  async deleteAllData(): Promise<Result<number, SidekickError>> {
+    try {
+      return { status: "ok", data: await TAURI_INVOKE("delete_all_data") };
+    } catch (e) {
+      if (e instanceof Error) throw e;
+      else return { status: "error", error: e as any };
+    }
+  },
+  /**
+   * The frontend's logs go to the same file as Rust's (tech doc 7.7). The
+   * message is a short code-like description; never content. Truncated to keep
+   * lines small; `request_id` / `session_id` correlate with Rust's lines.
+   */
+  async log(
+    level: LogLevel,
+    message: string,
+    requestId: string | null,
+    sessionId: string | null,
+  ): Promise<void> {
+    await TAURI_INVOKE("log", { level, message, requestId, sessionId });
+  },
+  /**
+   * Settings → Diagnostics → Export logs: a zip with the log files and a
+   * diagnostics snapshot, for bug reports. No database, settings or keys.
+   */
+  async exportLogs(filePath: string): Promise<Result<number, SidekickError>> {
+    try {
+      return { status: "ok", data: await TAURI_INVOKE("export_logs", { filePath }) };
+    } catch (e) {
+      if (e instanceof Error) throw e;
+      else return { status: "error", error: e as any };
+    }
+  },
   /**
    * Queues a file for parsing and embedding.
    */
@@ -827,6 +889,10 @@ export type LlmRequest = {
   effort: Effort | null;
 };
 /**
+ * Frontend log levels (`log` command).
+ */
+export type LogLevel = "error" | "warn" | "info" | "debug";
+/**
  * Whisper model download progress (Settings).
  */
 export type ModelDownloadProgress = { name: string; doneBytes: number; totalBytes: number | null };
@@ -874,6 +940,32 @@ export type Notes = {
    */
   summaryMd: string | null;
   actionItems: ActionItem[];
+};
+/**
+ * Fields to change; omitted ones stay as they are.
+ */
+export type OverlayPatch = {
+  opacity?: number | null;
+  fontSize?: number | null;
+  compact?: boolean | null;
+};
+/**
+ * How the overlay looks and where it sits (PRD UI-1 to UI-3).
+ */
+export type OverlayPrefs = {
+  /**
+   * Percent, 20 to 100.
+   */
+  opacity: number;
+  /**
+   * Text size in px, 12 to 20.
+   */
+  fontSize: number;
+  compact: boolean;
+  /**
+   * One per monitor, most recent first (managed by the app shell).
+   */
+  positions: SavedPosition[];
 };
 /**
  * Who the user is, for directed questions and STT boosts (PRD QA-2, LIS-5a).
@@ -937,10 +1029,11 @@ export type QuestionSource = "detected" | "chat" | "screenshot";
  * can select on a small preview without knowing the display's pixel size.
  */
 export type Region = { x: number; y: number; width: number; height: number };
-/**
- * How long session data is kept after a session ends (tech doc 4.4).
- */
-export type Retention = "session" | "7d" | "30d" | "forever";
+export type Retention =
+  /**
+   * Deleted as soon as the session ends.
+   */
+  "session" | "7d" | "30d" | "forever";
 /**
  * Who wrote a message.
  */
@@ -961,6 +1054,19 @@ export type SavedAnswer = {
    * Epoch ms.
    */
   createdAt: number;
+};
+/**
+ * A remembered overlay position on one monitor.
+ */
+export type SavedPosition = {
+  /**
+   * [`monitor_key`] of the monitor it was on.
+   */
+  monitor: string;
+  x: number;
+  y: number;
+  width: number;
+  height: number;
 };
 /**
  * A stored screenshot, without its pixels.
@@ -1002,6 +1108,10 @@ export type Session = {
    * The active Skill, if any (PRD SKL-1).
    */
   skillId: string | null;
+  /**
+   * How long its data is kept after it ends (tech doc 4.4).
+   */
+  retention: Retention;
 };
 /**
  * A session was created or changed status (`session.state`).
@@ -1040,6 +1150,7 @@ export type Settings = {
    */
   shortcuts: Binding[];
   profile: Profile;
+  overlay: OverlayPrefs;
 };
 /**
  * A partial update. Only the sections present are replaced; unknown fields are
@@ -1060,6 +1171,7 @@ export type SettingsPatch = {
    */
   shortcuts?: Binding[] | null;
   profile?: Profile | null;
+  overlay?: OverlayPrefs | null;
 };
 /**
  * Error returned by every fallible Sidekick function and IPC command.

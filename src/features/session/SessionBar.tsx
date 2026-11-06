@@ -1,5 +1,5 @@
 import { useEffect, useId, useState } from "react";
-import { sessionEvents } from "@/ipc";
+import { sessionEvents, type Retention } from "@/ipc";
 import { useSkillsStore } from "@/orchestrator";
 import { ConsentDialog } from "./ConsentDialog";
 import { useSessionStore } from "./store";
@@ -119,6 +119,7 @@ export function SessionBar() {
           </button>
         </div>
       )}
+      {session?.status === "ended" && <EndedSessionData />}
       {warnings.map((w) => (
         <p key={w} role="status" className="text-amber-300">
           {w}
@@ -171,5 +172,67 @@ function SkillPicker() {
         </option>
       ))}
     </select>
+  );
+}
+
+const KEEP_LABELS: Record<Retention, string> = {
+  session: "Delete now",
+  "7d": "7 days",
+  "30d": "30 days",
+  forever: "Forever",
+};
+
+/** After a session ends: how long to keep it, or delete it now (tech doc 4.4). */
+function EndedSessionData() {
+  const session = useSessionStore((s) => s.session);
+  const setRetention = useSessionStore((s) => s.setRetention);
+  const remove = useSessionStore((s) => s.remove);
+  const busy = useSessionStore((s) => s.busy);
+  const [confirming, setConfirming] = useState(false);
+  if (!session) return null;
+  return (
+    <div className="flex items-center gap-2 text-slate-400">
+      <label className="flex items-center gap-1">
+        Keep “{session.title}”
+        <select
+          aria-label="Keep this session"
+          className="rounded-md border border-slate-600 bg-slate-950 px-1 py-0.5"
+          value={session.retention}
+          disabled={busy}
+          onChange={(e) => void setRetention(e.target.value as Retention)}
+        >
+          {(["7d", "30d", "forever"] as Retention[]).map((r) => (
+            <option key={r} value={r}>
+              {KEEP_LABELS[r]}
+            </option>
+          ))}
+        </select>
+      </label>
+      {confirming ? (
+        <>
+          <span className="text-amber-300">Delete transcript, notes, answers and documents?</span>
+          <button
+            type="button"
+            className={`${button} text-red-300`}
+            disabled={busy}
+            onClick={() => void remove()}
+          >
+            Delete
+          </button>
+          <button type="button" className={button} onClick={() => setConfirming(false)}>
+            Cancel
+          </button>
+        </>
+      ) : (
+        <button
+          type="button"
+          className={button}
+          disabled={busy}
+          onClick={() => setConfirming(true)}
+        >
+          Delete session…
+        </button>
+      )}
+    </div>
   );
 }

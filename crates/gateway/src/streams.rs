@@ -95,9 +95,16 @@ impl StreamManager {
                 () = token.cancelled() => Err(SidekickError::new(ErrorCode::Cancelled, "Cancelled.")),
                 r = run => r,
             };
+            let ms = u64::try_from(started.elapsed().as_millis()).unwrap_or(u64::MAX);
             match outcome {
-                Ok((usage, finish)) => sink.done(&request_id, usage, finish),
-                Err(e) => sink.error(&request_id, &e),
+                Ok((usage, finish)) => {
+                    tracing::info!(target: "gateway", request_id, ms, input_tokens = usage.input_tokens, output_tokens = usage.output_tokens, finish = ?finish, "stream done");
+                    sink.done(&request_id, usage, finish);
+                }
+                Err(e) => {
+                    tracing::warn!(target: "gateway", request_id, ms, code = ?e.code, "stream failed");
+                    sink.error(&request_id, &e);
+                }
             }
             let mut map = active.lock().unwrap_or_else(PoisonError::into_inner);
             // Only remove our own token; a newer stream may have reused the id.

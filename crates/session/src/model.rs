@@ -88,6 +88,8 @@ pub struct Session {
     pub consent: Option<ConsentOption>,
     /// The active Skill, if any (PRD SKL-1).
     pub skill_id: Option<String>,
+    /// How long its data is kept after it ends (tech doc 4.4).
+    pub retention: sidekick_core::retention::Retention,
 }
 
 /// Which lifecycle moves are allowed.

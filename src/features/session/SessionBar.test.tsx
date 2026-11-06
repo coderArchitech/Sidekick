@@ -166,4 +166,36 @@ describe("Auto-answer toggle", () => {
     await user.selectOptions(picker, "");
     await waitFor(() => expect(useSessionStore.getState().session?.skillId).toBeNull());
   });
+
+  async function endedSession(user: ReturnType<typeof userEvent.setup>) {
+    render(<SessionBar />);
+    await createSession(user, "Retro");
+    await user.click(screen.getByRole("button", { name: "Start" }));
+    await user.click(screen.getByLabelText("Transcribe me only"));
+    await user.click(screen.getByRole("button", { name: "Start listening" }));
+    await user.click(await screen.findByRole("button", { name: "End" }));
+    return screen.findByRole("combobox", { name: "Keep this session" });
+  }
+
+  it("after the session ends, chooses how long to keep it", async () => {
+    const user = userEvent.setup();
+    const keep = await endedSession(user);
+    expect(keep).toHaveValue("30d");
+    await user.selectOptions(keep, "forever");
+    await waitFor(() => expect(useSessionStore.getState().session?.retention).toBe("forever"));
+  });
+
+  it("deletes an ended session after confirming", async () => {
+    const user = userEvent.setup();
+    await endedSession(user);
+    const id = useSessionStore.getState().session?.id ?? "";
+    await user.click(screen.getByRole("button", { name: "Delete session…" }));
+    expect(
+      screen.getByText(/Delete transcript, notes, answers and documents\?/),
+    ).toBeInTheDocument();
+    await user.click(screen.getByRole("button", { name: "Delete" }));
+    await waitFor(() => expect(useSessionStore.getState().session).toBeNull());
+    const left = await mockCommands.listSessions(null, null);
+    expect(left.status === "ok" && left.data.items.some((s) => s.id === id)).toBe(false);
+  });
 });

@@ -373,7 +373,8 @@ async fn mock_mode_answers_without_keys() {
         .iter()
         .filter_map(|e| e.strip_prefix("q6:token:"))
         .collect();
-    assert_eq!(text, "Mock answer to: What's the rate limit?");
+    // 256 tokens is a full answer, so the mock cites source [1].
+    assert_eq!(text, "Mock answer to: What's the rate limit? [1]");
     assert!(
         gw.providers(ProviderKind::Llm)
             .unwrap()

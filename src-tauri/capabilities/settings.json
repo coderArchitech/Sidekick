@@ -24,6 +24,9 @@
     "allow-delete-skill",
     "allow-import-skill",
     "allow-export-skill",
+    "allow-delete-all-data",
+    "allow-log",
+    "allow-export-logs",
     "dialog:allow-open",
     "dialog:allow-save",
     "allow-get-diagnostics"
