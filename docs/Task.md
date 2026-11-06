@@ -70,7 +70,7 @@ All Phase 0 code and automated tests are done and green on Linux, Windows and ma
 | T-028 | `skills` crate and Skill builder | ✅ Done | Golden cases run against live models in T-039; tool use itself comes with Agents (T-045) |
 | T-029 | Overlay controls and private display | 🟡 In progress: testing | 🖥️ Waiting on hardware: multi-monitor restore on Windows/macOS. Snap and restore verified in the real app on Linux (Xvfb, one monitor) |
 | T-030 | Data control: retention, delete session | ✅ Done | Also fixed: deleting a session now deletes its vectors (they have no foreign key) |
-| T-031 | Logging to file and log export | ⬜ To do | |
+| T-031 | Logging to file and log export | 🟡 In progress: testing | Waiting on dependency: the log scan runs after the full E2E suite (T-033). Scanner done and passing on a real-app run |
 | T-032 | UI test suite (Playwright) | ⬜ To do | |
 | T-033 | End-to-end test suite (WebdriverIO) | ⬜ To do | |
 | T-034 | MVP acceptance pass | ⬜ To do | 🖥️ TECHNICAL.md 2.6 |
@@ -516,9 +516,9 @@ All Phase 0 code and automated tests are done and green on Linux, Windows and ma
 **Scope:** JSON-line logs with daily rotation (14 days, 50 MB); frontend `log` command; correlation IDs; Export logs zip with diagnostics snapshot.
 
 **Tests**
-- [ ] Unit: rotation and size cap.
-- [ ] Integration: log scan finds no key patterns or fixture phrases after a full E2E run.
-- [ ] Integration: export zip contains logs and diagnostics, no database.
+- [x] Unit: rotation (daily, by size) and the 14-day / 50 MB caps; redaction of key-shaped strings.
+- [ ] Integration: log scan finds no key patterns or fixture phrases after a full E2E run (T-033). `scripts/scan-logs.mjs` is ready and passed on a real-app run: create, consent, live with fixture audio, Chat question, end, notes and summary.
+- [x] Integration: export zip contains logs and diagnostics, no database.
 
 ### T-032 UI test suite (Playwright)
 

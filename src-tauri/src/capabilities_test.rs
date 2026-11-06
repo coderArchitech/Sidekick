@@ -41,6 +41,7 @@ const SETTINGS_ONLY: &[&str] = &[
     "allow-import-skill",
     "allow-export-skill",
     "allow-delete-all-data",
+    "allow-export-logs",
 ];
 
 #[test]

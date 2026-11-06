@@ -53,6 +53,8 @@ const COMMANDS: &[&str] = &[
     "set_overlay",
     "set_session_retention",
     "delete_all_data",
+    "log",
+    "export_logs",
     "ingest_document",
     "ingest_url",
     "list_documents",

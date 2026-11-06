@@ -62,6 +62,7 @@ export type {
   FinishReason,
   KeyCheck,
   KeyStatus,
+  LogLevel,
   LlmRequest,
   ModelInfo,
   NewActionItem,
@@ -182,6 +183,16 @@ export async function pickSkillFile(): Promise<string | null> {
 export async function chooseSkillExportPath(defaultName: string): Promise<string | null> {
   if (!isTauri) return mockFiles.saveAs.shift() ?? null;
   return save({ defaultPath: defaultName, filters: [{ name: "Skill", extensions: ["md"] }] });
+}
+
+/** Asks where to save the log bundle. Null if cancelled. */
+export async function chooseLogExportPath(): Promise<string | null> {
+  if (!isTauri) return mockFiles.saveAs.shift() ?? null;
+  const day = new Date().toISOString().slice(0, 10);
+  return save({
+    defaultPath: `sidekick-logs-${day}.zip`,
+    filters: [{ name: "Zip", extensions: ["zip"] }],
+  });
 }
 
 /** Files dropped onto the window. */

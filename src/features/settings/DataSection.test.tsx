@@ -1,7 +1,7 @@
 import { render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it } from "vitest";
-import { mockCommands, resetMocks } from "@/ipc/testing";
+import { mockCommands, mockFiles, mockSkills, resetMocks } from "@/ipc/testing";
 import { DataSection } from "./DataSection";
 
 describe("Settings → Your data", () => {
@@ -33,5 +33,29 @@ describe("Settings → Your data", () => {
     await user.click(screen.getByRole("button", { name: "Cancel" }));
     const left = await mockCommands.listSessions(null, null);
     expect(left.status === "ok" && left.data.items).toHaveLength(1);
+  });
+});
+
+describe("Settings → Diagnostics export", () => {
+  beforeEach(() => resetMocks());
+
+  it("exports the log bundle to the chosen file", async () => {
+    const { DiagnosticsPanel } = await import("./DiagnosticsPanel");
+    const user = userEvent.setup();
+    mockFiles.saveAs.push("/tmp/sidekick-logs.zip");
+    render(<DiagnosticsPanel />);
+    await user.click(screen.getByRole("button", { name: "Export logs…" }));
+    expect(await screen.findByRole("status")).toHaveTextContent(
+      "Saved the log bundle (1 log file and diagnostics).",
+    );
+    expect(mockSkills.files.has("/tmp/sidekick-logs.zip")).toBe(true);
+  });
+
+  it("does nothing when the save dialog is cancelled", async () => {
+    const { DiagnosticsPanel } = await import("./DiagnosticsPanel");
+    const user = userEvent.setup();
+    render(<DiagnosticsPanel />);
+    await user.click(screen.getByRole("button", { name: "Export logs…" }));
+    expect(screen.queryByRole("status")).toBeNull();
   });
 });

@@ -544,6 +544,31 @@ export const commands = {
     }
   },
   /**
+   * The frontend's logs go to the same file as Rust's (tech doc 7.7). The
+   * message is a short code-like description; never content. Truncated to keep
+   * lines small; `request_id` / `session_id` correlate with Rust's lines.
+   */
+  async log(
+    level: LogLevel,
+    message: string,
+    requestId: string | null,
+    sessionId: string | null,
+  ): Promise<void> {
+    await TAURI_INVOKE("log", { level, message, requestId, sessionId });
+  },
+  /**
+   * Settings → Diagnostics → Export logs: a zip with the log files and a
+   * diagnostics snapshot, for bug reports. No database, settings or keys.
+   */
+  async exportLogs(filePath: string): Promise<Result<number, SidekickError>> {
+    try {
+      return { status: "ok", data: await TAURI_INVOKE("export_logs", { filePath }) };
+    } catch (e) {
+      if (e instanceof Error) throw e;
+      else return { status: "error", error: e as any };
+    }
+  },
+  /**
    * Queues a file for parsing and embedding.
    */
   async ingestDocument(sessionId: string, path: string): Promise<Result<null, SidekickError>> {
@@ -863,6 +888,10 @@ export type LlmRequest = {
   maxTokens: number;
   effort: Effort | null;
 };
+/**
+ * Frontend log levels (`log` command).
+ */
+export type LogLevel = "error" | "warn" | "info" | "debug";
 /**
  * Whisper model download progress (Settings).
  */

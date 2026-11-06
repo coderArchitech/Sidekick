@@ -5163,9 +5163,14 @@ dependencies = [
 name = "sidekick-diagnostics"
 version = "0.1.0"
 dependencies = [
+ "regex",
  "serde",
  "serde_json",
  "specta",
+ "tempfile",
+ "tracing",
+ "tracing-subscriber",
+ "zip 2.6.1",
 ]
 
 [[package]]

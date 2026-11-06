@@ -4,6 +4,8 @@
 //! and reports count, p50, p95 and whether it meets its target. Everything stays
 //! on this machine; only durations are stored, never content.
 
+pub mod logfile;
+
 use std::collections::{HashMap, VecDeque};
 use std::sync::{Mutex, PoisonError};
 use std::time::{Duration, Instant};

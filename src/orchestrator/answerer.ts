@@ -9,6 +9,7 @@ import type {
   SidekickError,
   Stage,
 } from "@/ipc";
+import { log } from "@/lib/log";
 import type { ModelPlan } from "./models";
 import {
   NOT_FOUND,
@@ -331,6 +332,8 @@ export class AnswerRouter {
     });
     f.view = { ...f.view, status: "error", error: message };
     this.onUpdate({ ...f.view });
+    // Error messages are Sidekick's own wording, never content.
+    log.warn(`answer failed: ${message}`, { requestId: f.view.id, sessionId: f.input.sessionId });
     return f.view;
   }
 }

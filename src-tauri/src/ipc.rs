@@ -62,6 +62,8 @@ pub fn builder() -> Builder<tauri::Wry> {
             commands::overlay::set_overlay,
             commands::data::set_session_retention,
             commands::data::delete_all_data,
+            commands::diagnostics::log,
+            commands::diagnostics::export_logs,
             commands::documents::ingest_document,
             commands::documents::ingest_url,
             commands::documents::list_documents,

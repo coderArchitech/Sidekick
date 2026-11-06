@@ -9,3 +9,9 @@ body,
   margin: 0;
   background: transparent;
 }
+
+/* The UI is dark: native controls (select, scrollbars, date pickers) follow,
+   otherwise WebKitGTK draws a light select with the inherited white text. */
+:root {
+  color-scheme: dark;
+}

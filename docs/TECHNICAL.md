@@ -634,7 +634,8 @@ Commands are request/response calls from the frontend to Rust (`invoke`). All re
 | `set_overlay` | `OverlayPatch` (`opacity?` 20–100, `fontSize?` 12–20, `compact?`) | `OverlayPrefs` (also `positions`) | Overlay appearance (overlay window; positions are saved by the shell). Click-through arrives with T-048 |
 | `get_capture_protection` | none | `ProtectionStatus` (`state`: protected / not_guaranteed / unavailable / disabled, plus a one-sentence `reason`) | Whether capture exclusion is active; shown as the shield in the overlay header |
 | `get_usage` | `range` | `UsageSummary` | Minutes, tokens and estimated cost |
-| `get_diagnostics` / `export_logs` | none / `file_path` | `Diagnostics` / `()` | App version, OS, protection status and per-stage latency stats; log bundle (T-031) |
+| `get_diagnostics` / `export_logs` | none / `file_path` | `Diagnostics` / `u32` (log files included) | App version, OS, protection status and per-stage latency stats; a zip with `logs/*.log` and `diagnostics.json`, never the database, settings or keys (Settings window) |
+| `log` | `level` (`error`/`warn`/`info`/`debug`), `message` (≤ 500 chars), `request_id?`, `session_id?` | `()` | Frontend lines into the same log file, target `frontend`. Messages are Sidekick's own wording, never content; uncaught errors are logged by type and first stack frame only |
 | `record_latency` | `stage, ms` | `()` | Overlay reports a measured stage (e.g. question → cue) |
 | `export_backup` / `restore_backup` | `file_path, passphrase` | `()` | Backup and restore |
 
@@ -1245,9 +1246,9 @@ There's no on-call; alerts are in-app notices shown to the user:
 | --- | --- |
 | Location (Windows) | `%APPDATA%/com.sidekick.app/logs/` |
 | Location (macOS) | `~/Library/Logs/com.sidekick.app/` |
-| Format | JSON lines: `timestamp`, `level`, `target` (module), `message`, `request_id`, `session_id`, plus structured fields |
-| Rotation | Daily, keep 14 days, max 50 MB total |
-| Content rules | No keys, prompts, transcript, document content or answers (section 7.7) |
+| Format | JSON lines (`tracing-subscriber` JSON): `timestamp`, `level`, `target` (module), `fields.message`, plus `request_id` (LLM streams: first token, done or failed with timing and token counts; frontend answer failures) or `session_id` (every session state change) |
+| Rotation | `sidekick-YYYY-MM-DD.log` per UTC day, a new `.1`, `.2`… part past 10 MB, files older than 14 days deleted, and the oldest deleted first above 50 MB in total (`sidekick_diagnostics::logfile`). With `SIDEKICK_DATA_DIR`, logs go to `<dir>/logs` |
+| Content rules | No keys, prompts, transcript, document content or answers (section 7.7). Every line also passes a redaction filter on its way to disk that masks key-shaped strings (`sk-…`, `AIza…`, `Bearer …`, 32+ hex characters). `node scripts/scan-logs.mjs <logs-dir>` checks a log folder for key patterns and fixture phrases; the E2E suite runs it (T-033) |
 | Export | Settings → Diagnostics → Export logs creates a zip with logs and a diagnostics snapshot for bug reports |
 
 ### 10.4 Runbooks

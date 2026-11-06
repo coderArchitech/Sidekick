@@ -32,6 +32,7 @@
     "allow-set-session-skill",
     "allow-set-overlay",
     "allow-set-session-retention",
+    "allow-log",
     "allow-get-notes",
     "allow-save-notes",
     "allow-save-summary",

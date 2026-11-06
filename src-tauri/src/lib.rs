@@ -21,7 +21,6 @@ mod capabilities_test;
 
 /// Entry point shared by the desktop binary and (later) mobile targets.
 pub fn run() {
-    logging::init();
     let builder = ipc::builder();
 
     #[allow(clippy::expect_used)] // Startup: the app cannot run without its context.
@@ -30,6 +29,8 @@ pub fn run() {
         .plugin(tauri_plugin_dialog::init())
         .invoke_handler(builder.invoke_handler())
         .setup(move |app| {
+            logging::init(logging::log_dir(app.path().app_log_dir()?));
+            tracing::info!(target: "app", version = env!("CARGO_PKG_VERSION"), os = std::env::consts::OS, "starting");
             builder.mount_events(app);
             let default_dir = app.path().app_data_dir()?;
             // A startup failure here should show the recovery screen (tech doc 4.5);

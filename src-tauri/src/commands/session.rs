@@ -30,6 +30,7 @@ pub struct SessionStarted {
 }
 
 pub(crate) fn changed(app: &AppHandle, session: &Session) {
+    tracing::info!(target: "session", session_id = %session.id, status = ?session.status, "session changed");
     let _ = SessionChanged {
         session: session.clone(),
     }

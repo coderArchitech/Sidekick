@@ -256,6 +256,9 @@ export const mockProtection: { status: ProtectionStatus } = {
   status: { state: "unavailable", reason: "Running in a browser: no screen-share protection." },
 };
 /** Paths the mock file picker returns next (tests set them). */
+/** Lines sent to the `log` command, for assertions. */
+export const mockLogs: { level: string; message: string; requestId: string | null }[] = [];
+
 export const mockFiles: { picked: string[]; saveAs: string[] } = { picked: [], saveAs: [] };
 /** Browser-demo switches; tests leave them off. */
 export const mockOptions = { demoTranscript: false, ingestStepMs: 5 };
@@ -311,6 +314,7 @@ export function resetMocks(): void {
   documents.clear();
   savedAnswers.length = 0;
   mockFiles.picked = [];
+  mockLogs.length = 0;
   mockFiles.saveAs = [];
   bookmarks.clear();
   notesBySession.clear();
@@ -736,6 +740,14 @@ export const mockCommands: Commands = {
       );
     settings = { ...settings, overlay: next };
     return Promise.resolve({ status: "ok", data: structuredClone(next) });
+  },
+  log: (level, message, requestId) => {
+    mockLogs.push({ level, message, requestId });
+    return Promise.resolve();
+  },
+  exportLogs: (path) => {
+    mockSkills.files.set(path, "zip: diagnostics.json, logs/");
+    return Promise.resolve({ status: "ok", data: 1 });
   },
   rateAnswer: (answerId, rating) => {
     const a = savedAnswers.find((x) => x.id === answerId);
