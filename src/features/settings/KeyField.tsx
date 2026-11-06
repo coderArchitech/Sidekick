@@ -89,8 +89,7 @@ export function KeyField({ provider, providerName, status, onChanged }: Props) {
     }
   }
 
-  const button =
-    "rounded-md border border-slate-600 px-2.5 py-1 text-sm hover:bg-slate-700 disabled:opacity-50";
+  const button = "btn btn-secondary";
 
   return (
     <div className="mt-3 space-y-2">
@@ -102,7 +101,7 @@ export function KeyField({ provider, providerName, status, onChanged }: Props) {
             void save();
           }}
         >
-          <label htmlFor={inputId} className="block text-sm text-slate-300">
+          <label htmlFor={inputId} className="block text-sm text-fg-2">
             {providerName} API key
           </label>
           <div className="flex flex-wrap gap-2">
@@ -113,7 +112,7 @@ export function KeyField({ provider, providerName, status, onChanged }: Props) {
               spellCheck={false}
               value={value}
               onChange={(e) => setValue(e.target.value)}
-              className="min-w-0 flex-1 rounded-md border border-slate-600 bg-slate-950 px-2 py-1 font-mono text-sm"
+              className="min-w-0 flex-1 field font-mono text-sm"
             />
             <button
               type="button"
@@ -130,7 +129,7 @@ export function KeyField({ provider, providerName, status, onChanged }: Props) {
           <div className="flex gap-2">
             <button
               type="submit"
-              className={`${button} bg-blue-600 hover:bg-blue-500`}
+              className={`${button} bg-accent hover:bg-accent-hover`}
               disabled={busy || !value.trim()}
             >
               {busy ? "Testing…" : "Save and test"}
@@ -144,7 +143,7 @@ export function KeyField({ provider, providerName, status, onChanged }: Props) {
         </form>
       ) : (
         <div className="flex flex-wrap items-center gap-2">
-          <span className="text-sm text-slate-300">
+          <span className="text-sm text-fg-2">
             Saved key ending in <span className="font-mono">••••{status.last4}</span>
           </span>
           <button type="button" className={button} disabled={busy} onClick={() => void test()}>
@@ -161,7 +160,7 @@ export function KeyField({ provider, providerName, status, onChanged }: Props) {
       {message && (
         <p
           role={message.kind === "error" ? "alert" : "status"}
-          className={`text-sm ${message.kind === "error" ? "text-red-300" : "text-emerald-300"}`}
+          className={`text-sm ${message.kind === "error" ? "text-danger" : "text-success"}`}
         >
           {message.text}
         </p>

@@ -16,7 +16,7 @@ export function Markdown({ text }: { text: string }) {
           const lang = /language-([\w+-]+)/.exec(className ?? "")?.[1];
           const code = String(children).replace(/\n$/, "");
           if (lang || code.includes("\n")) return <CodeBlock code={code} lang={lang ?? ""} />;
-          return <code className="rounded bg-slate-800 px-1 text-[0.9em]">{children}</code>;
+          return <code className="rounded bg-surface-2 px-1 text-[0.9em]">{children}</code>;
         },
         a: ({ children, href }) => (
           <span className="underline decoration-dotted" title={href}>

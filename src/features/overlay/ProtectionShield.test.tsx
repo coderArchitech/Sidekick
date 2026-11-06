@@ -8,10 +8,10 @@ describe("ProtectionShield", () => {
   beforeEach(resetMocks);
 
   it.each<[ProtectionState, string, string]>([
-    ["protected", "Hidden from screen share", "bg-emerald-500"],
-    ["not_guaranteed", "Screen-share hiding not guaranteed", "bg-amber-400"],
-    ["unavailable", "Visible in screen share", "bg-red-500"],
-    ["disabled", "Screen-share hiding off", "bg-slate-400"],
+    ["protected", "Hidden from screen share", "bg-success"],
+    ["not_guaranteed", "Screen-share hiding not guaranteed", "bg-warning"],
+    ["unavailable", "Visible in screen share", "bg-danger"],
+    ["disabled", "Screen-share hiding off", "bg-fg-muted"],
   ])("shows %s with label and colour", async (state, label, colour) => {
     mockProtection.status = { state, reason: "Because." };
     const { container } = render(<ProtectionShield />);

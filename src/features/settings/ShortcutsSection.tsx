@@ -24,11 +24,11 @@ export function ShortcutsSection({ shortcuts, onSave }: Props) {
   const changed = draft.some((b, i) => b.keys !== shortcuts[i]?.keys);
 
   return (
-    <section aria-labelledby="shortcuts-heading" className="rounded-lg border border-slate-700 p-4">
+    <section aria-labelledby="shortcuts-heading" className="card p-4">
       <h2 id="shortcuts-heading" className="text-base font-semibold">
         Shortcuts
       </h2>
-      <p className="mb-3 text-sm text-slate-400">
+      <p className="mb-3 text-sm text-fg-muted">
         Work while another app has focus. Write them like <code>CmdOrCtrl+Shift+H</code> (Cmd on
         macOS, Ctrl on Windows); each needs a modifier.
       </p>
@@ -55,23 +55,19 @@ export function ShortcutsSection({ shortcuts, onSave }: Props) {
                 onChange={(e) =>
                   setDraft(draft.map((d, j) => (j === i ? { ...d, keys: e.target.value } : d)))
                 }
-                className="w-52 rounded-md border border-slate-600 bg-slate-950 px-2 py-1 font-mono text-xs"
+                className="field field-sm w-52 font-mono"
               />
             </label>
           ))}
         </div>
         <div className="mt-3 flex gap-2">
-          <button
-            type="submit"
-            disabled={!changed}
-            className="rounded-md border border-slate-600 bg-blue-600 px-2.5 py-1 text-sm hover:bg-blue-500 disabled:opacity-50"
-          >
+          <button type="submit" disabled={!changed} className="btn btn-primary">
             Save shortcuts
           </button>
           <button
             type="button"
             disabled={!changed}
-            className="rounded-md border border-slate-600 px-2.5 py-1 text-sm hover:bg-slate-700 disabled:opacity-50"
+            className="btn btn-secondary"
             onClick={() => {
               setDraft(shortcuts);
               setMessage(null);
@@ -84,7 +80,7 @@ export function ShortcutsSection({ shortcuts, onSave }: Props) {
       {message && (
         <p
           role={message.ok ? "status" : "alert"}
-          className={`mt-2 text-sm ${message.ok ? "text-emerald-300" : "text-red-300"}`}
+          className={`mt-2 text-sm ${message.ok ? "text-success" : "text-danger"}`}
         >
           {message.text}
         </p>

@@ -433,7 +433,9 @@ export const mockCommands: Commands = {
     const question = last?.content ?? "";
     // Mirrors the Rust mock: it notes when a screenshot came with the question.
     const prefix = last?.screenshotId ? "Mock answer (with screenshot) to:" : "Mock answer to:";
-    const words = `${prefix} ${question}`.split(/(?<= )/);
+    // Like the Rust mock: full answers (answer-sized budgets) cite source [1].
+    const cite = request.maxTokens > 100 ? " [1]" : "";
+    const words = `${prefix} ${question}${cite}`.split(/(?<= )/);
     const handle = { cancelled: false };
     activeStreams.set(requestId, handle);
     void (async () => {

@@ -11,7 +11,7 @@ test("code in an answer is highlighted and copied only on click", async ({ page 
   await page.evaluate(() => navigator.clipboard.writeText("untouched"));
   // The mock model echoes the question, so the fenced code comes back in the answer.
   const box = page.getByRole("textbox", { name: "Ask a question" });
-  await box.fill("Explain this:\n```ts\nconst limit = 600;\n```");
+  await box.fill("Explain this:\n```ts\nconst limit = 600;\n```\nThanks.");
   await box.press("Enter");
   const code = page.locator("pre code", { hasText: "const limit = 600;" }).first();
   await expect(code).toBeVisible();

@@ -8,7 +8,7 @@ export function LiveAnswers() {
   const views = useAnswersStore((s) => s.views);
   if (views.length === 0) {
     return (
-      <p className="text-slate-400">
+      <p className="text-fg-muted">
         {session?.status === "live"
           ? session.autoAnswer
             ? "Listening for questions…"

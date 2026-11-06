@@ -22,6 +22,9 @@ test("compact mode and the document panel pass axe", async ({ page }) => {
   await startSession(page);
   await page.getByText(/Documents \(/).click();
   await expectAccessible(page);
-  await page.getByRole("button", { name: "Compact" }).click();
+  await page.getByRole("button", { name: "View" }).click();
+  await expectAccessible(page);
+  await page.getByRole("switch", { name: "Compact" }).check();
+  await page.keyboard.press("Escape");
   await expectAccessible(page);
 });

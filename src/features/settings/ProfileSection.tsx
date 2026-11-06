@@ -25,19 +25,18 @@ export function ProfileSection({ profile, onSave }: Props) {
     setNewNick("");
   }
 
-  const input = "rounded-md border border-slate-600 bg-slate-950 px-2 py-1 text-sm";
-  const button =
-    "rounded-md border border-slate-600 px-2.5 py-1 text-sm hover:bg-slate-700 disabled:opacity-50";
+  const input = "field text-sm";
+  const button = "btn btn-secondary";
 
   return (
-    <section aria-labelledby="profile-heading" className="rounded-lg border border-slate-700 p-4">
+    <section aria-labelledby="profile-heading" className="card p-4">
       <h2 id="profile-heading" className="text-base font-semibold">
         Profile
       </h2>
-      <p className="mb-3 text-sm text-slate-400">
+      <p className="mb-3 text-sm text-fg-muted">
         Questions that use these names are answered first, even with Auto-answer off.
       </p>
-      <label htmlFor={nameId} className="block text-sm text-slate-300">
+      <label htmlFor={nameId} className="block text-sm text-fg-2">
         Your name
       </label>
       <input
@@ -47,21 +46,21 @@ export function ProfileSection({ profile, onSave }: Props) {
         className={`mt-1 ${input}`}
       />
 
-      <h3 className="mt-3 text-sm text-slate-300">Nicknames</h3>
+      <h3 className="mt-3 text-sm text-fg-2">Nicknames</h3>
       {nicknames.length === 0 ? (
-        <p className="text-sm text-slate-400">None yet.</p>
+        <p className="text-sm text-fg-muted">None yet.</p>
       ) : (
         <ul aria-label="Nicknames" className="mt-1 flex flex-wrap gap-2">
           {nicknames.map((n) => (
             <li
               key={n}
-              className="flex items-center gap-1 rounded-full border border-slate-600 px-2 py-0.5 text-sm"
+              className="flex items-center gap-1 rounded-full border border-line-strong px-2 py-0.5 text-sm"
             >
               {n}
               <button
                 type="button"
                 aria-label={`Remove ${n}`}
-                className="text-slate-400 hover:text-slate-100"
+                className="text-fg-muted hover:text-fg"
                 onClick={() => setNicknames(nicknames.filter((x) => x !== n))}
               >
                 ×
@@ -93,7 +92,7 @@ export function ProfileSection({ profile, onSave }: Props) {
       </form>
       <button
         type="button"
-        className={`mt-3 ${button} bg-blue-600 hover:bg-blue-500`}
+        className={`mt-3 ${button} bg-accent hover:bg-accent-hover`}
         onClick={() =>
           void onSave({ name, nicknames }).then((r) => {
             if ("error" in r) {
@@ -111,7 +110,7 @@ export function ProfileSection({ profile, onSave }: Props) {
       {message && (
         <p
           role={message.ok ? "status" : "alert"}
-          className={`mt-2 text-sm ${message.ok ? "text-emerald-300" : "text-red-300"}`}
+          className={`mt-2 text-sm ${message.ok ? "text-success" : "text-danger"}`}
         >
           {message.text}
         </p>

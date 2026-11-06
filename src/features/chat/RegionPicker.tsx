@@ -55,11 +55,11 @@ export function RegionPicker({
     <div
       role="dialog"
       aria-label="Select an area"
-      className="absolute bottom-full left-0 z-10 mb-1 w-80 rounded-md border border-slate-700 bg-slate-900 p-2 text-xs shadow-lg"
+      className="absolute bottom-full left-0 z-10 mb-1 w-80 rounded-md border border-line bg-surface p-2 text-xs shadow-lg"
     >
-      <p className="mb-1 text-slate-300">Drag over the area to capture.</p>
-      {error && <p className="text-red-300">{error}</p>}
-      {!src && !error && <p className="text-slate-400">Loading a preview…</p>}
+      <p className="mb-1 text-fg-2">Drag over the area to capture.</p>
+      {error && <p className="text-danger">{error}</p>}
+      {!src && !error && <p className="text-fg-muted">Loading a preview…</p>}
       {src && (
         <div
           ref={box}
@@ -80,7 +80,7 @@ export function RegionPicker({
           {region && (
             <div
               aria-hidden
-              className="absolute border-2 border-sky-400 bg-sky-400/20"
+              className="absolute border-2 border-accent bg-accent/20"
               style={{
                 left: `${region.x * 100}%`,
                 top: `${region.y * 100}%`,
@@ -92,13 +92,13 @@ export function RegionPicker({
         </div>
       )}
       <div className="mt-2 flex justify-end gap-2">
-        <button type="button" className="rounded px-2 py-1 hover:bg-slate-800" onClick={onCancel}>
+        <button type="button" className="btn btn-ghost btn-sm" onClick={onCancel}>
           Cancel
         </button>
         <button
           type="button"
           disabled={!valid}
-          className="rounded bg-sky-700 px-2 py-1 text-white disabled:opacity-40"
+          className="btn btn-primary btn-sm"
           onClick={() => region && onPick(region)}
         >
           Capture area

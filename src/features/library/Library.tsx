@@ -11,8 +11,7 @@ const STATUS: Record<DocStatus, string> = {
   failed: "Failed",
 };
 
-const button =
-  "rounded-md border border-slate-600 px-2 py-0.5 text-xs hover:bg-slate-700 disabled:opacity-50";
+const button = "btn btn-secondary btn-sm";
 
 /**
  * Session documents (PRD CTX-1, CTX-2): add files with the picker or by
@@ -53,12 +52,12 @@ export function Library() {
   const ready = documents.filter((d) => d.status === "ready").length;
 
   return (
-    <div className="border-b border-slate-700 px-3 py-1.5 text-xs">
+    <div className="border-b border-line px-3 py-1.5 text-xs">
       <button
         type="button"
         aria-expanded={open}
         aria-controls={panelId}
-        className="text-slate-300 hover:text-slate-100"
+        className="text-fg-2 hover:text-fg"
         onClick={() => setOpen((o) => !o)}
       >
         {open ? "▾" : "▸"} Documents ({ready}/{documents.length} ready)
@@ -88,18 +87,18 @@ export function Library() {
                 value={url}
                 placeholder="https://…"
                 onChange={(e) => setUrl(e.target.value)}
-                className="min-w-0 flex-1 rounded-md border border-slate-600 bg-slate-950 px-2 py-0.5"
+                className="field field-sm min-w-0 flex-1"
               />
               <button type="submit" className={button} disabled={!url.trim()}>
                 Add link
               </button>
             </form>
           </div>
-          <p className="text-slate-400">
+          <p className="text-fg-muted">
             Or drop files onto this window. PDF, Word, PowerPoint, Excel, text, Markdown.
           </p>
           {error && (
-            <p role="alert" className="text-red-300">
+            <p role="alert" className="text-danger">
               {error}
             </p>
           )}
@@ -115,10 +114,10 @@ export function Library() {
                     <span
                       className={
                         d.status === "ready"
-                          ? "text-emerald-300"
+                          ? "text-success"
                           : d.status === "failed"
-                            ? "text-red-300"
-                            : "text-amber-300"
+                            ? "text-danger"
+                            : "text-warning"
                       }
                     >
                       {STATUS[d.status]}
@@ -147,7 +146,7 @@ export function Library() {
           {documents
             .filter((d) => d.status === "failed" && d.error)
             .map((d) => (
-              <p key={`${d.id}-err`} className="text-red-300">
+              <p key={`${d.id}-err`} className="text-danger">
                 {d.name}: {d.error}
               </p>
             ))}

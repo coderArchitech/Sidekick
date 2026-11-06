@@ -37,7 +37,7 @@ export function CaptureMenu({ sessionId, disabled }: { sessionId: string; disabl
           setError(null);
           setStep(step === "closed" ? "menu" : "closed");
         }}
-        className="rounded-md border border-slate-700 px-2 py-1.5 text-sm text-slate-200 hover:bg-slate-800 disabled:opacity-40"
+        className="btn btn-secondary"
       >
         {capturing ? "Capturing…" : "Screenshot"}
       </button>
@@ -46,7 +46,7 @@ export function CaptureMenu({ sessionId, disabled }: { sessionId: string; disabl
         <div
           role="menu"
           aria-label="Capture"
-          className="absolute bottom-full left-0 z-10 mb-1 w-40 rounded-md border border-slate-700 bg-slate-900 p-1 text-sm shadow-lg"
+          className="absolute bottom-full left-0 z-10 mb-1 w-40 rounded-md border border-line bg-surface p-1 text-sm shadow-lg"
         >
           <MenuItem onClick={() => void take({ mode: "screen" })}>Full screen</MenuItem>
           <MenuItem
@@ -65,27 +65,25 @@ export function CaptureMenu({ sessionId, disabled }: { sessionId: string; disabl
         <div
           role="dialog"
           aria-label="Choose a window"
-          className="absolute bottom-full left-0 z-10 mb-1 max-h-64 w-64 overflow-y-auto rounded-md border border-slate-700 bg-slate-900 p-1 text-sm shadow-lg"
+          className="absolute bottom-full left-0 z-10 mb-1 max-h-64 w-64 overflow-y-auto rounded-md border border-line bg-surface p-1 text-sm shadow-lg"
         >
-          {error && <p className="p-1 text-red-300">{error}</p>}
-          {!windows && !error && <p className="p-1 text-slate-400">Finding windows…</p>}
-          {windows?.length === 0 && (
-            <p className="p-1 text-slate-400">No other windows are open.</p>
-          )}
+          {error && <p className="p-1 text-danger">{error}</p>}
+          {!windows && !error && <p className="p-1 text-fg-muted">Finding windows…</p>}
+          {windows?.length === 0 && <p className="p-1 text-fg-muted">No other windows are open.</p>}
           {windows?.map((w) => (
             <button
               key={w.id}
               type="button"
-              className="block w-full truncate rounded px-2 py-1 text-left hover:bg-slate-800"
+              className="block w-full truncate rounded px-2 py-1 text-left hover:bg-surface-2"
               onClick={() => void take({ mode: "window", windowId: w.id })}
             >
-              <span className="text-slate-100">{w.appName || "Window"}</span>
-              {w.title && <span className="text-slate-400"> — {w.title}</span>}
+              <span className="text-fg">{w.appName || "Window"}</span>
+              {w.title && <span className="text-fg-muted"> — {w.title}</span>}
             </button>
           ))}
           <button
             type="button"
-            className="mt-1 w-full rounded px-2 py-1 text-left text-slate-400 hover:bg-slate-800"
+            className="mt-1 w-full rounded px-2 py-1 text-left text-fg-muted hover:bg-surface-2"
             onClick={() => setStep("closed")}
           >
             Cancel
@@ -108,7 +106,7 @@ function MenuItem({ onClick, children }: { onClick: () => void; children: string
     <button
       type="button"
       role="menuitem"
-      className="block w-full rounded px-2 py-1 text-left text-slate-100 hover:bg-slate-800"
+      className="block w-full rounded px-2 py-1 text-left text-fg hover:bg-surface-2"
       onClick={onClick}
     >
       {children}
@@ -139,7 +137,7 @@ export function PendingScreenshot() {
     <div
       role="status"
       aria-label="Screenshot attached"
-      className="flex items-center gap-2 rounded-md border border-slate-700 p-1 text-xs text-slate-300"
+      className="flex items-center gap-2 rounded-md border border-line p-1 text-xs text-fg-2"
     >
       {src && <img src={src} alt="Screenshot preview" className="h-10 rounded object-cover" />}
       <span className="flex-1">
@@ -148,7 +146,7 @@ export function PendingScreenshot() {
       <button
         type="button"
         aria-label="Remove screenshot"
-        className="rounded px-1.5 hover:bg-slate-800"
+        className="rounded px-1.5 hover:bg-surface-2"
         onClick={clear}
       >
         ✕

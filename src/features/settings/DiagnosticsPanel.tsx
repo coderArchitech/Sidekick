@@ -44,27 +44,16 @@ export function DiagnosticsPanel() {
   }, [version]);
 
   return (
-    <section
-      aria-labelledby="diagnostics-heading"
-      className="rounded-lg border border-slate-700 p-4"
-    >
+    <section aria-labelledby="diagnostics-heading" className="card p-4">
       <div className="flex items-center justify-between">
         <h2 id="diagnostics-heading" className="text-base font-semibold">
           Diagnostics
         </h2>
         <div className="flex gap-2">
-          <button
-            type="button"
-            className="rounded-md border border-slate-600 px-2.5 py-1 text-sm hover:bg-slate-700"
-            onClick={() => void exportLogs()}
-          >
+          <button type="button" className="btn btn-secondary" onClick={() => void exportLogs()}>
             Export logs…
           </button>
-          <button
-            type="button"
-            className="rounded-md border border-slate-600 px-2.5 py-1 text-sm hover:bg-slate-700"
-            onClick={refresh}
-          >
+          <button type="button" className="btn btn-secondary" onClick={refresh}>
             Refresh
           </button>
         </div>
@@ -72,24 +61,24 @@ export function DiagnosticsPanel() {
       {exported && (
         <p
           role={exported.error ? "alert" : "status"}
-          className={`text-sm ${exported.error ? "text-red-300" : "text-emerald-300"}`}
+          className={`text-sm ${exported.error ? "text-danger" : "text-success"}`}
         >
           {exported.text}
         </p>
       )}
-      <p className="mb-3 text-sm text-slate-400">
+      <p className="mb-3 text-sm text-fg-muted">
         Measured on this computer over the last 15 minutes. Nothing here is sent anywhere. The log
         bundle holds logs (no keys, transcripts or answers) and these numbers, for a bug report.
       </p>
       {data && (
         <>
-          <p className="text-sm text-slate-300">
+          <p className="text-sm text-fg-2">
             Sidekick {data.appVersion} on {data.os}. Screen-share protection:{" "}
             {data.protection.reason}
           </p>
           <table className="mt-3 w-full text-left text-sm">
             <caption className="sr-only">Latency by stage</caption>
-            <thead className="text-slate-400">
+            <thead className="text-fg-muted">
               <tr>
                 <th scope="col" className="py-1 font-normal">
                   Stage
@@ -110,22 +99,22 @@ export function DiagnosticsPanel() {
             </thead>
             <tbody>
               {data.stages.map((s) => (
-                <tr key={s.stage} className="border-t border-slate-800">
+                <tr key={s.stage} className="border-t border-line">
                   <th scope="row" className="py-1 font-normal">
                     {STAGE_LABELS[s.stage]}
                   </th>
                   <td>{ms(s.p50Ms)}</td>
                   <td>{ms(s.p95Ms)}</td>
-                  <td className="text-slate-400">
+                  <td className="text-fg-muted">
                     {s.targetP50Ms} / {s.targetP95Ms} ms
                   </td>
                   <td>
                     {s.healthy === null ? (
-                      <span className="text-slate-400">No data</span>
+                      <span className="text-fg-muted">No data</span>
                     ) : s.healthy ? (
-                      <span className="text-emerald-300">Healthy</span>
+                      <span className="text-success">Healthy</span>
                     ) : (
-                      <span className="text-amber-300">Slow</span>
+                      <span className="text-warning">Slow</span>
                     )}
                   </td>
                 </tr>

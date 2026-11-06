@@ -71,21 +71,18 @@ export function ProviderSection({ kind, title, description, choice, allowOff, on
   const models = canListModels && loadedModels.provider === selectedId ? loadedModels.models : [];
 
   return (
-    <section
-      aria-labelledby={`${providerSelectId}-heading`}
-      className="rounded-lg border border-slate-700 p-4"
-    >
+    <section aria-labelledby={`${providerSelectId}-heading`} className="card p-4">
       <h2 id={`${providerSelectId}-heading`} className="text-base font-semibold">
         {title}
       </h2>
-      <p className="mb-3 text-sm text-slate-400">{description}</p>
+      <p className="mb-3 text-sm text-fg-muted">{description}</p>
 
-      <label htmlFor={providerSelectId} className="block text-sm text-slate-300">
+      <label htmlFor={providerSelectId} className="block text-sm text-fg-2">
         Provider
       </label>
       <select
         id={providerSelectId}
-        className="mt-1 rounded-md border border-slate-600 bg-slate-950 px-2 py-1 text-sm"
+        className="field mt-1"
         value={choice?.provider ?? OFF}
         onChange={(e) =>
           onChoose(e.target.value === OFF ? null : { provider: e.target.value, model: null })
@@ -102,7 +99,7 @@ export function ProviderSection({ kind, title, description, choice, allowOff, on
       </select>
 
       {selected && !selected.keyRequired && (
-        <p className="mt-3 text-sm text-slate-400">Runs on this computer. No key needed.</p>
+        <p className="mt-3 text-sm text-fg-muted">Runs on this computer. No key needed.</p>
       )}
       {selected?.keyRequired && (
         <KeyField
@@ -116,12 +113,12 @@ export function ProviderSection({ kind, title, description, choice, allowOff, on
 
       {kind === "llm" && models.length > 0 && choice && (
         <div className="mt-3">
-          <label htmlFor={modelSelectId} className="block text-sm text-slate-300">
+          <label htmlFor={modelSelectId} className="block text-sm text-fg-2">
             Model
           </label>
           <select
             id={modelSelectId}
-            className="mt-1 rounded-md border border-slate-600 bg-slate-950 px-2 py-1 text-sm"
+            className="field mt-1"
             value={choice.model ?? DEFAULT_MODEL}
             onChange={(e) => onChoose({ provider: choice.provider, model: e.target.value || null })}
           >
@@ -141,7 +138,7 @@ export function ProviderSection({ kind, title, description, choice, allowOff, on
         />
       )}
       {kind !== "llm" && selected?.id !== "whisper-local" && choice?.model && (
-        <p className="mt-3 text-sm text-slate-400">Model: {choice.model}</p>
+        <p className="mt-3 text-sm text-fg-muted">Model: {choice.model}</p>
       )}
     </section>
   );

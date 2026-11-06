@@ -69,13 +69,16 @@ describe("Overlay appearance (PRD UI-1, UI-3)", () => {
     render(<Overlay />);
     await waitFor(() => expect(useOverlayStore.getState().fontSize).toBe(18));
     expect(useOverlayStore.getState().opacity).toBe(0.55);
-    expect(screen.getByRole("button", { name: "Compact" })).toHaveAttribute("aria-pressed", "true");
+    await userEvent.click(screen.getByRole("button", { name: "View" }));
+    expect(screen.getByRole("switch", { name: "Compact" })).toBeChecked();
   });
 
   it("text size buttons scale the text and are saved", async () => {
     const user = userEvent.setup();
     render(<Overlay />);
     await waitFor(() => expect(document.documentElement.style.fontSize).toBe("16px"));
+    await user.click(screen.getByRole("button", { name: "View" }));
+    expect(screen.getByRole("dialog", { name: "View options" })).toHaveTextContent("14px");
     await user.click(screen.getByRole("button", { name: "Larger text" }));
     await user.click(screen.getByRole("button", { name: "Larger text" }));
     expect(document.documentElement.style.fontSize).toBe(`${(16 * 16) / 14}px`);
@@ -90,7 +93,8 @@ describe("Overlay appearance (PRD UI-1, UI-3)", () => {
     const user = userEvent.setup();
     render(<Overlay />);
     expect(screen.getByRole("button", { name: "New session" })).toBeInTheDocument();
-    await user.click(screen.getByRole("button", { name: "Compact" }));
+    await user.click(screen.getByRole("button", { name: "View" }));
+    await user.click(screen.getByRole("switch", { name: "Compact" }));
     expect(screen.queryByRole("button", { name: "New session" })).not.toBeInTheDocument();
     expect(screen.queryByText(/Documents/)).not.toBeInTheDocument();
     expect(screen.getAllByRole("tab")).toHaveLength(4);
@@ -99,10 +103,23 @@ describe("Overlay appearance (PRD UI-1, UI-3)", () => {
 
   it("opacity is saved as a percentage once it settles", async () => {
     render(<Overlay />);
+    await userEvent.click(screen.getByRole("button", { name: "View" }));
     const slider = screen.getByRole("slider", { name: "Panel opacity" });
     fireEvent.change(slider, { target: { value: "0.5" } });
     fireEvent.change(slider, { target: { value: "0.45" } });
     expect((await savedOverlay()).opacity).toBe(45);
+  });
+
+  it("the View menu closes on Escape and outside clicks", async () => {
+    const user = userEvent.setup();
+    render(<Overlay />);
+    await user.click(screen.getByRole("button", { name: "View" }));
+    expect(screen.getByRole("button", { name: "View" })).toHaveAttribute("aria-expanded", "true");
+    await user.keyboard("{Escape}");
+    expect(screen.queryByRole("dialog", { name: "View options" })).toBeNull();
+    await user.click(screen.getByRole("button", { name: "View" }));
+    await user.click(screen.getByRole("tab", { name: "Notes" }));
+    expect(screen.queryByRole("dialog", { name: "View options" })).toBeNull();
   });
 
   it("has no accessibility violations (axe)", async () => {

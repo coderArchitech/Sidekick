@@ -51,12 +51,12 @@ export function WhisperModels({ model, onChoose }: Props) {
   const busy = progress !== null;
   return (
     <div className="mt-3 space-y-2 text-sm">
-      <label htmlFor={selectId} className="block text-slate-300">
+      <label htmlFor={selectId} className="block text-fg-2">
         Model
       </label>
       <select
         id={selectId}
-        className="rounded-md border border-slate-600 bg-slate-950 px-2 py-1"
+        className="field"
         value={chosen}
         disabled={busy}
         onChange={(e) => onChoose(e.target.value)}
@@ -69,17 +69,11 @@ export function WhisperModels({ model, onChoose }: Props) {
         ))}
       </select>
       {entry && !entry.downloaded && !busy && (
-        <button
-          type="button"
-          className="ml-2 rounded-md bg-sky-700 px-2 py-1 text-white"
-          onClick={() => void download()}
-        >
+        <button type="button" className="btn btn-primary ml-2" onClick={() => void download()}>
           Download ({entry.sizeMb} MB)
         </button>
       )}
-      {entry?.downloaded && (
-        <p className="text-emerald-300">Ready. Audio stays on this computer.</p>
-      )}
+      {entry?.downloaded && <p className="text-success">Ready. Audio stays on this computer.</p>}
       {progress && (
         <div role="status" aria-label="Download progress">
           <progress
@@ -88,18 +82,18 @@ export function WhisperModels({ model, onChoose }: Props) {
             value={progress.percent ?? undefined}
             aria-valuetext={progress.percent === null ? "Downloading" : `${progress.percent}%`}
           />
-          <p className="text-slate-400">
+          <p className="text-fg-muted">
             Downloading {progress.name}… {progress.percent === null ? "" : `${progress.percent}%`}
           </p>
         </div>
       )}
       {error && (
-        <p role="alert" className="text-red-300">
+        <p role="alert" className="text-danger">
           {error}
         </p>
       )}
       {entry && !entry.englishOnly && (
-        <p className="text-slate-400">
+        <p className="text-fg-muted">
           Multilingual models also handle mixed languages like Hinglish.
         </p>
       )}

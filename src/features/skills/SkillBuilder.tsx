@@ -65,7 +65,7 @@ export function SkillBuilder({ initial, editing, onSaved, onCancel }: Props) {
 
   const fieldError = (field: string) =>
     errorFor(field).map((m) => (
-      <p key={m} className="text-xs text-red-300">
+      <p key={m} className="text-xs text-danger">
         {m}
       </p>
     ));
@@ -73,45 +73,45 @@ export function SkillBuilder({ initial, editing, onSaved, onCancel }: Props) {
   return (
     <form
       aria-label={editing ? `Edit ${initial.name}` : "New Skill"}
-      className="space-y-3 rounded-md border border-slate-700 p-3 text-sm"
+      className="space-y-3 rounded-md border border-line p-3 text-sm"
       onSubmit={(e) => {
         e.preventDefault();
         void save();
       }}
     >
       <div>
-        <label htmlFor={`${base}-name`} className="block text-slate-300">
+        <label htmlFor={`${base}-name`} className="block text-fg-2">
           Name
         </label>
         <input
           id={`${base}-name`}
           value={skill.name}
           onChange={(e) => set({ name: e.target.value })}
-          className="mt-1 w-full rounded-md border border-slate-600 bg-slate-950 px-2 py-1"
+          className="field mt-1 w-full"
         />
         {!editing && skill.name.trim() && (
-          <p className="text-xs text-slate-400">Saved as {slug(skill.name)}.md</p>
+          <p className="text-xs text-fg-muted">Saved as {slug(skill.name)}.md</p>
         )}
         {fieldError("name")}
         {fieldError("id")}
       </div>
       <div>
-        <label htmlFor={`${base}-desc`} className="block text-slate-300">
+        <label htmlFor={`${base}-desc`} className="block text-fg-2">
           Description
         </label>
         <input
           id={`${base}-desc`}
           value={skill.description ?? ""}
           onChange={(e) => set({ description: e.target.value })}
-          className="mt-1 w-full rounded-md border border-slate-600 bg-slate-950 px-2 py-1"
+          className="field mt-1 w-full"
         />
         {fieldError("description")}
       </div>
       <div>
-        <label htmlFor={`${base}-instr`} className="block text-slate-300">
+        <label htmlFor={`${base}-instr`} className="block text-fg-2">
           Instructions
         </label>
-        <p className="text-xs text-slate-400">
+        <p className="text-xs text-fg-muted">
           How Sidekick should behave: persona, tone, answer format, what to avoid.
         </p>
         <textarea
@@ -119,12 +119,12 @@ export function SkillBuilder({ initial, editing, onSaved, onCancel }: Props) {
           rows={8}
           value={skill.instructions}
           onChange={(e) => set({ instructions: e.target.value })}
-          className="mt-1 w-full rounded-md border border-slate-600 bg-slate-950 px-2 py-1"
+          className="field mt-1 w-full"
         />
         {fieldError("instructions")}
       </div>
       <fieldset>
-        <legend className="text-slate-300">Use for</legend>
+        <legend className="text-fg-2">Use for</legend>
         {TRIGGERS.map((t) => (
           <label key={t} className="mr-3 inline-flex items-center gap-1">
             <input
@@ -138,7 +138,7 @@ export function SkillBuilder({ initial, editing, onSaved, onCancel }: Props) {
         {fieldError("triggers")}
       </fieldset>
       <fieldset>
-        <legend className="text-slate-300">Tools</legend>
+        <legend className="text-fg-2">Tools</legend>
         {TOOLS.map((t) => (
           <label key={t} className="block">
             <input
@@ -148,43 +148,35 @@ export function SkillBuilder({ initial, editing, onSaved, onCancel }: Props) {
               onChange={() => set({ tools: toggle(skill.tools, t) })}
             />
             {TOOL_LABELS[t].label}
-            <span className="text-xs text-slate-400"> — {TOOL_LABELS[t].detail}</span>
+            <span className="text-xs text-fg-muted"> — {TOOL_LABELS[t].detail}</span>
           </label>
         ))}
         {fieldError("tools")}
       </fieldset>
       <div>
-        <label htmlFor={`${base}-format`} className="block text-slate-300">
+        <label htmlFor={`${base}-format`} className="block text-fg-2">
           Answers
         </label>
         <select
           id={`${base}-format`}
           value={skill.answerFormat ?? "cue_then_full"}
           onChange={(e) => set({ answerFormat: e.target.value as AnswerFormat })}
-          className="mt-1 rounded-md border border-slate-600 bg-slate-950 px-2 py-1"
+          className="mt-1 field"
         >
           <option value="cue_then_full">One-line cue, then the full answer</option>
           <option value="full_only">Full answer only</option>
         </select>
       </div>
       {errorFor("").map((m) => (
-        <p key={m} role="alert" className="text-red-300">
+        <p key={m} role="alert" className="text-danger">
           {m}
         </p>
       ))}
       <div className="flex justify-end gap-2">
-        <button
-          type="button"
-          className="rounded-md px-3 py-1 hover:bg-slate-800"
-          onClick={onCancel}
-        >
+        <button type="button" className="btn btn-ghost" onClick={onCancel}>
           Cancel
         </button>
-        <button
-          type="submit"
-          disabled={saving}
-          className="rounded-md bg-blue-600 px-3 py-1 hover:bg-blue-500 disabled:opacity-50"
-        >
+        <button type="submit" disabled={saving} className="btn btn-primary">
           Save Skill
         </button>
       </div>

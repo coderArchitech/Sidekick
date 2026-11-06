@@ -2,10 +2,10 @@ import { useEffect, useState } from "react";
 import { commands, type ProtectionState, type ProtectionStatus } from "@/ipc";
 
 const LOOK: Record<ProtectionState, { label: string; className: string }> = {
-  protected: { label: "Hidden from screen share", className: "bg-emerald-500" },
-  not_guaranteed: { label: "Screen-share hiding not guaranteed", className: "bg-amber-400" },
-  unavailable: { label: "Visible in screen share", className: "bg-red-500" },
-  disabled: { label: "Screen-share hiding off", className: "bg-slate-400" },
+  protected: { label: "Hidden from screen share", className: "bg-success" },
+  not_guaranteed: { label: "Screen-share hiding not guaranteed", className: "bg-warning" },
+  unavailable: { label: "Visible in screen share", className: "bg-danger" },
+  disabled: { label: "Screen-share hiding off", className: "bg-fg-muted" },
 };
 
 /** Shows whether the overlay is hidden from screen sharing (PRD UI-4a). */
@@ -23,7 +23,7 @@ export function ProtectionShield() {
       role="status"
       aria-label={`${look.label}. ${status.reason}`}
       title={status.reason}
-      className="flex items-center gap-1 text-xs text-slate-300"
+      className="flex items-center gap-1 text-xs text-fg-2"
     >
       <span
         aria-hidden="true"
