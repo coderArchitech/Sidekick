@@ -52,7 +52,7 @@ All Phase 0 code and automated tests are done and green on Linux, Windows and ma
 
 | ID | Task | Status | Notes |
 | --- | --- | --- | --- |
-| T-013 | Sessions and consent | 🟡 In progress: testing | Waiting on dependency: E2E needs the WebdriverIO harness (T-033). Everything else done, including a real-app run |
+| T-013 | Sessions and consent | ✅ Done | E2E passes with the T-033 suite |
 | T-014 | Live transcript tab | ✅ Done | Verified in the real app with fixture audio |
 | T-015 | `hotkeys` crate: global shortcuts | 🟡 In progress: testing | 🖥️ Waiting on hardware: verified on Linux (X11); needs a check on Windows and macOS. All actions are wired |
 | T-016 | Profile: name and nicknames | ✅ Done | Detection use lands in T-020 |
@@ -70,9 +70,9 @@ All Phase 0 code and automated tests are done and green on Linux, Windows and ma
 | T-028 | `skills` crate and Skill builder | ✅ Done | Golden cases run against live models in T-039; tool use itself comes with Agents (T-045) |
 | T-029 | Overlay controls and private display | 🟡 In progress: testing | 🖥️ Waiting on hardware: multi-monitor restore on Windows/macOS. Snap and restore verified in the real app on Linux (Xvfb, one monitor) |
 | T-030 | Data control: retention, delete session | ✅ Done | Also fixed: deleting a session now deletes its vectors (they have no foreign key) |
-| T-031 | Logging to file and log export | 🟡 In progress: testing | Waiting on dependency: the log scan runs after the full E2E suite (T-033). Scanner done and passing on a real-app run |
+| T-031 | Logging to file and log export | ✅ Done | Log scan runs after every E2E pass |
 | T-032 | UI test suite (Playwright) | 🟡 In progress: testing | Waiting on CI: the new UI job's first run on the PR. 16 specs pass locally, 48/48 repeated 3x. axe found and fixed: unnamed-text mismatch on A−/A+, low-contrast grey text |
-| T-033 | End-to-end test suite (WebdriverIO) | ⬜ To do | |
+| T-033 | End-to-end test suite (WebdriverIO) | 🟡 In progress: testing | Waiting on CI: the first E2E runs on Windows and macOS. All specs pass on Linux (Xvfb), 4/4 on each of 4 runs. One suite runs on every PR (about a minute once built), so there's no separate nightly |
 | T-034 | MVP acceptance pass | ⬜ To do | 🖥️ TECHNICAL.md 2.6 |
 
 ### Phase 2: V1 launch readiness
@@ -294,7 +294,7 @@ All Phase 0 code and automated tests are done and green on Linux, Windows and ma
 - [x] Integration: pause drops audio and splits the transcript; stop flushes STT.
 - [x] Component: session bar creates, starts, pauses, resumes and ends; consent dialog needs a choice, Cancel/Escape start nothing, focus starts on the first option; errors shown; axe passes.
 - [x] Manual: real app (Linux, Xvfb, driven with xdotool) with `SIDEKICK_MOCK_PROVIDERS=1` and `SIDEKICK_AUDIO_FIXTURE`: created a session, consent dialog shown, went live ("Listening"), ended cleanly; no errors in the log.
-- [ ] E2E: create session → consent → start with fixture audio → transcript appears → end (needs the WebdriverIO harness, T-033).
+- [x] E2E: create session → consent → start with fixture audio → transcript appears → end (`tests/e2e/specs/session.e2e.ts`).
 
 ### T-014 Live transcript tab
 
@@ -517,7 +517,7 @@ All Phase 0 code and automated tests are done and green on Linux, Windows and ma
 
 **Tests**
 - [x] Unit: rotation (daily, by size) and the 14-day / 50 MB caps; redaction of key-shaped strings.
-- [ ] Integration: log scan finds no key patterns or fixture phrases after a full E2E run (T-033). `scripts/scan-logs.mjs` is ready and passed on a real-app run: create, consent, live with fixture audio, Chat question, end, notes and summary.
+- [x] Integration: log scan finds no key patterns or fixture phrases after a full E2E run (T-033, runs after every E2E pass). `scripts/scan-logs.mjs` is ready and passed on a real-app run: create, consent, live with fixture audio, Chat question, end, notes and summary.
 - [x] Integration: export zip contains logs and diagnostics, no database.
 
 ### T-032 UI test suite (Playwright)
@@ -535,10 +535,10 @@ All Phase 0 code and automated tests are done and green on Linux, Windows and ma
 **Scope:** `tests/e2e/` with @wdio/tauri-service; mock providers and fixture audio; smoke suite on every PR (Windows, macOS), full suite nightly.
 
 **Tests**
-- [ ] E2E: session start with consent → fixture audio → transcript → detected question → cited answer.
-- [ ] E2E: screenshot capture and ask.
-- [ ] E2E: settings: add, test and remove a key (mock provider).
-- [ ] E2E: LLM failure keeps transcript running (NFR-5).
+- [x] E2E: session start with consent → fixture audio → transcript → detected question → cited answer.
+- [x] E2E: screenshot capture and ask.
+- [x] E2E: settings: add, test and remove a key (mock provider).
+- [x] E2E: LLM failure keeps transcript running (NFR-5).
 - [ ] CI: smoke suite green on Windows and macOS.
 
 ### T-034 MVP acceptance pass 🖥️

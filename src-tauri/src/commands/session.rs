@@ -137,7 +137,7 @@ fn stt_plan(state: &AppState, choice: &ProviderChoice) -> SidekickResult<SttPlan
         })
     };
     let (provider, key): (Arc<dyn sidekick_stt::SttProvider>, _) = if state.mock {
-        (Arc::new(MockSttProvider), None)
+        (Arc::new(MockSttProvider::from_env()), None)
     } else {
         match choice.provider.as_str() {
             "deepgram" => (

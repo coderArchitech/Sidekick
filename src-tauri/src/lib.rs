@@ -23,9 +23,15 @@ mod capabilities_test;
 pub fn run() {
     let builder = ipc::builder();
 
+    let app = tauri::Builder::default();
+    // E2E builds only (T-033): WebDriver inside the app, on every OS.
+    #[cfg(feature = "e2e")]
+    let app = app
+        .plugin(tauri_plugin_wdio::init())
+        .plugin(tauri_plugin_wdio_webdriver::init());
+
     #[allow(clippy::expect_used)] // Startup: the app cannot run without its context.
-    tauri::Builder::default()
-        .plugin(shortcuts::plugin())
+    app.plugin(shortcuts::plugin())
         .plugin(tauri_plugin_dialog::init())
         .invoke_handler(builder.invoke_handler())
         .setup(move |app| {

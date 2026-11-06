@@ -16,8 +16,13 @@ tauri-build = { version = "2", features = [] }
 [features]
 # Local Whisper speech-to-text (builds whisper.cpp; needs CMake and a C++ compiler).
 local-whisper = ["sidekick-stt/local-whisper"]
+# End-to-end tests only (T-033): an embedded WebDriver server and the WDIO
+# helper plugin. Never in a release build; see tests/e2e/README.md.
+e2e = ["dep:tauri-plugin-wdio", "dep:tauri-plugin-wdio-webdriver"]
 
 [dependencies]
+tauri-plugin-wdio = { version = "1.5", optional = true }
+tauri-plugin-wdio-webdriver = { version = "1.5", optional = true }
 sidekick-core = { workspace = true, features = ["specta"] }
 sidekick-secrets = { workspace = true, features = ["specta"] }
 sidekick-store.workspace = true

@@ -1,0 +1,21 @@
+{
+  "$schema": "https://schema.tauri.app/config/2",
+  "build": {
+    "beforeBuildCommand": "pnpm build --mode e2e"
+  },
+  "app": {
+    "withGlobalTauri": true,
+    "security": {
+      "capabilities": [
+        "overlay",
+        "settings",
+        {
+          "identifier": "e2e",
+          "description": "E2E builds only (T-033): lets WebdriverIO drive both windows.",
+          "windows": ["overlay", "settings"],
+          "permissions": ["wdio:default", "wdio-webdriver:default"]
+        }
+      ]
+    }
+  }
+}

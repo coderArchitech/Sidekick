@@ -857,6 +857,8 @@ On first launch, grant Microphone (and on macOS, System Audio Recording) permiss
 | --- | --- | --- | --- |
 | `SIDEKICK_LOG` | `info` | No | Log level: `error`, `warn`, `info`, `debug`, `trace` |
 | `SIDEKICK_DATA_DIR` | OS app data folder | No | Use a separate data folder for development |
+| `SIDEKICK_MOCK_TRANSCRIPT` | unset | No | Mock mode: a text file, one line per utterance; each burst of fixture audio becomes the next line (E2E) |
+| `SIDEKICK_MOCK_LLM_FAIL` | `0` | No | Mock mode: `1` makes every answer fail like an outage (E2E, NFR-5) |
 | `SIDEKICK_MOCK_PROVIDERS` | `0` | No | `1` replaces all providers with deterministic mocks (used in tests). Keys stay in memory, and the database key is a fixed test value so a mock `SIDEKICK_DATA_DIR` reopens after a restart |
 | `SIDEKICK_AUDIO_FIXTURE` | unset | No | Path to a WAV file played instead of live audio (tests and demos) |
 | `SIDEKICK_DISABLE_EXCLUSION` | `0` | No | `1` disables capture exclusion so the overlay can be screenshotted for docs |
@@ -877,6 +879,7 @@ Run from the repository root. Cargo commands apply to the whole workspace.
 | Frontend unit and component tests | `pnpm test` | Yes |
 | Type check | `pnpm typecheck` | Yes |
 | UI tests (Playwright, mocked backend) | `pnpm test:ui` (first time: `pnpm exec playwright install chromium`) | Yes (`UI` job) |
+| End-to-end tests (WebdriverIO, real app) | `pnpm build:e2e`, then `pnpm test:e2e` (Linux without a display: `xvfb-run -a pnpm test:e2e`) | Yes (`E2E` job) |
 | Full-app end-to-end tests | `pnpm test:e2e` (builds a debug app first) | Not yet |
 | Lint and format check | `pnpm lint`, `cargo clippy --workspace --all-targets -- -D warnings`, `cargo fmt --all --check` | Yes |
 | Format everything | `pnpm format` and `cargo fmt --all` | Yes |
@@ -1076,7 +1079,7 @@ These rules keep each part replaceable on its own. The compiler (Rust) and ESLin
 | Rust integration | `cargo test` (tests/ folder) | Database migrations, ingest pipeline end to end with fixture files, gateway with a mock HTTP server (`wiremock`) | Every PR |
 | Frontend unit and component | Vitest + React Testing Library | Orchestrator logic (detection, prompt building, routing), stores, components | Every PR |
 | UI | Playwright with mocked IPC (`tests/ui/`, Chromium at the overlay's 420 x 640 and the Settings window's size) | Consent dialog (mouse and keyboard), Auto-answer on/off with directed questions, Chat with follow-ups and capture-and-ask, Ask and Auto shortcuts, code highlighting and copy-on-click (real clipboard), settings dropdowns, keys masked, Whisper download, and axe (WCAG 2.1 A/AA, contrast included) on every tab and dialog. The app runs with `vite --mode uitest`: mocks without the demo transcript, plus `window.__sidekickTest` to emit events and add transcript lines | Every PR |
-| End-to-end | WebdriverIO + @wdio/tauri-service | Real app on Windows and macOS: session start with consent, fixture audio → transcript → answer, screenshot ask, settings and keys (mock providers) | Every PR (smoke), nightly (full) |
+| End-to-end | WebdriverIO 9 + @wdio/tauri-service, embedded WebDriver (`tests/e2e/`, see its README) | Real app with mock providers, fixture audio and a scripted mock transcript: consent → transcript → detected question → cited answer; screenshot capture and ask; add, test and remove a key in Settings; an LLM outage keeps the transcript running (NFR-5); log scan for keys and content after each run. Built with `pnpm build:e2e` (cargo feature `e2e` + `tauri.e2e.conf.json`, never in releases) | Every PR on Ubuntu, Windows and macOS (`E2E` job) |
 | Answer quality | Custom eval script | Golden question set against fixture docs and transcripts with real providers; scores accuracy and citation correctness | Weekly and before release |
 | Performance | Soak script + diagnostics | 60-minute session with fixture audio: CPU, RAM, latency percentiles (section 13) | Nightly and before release |
 | Security | `cargo audit`, `cargo deny`, `pnpm audit`, log scan, secret scan | Vulnerable deps, licenses, keys in logs or repo | Every PR |
@@ -1142,7 +1145,7 @@ Two GitHub Actions workflows live in `.github/workflows/`. **Today only `ci.yml`
 | Checks | Ubuntu | Install with frozen lockfiles, lint, format check, type check, `bindings.ts` up to date, secret scan |
 | Unit and integration | Windows, macOS | `cargo test`, Vitest, coverage gates |
 | UI | Ubuntu | Playwright with mocked backend, axe accessibility checks |
-| E2E smoke | Windows, macOS | Debug build, WebdriverIO smoke suite with mock providers, log scan for secrets |
+| E2E | Ubuntu (Xvfb), Windows, macOS | `pnpm build:e2e` then `pnpm test:e2e`: the full suite with mock providers (about a minute once built), log scan for secrets and content; screenshots uploaded on failure |
 | Security | Ubuntu | `cargo audit`, `cargo deny`, `pnpm audit` |
 
 **`release.yml`: on a version tag (`v1.2.0`, `v1.3.0-beta.1`)**

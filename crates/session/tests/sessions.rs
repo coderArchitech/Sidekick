@@ -201,7 +201,7 @@ fn write_wav(path: &Path, pattern: &[(bool, f32)]) {
 
 fn plan() -> SttPlan {
     SttPlan {
-        provider: Arc::new(MockSttProvider),
+        provider: Arc::new(MockSttProvider::default()),
         key: None,
         language: "en".into(),
         keyterms: vec![],
