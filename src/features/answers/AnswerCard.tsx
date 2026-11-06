@@ -49,7 +49,7 @@ export function AnswerCard({ view }: { view: AnswerView }) {
           {view.error}
         </p>
       )}
-      {view.status === "cancelled" && <p className="mt-1 text-xs text-slate-500">Stopped.</p>}
+      {view.status === "cancelled" && <p className="mt-1 text-xs text-slate-400">Stopped.</p>}
 
       {(view.body || view.sources.length > 0) && view.body !== view.cue && (
         <>
@@ -87,7 +87,7 @@ export function AnswerCard({ view }: { view: AnswerView }) {
             type="button"
             aria-label="Helpful"
             aria-pressed={rating === 1}
-            className={`rounded px-1.5 hover:bg-slate-800 ${rating === 1 ? "text-emerald-300" : "text-slate-500"}`}
+            className={`rounded px-1.5 hover:bg-slate-800 ${rating === 1 ? "text-emerald-300" : "text-slate-400"}`}
             onClick={() => void rate(1)}
           >
             👍
@@ -96,7 +96,7 @@ export function AnswerCard({ view }: { view: AnswerView }) {
             type="button"
             aria-label="Not helpful"
             aria-pressed={rating === -1}
-            className={`rounded px-1.5 hover:bg-slate-800 ${rating === -1 ? "text-red-300" : "text-slate-500"}`}
+            className={`rounded px-1.5 hover:bg-slate-800 ${rating === -1 ? "text-red-300" : "text-slate-400"}`}
             onClick={() => void rate(-1)}
           >
             👎

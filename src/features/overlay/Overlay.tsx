@@ -82,21 +82,21 @@ export function Overlay() {
         <div className="flex items-center text-xs" role="group" aria-label="Text size">
           <button
             type="button"
-            aria-label="Smaller text"
             className="rounded px-1 text-slate-300 hover:bg-slate-700 disabled:opacity-40"
             disabled={fontSize <= MIN_FONT}
             onClick={() => setFontSize(fontSize - 1)}
           >
-            A−
+            <span aria-hidden="true">A−</span>
+            <span className="sr-only">Smaller text</span>
           </button>
           <button
             type="button"
-            aria-label="Larger text"
             className="rounded px-1 text-slate-300 hover:bg-slate-700 disabled:opacity-40"
             disabled={fontSize >= MAX_FONT}
             onClick={() => setFontSize(fontSize + 1)}
           >
-            A+
+            <span aria-hidden="true">A+</span>
+            <span className="sr-only">Larger text</span>
           </button>
         </div>
         <button

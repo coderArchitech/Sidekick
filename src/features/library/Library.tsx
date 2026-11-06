@@ -95,7 +95,7 @@ export function Library() {
               </button>
             </form>
           </div>
-          <p className="text-slate-500">
+          <p className="text-slate-400">
             Or drop files onto this window. PDF, Word, PowerPoint, Excel, text, Markdown.
           </p>
           {error && (

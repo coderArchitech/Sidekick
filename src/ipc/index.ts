@@ -13,7 +13,10 @@ import {
   mockCommands,
   mockFiles,
   mockOptions,
+  mockProtection,
   mockSessionBus,
+  mockSkills,
+  mockTranscriptLine,
   mockWindowCalls,
 } from "./mock";
 
@@ -24,6 +27,23 @@ if (
   import.meta.env.MODE === "web"
 ) {
   mockOptions.demoTranscript = true;
+}
+
+// Playwright UI tests (vite --mode uitest, T-032) drive the mocked backend
+// through this hook: emit events, add transcript lines, queue file picks.
+if (
+  typeof window !== "undefined" &&
+  !("__TAURI_INTERNALS__" in window) &&
+  import.meta.env.MODE === "uitest"
+) {
+  (window as unknown as { __sidekickTest: unknown }).__sidekickTest = {
+    commands: mockCommands,
+    sessionBus: mockSessionBus,
+    transcriptLine: mockTranscriptLine,
+    files: mockFiles,
+    skills: mockSkills,
+    protection: mockProtection,
+  };
 }
 import type { SessionEvents } from "./sessionEvents";
 

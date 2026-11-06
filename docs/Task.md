@@ -71,7 +71,7 @@ All Phase 0 code and automated tests are done and green on Linux, Windows and ma
 | T-029 | Overlay controls and private display | 🟡 In progress: testing | 🖥️ Waiting on hardware: multi-monitor restore on Windows/macOS. Snap and restore verified in the real app on Linux (Xvfb, one monitor) |
 | T-030 | Data control: retention, delete session | ✅ Done | Also fixed: deleting a session now deletes its vectors (they have no foreign key) |
 | T-031 | Logging to file and log export | 🟡 In progress: testing | Waiting on dependency: the log scan runs after the full E2E suite (T-033). Scanner done and passing on a real-app run |
-| T-032 | UI test suite (Playwright) | ⬜ To do | |
+| T-032 | UI test suite (Playwright) | 🟡 In progress: testing | Waiting on CI: the new UI job's first run on the PR. 16 specs pass locally, 48/48 repeated 3x. axe found and fixed: unnamed-text mismatch on A−/A+, low-contrast grey text |
 | T-033 | End-to-end test suite (WebdriverIO) | ⬜ To do | |
 | T-034 | MVP acceptance pass | ⬜ To do | 🖥️ TECHNICAL.md 2.6 |
 
@@ -526,7 +526,7 @@ All Phase 0 code and automated tests are done and green on Linux, Windows and ma
 **Scope:** `tests/ui/` with mocked IPC events; flows: Auto-answer toggle, Chat, code copy, settings dropdowns, consent dialog; axe checks; added to CI.
 
 **Tests**
-- [ ] UI: each flow above has a spec; axe passes on every screen.
+- [x] UI: each flow above has a spec; axe passes on every screen.
 - [ ] CI: UI job green.
 
 ### T-033 End-to-end test suite (WebdriverIO)

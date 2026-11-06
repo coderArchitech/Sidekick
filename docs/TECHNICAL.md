@@ -876,7 +876,7 @@ Run from the repository root. Cargo commands apply to the whole workspace.
 | Rust unit and integration tests | `cargo test --workspace` (one crate: `cargo test -p sidekick-<name>`) | Yes |
 | Frontend unit and component tests | `pnpm test` | Yes |
 | Type check | `pnpm typecheck` | Yes |
-| UI tests (Playwright, mocked backend) | `pnpm test:ui` | Not yet |
+| UI tests (Playwright, mocked backend) | `pnpm test:ui` (first time: `pnpm exec playwright install chromium`) | Yes (`UI` job) |
 | Full-app end-to-end tests | `pnpm test:e2e` (builds a debug app first) | Not yet |
 | Lint and format check | `pnpm lint`, `cargo clippy --workspace --all-targets -- -D warnings`, `cargo fmt --all --check` | Yes |
 | Format everything | `pnpm format` and `cargo fmt --all` | Yes |
@@ -1075,7 +1075,7 @@ These rules keep each part replaceable on its own. The compiler (Rust) and ESLin
 | Rust unit | `cargo test` | Chunking, retrieval ranking, provider request/response mapping, error mapping, consent rules, retention logic | Every PR |
 | Rust integration | `cargo test` (tests/ folder) | Database migrations, ingest pipeline end to end with fixture files, gateway with a mock HTTP server (`wiremock`) | Every PR |
 | Frontend unit and component | Vitest + React Testing Library | Orchestrator logic (detection, prompt building, routing), stores, components | Every PR |
-| UI | Playwright with mocked IPC | Overlay flows: Auto-answer toggle, Chat, code copy, settings dropdowns, accessibility (axe) | Every PR |
+| UI | Playwright with mocked IPC (`tests/ui/`, Chromium at the overlay's 420 x 640 and the Settings window's size) | Consent dialog (mouse and keyboard), Auto-answer on/off with directed questions, Chat with follow-ups and capture-and-ask, Ask and Auto shortcuts, code highlighting and copy-on-click (real clipboard), settings dropdowns, keys masked, Whisper download, and axe (WCAG 2.1 A/AA, contrast included) on every tab and dialog. The app runs with `vite --mode uitest`: mocks without the demo transcript, plus `window.__sidekickTest` to emit events and add transcript lines | Every PR |
 | End-to-end | WebdriverIO + @wdio/tauri-service | Real app on Windows and macOS: session start with consent, fixture audio → transcript → answer, screenshot ask, settings and keys (mock providers) | Every PR (smoke), nightly (full) |
 | Answer quality | Custom eval script | Golden question set against fixture docs and transcripts with real providers; scores accuracy and citation correctness | Weekly and before release |
 | Performance | Soak script + diagnostics | 60-minute session with fixture audio: CPU, RAM, latency percentiles (section 13) | Nightly and before release |

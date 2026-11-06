@@ -20,7 +20,8 @@
     "typecheck": "tsc --noEmit",
     "ipc:gen": "node scripts/ipc-gen.mjs",
     "icons": "tauri icon src-tauri/app-icon.png",
-    "verify": "pnpm lint && pnpm typecheck && pnpm test && cargo fmt --all --check && cargo clippy --workspace --all-targets -- -D warnings && cargo test --workspace"
+    "verify": "pnpm lint && pnpm typecheck && pnpm test && cargo fmt --all --check && cargo clippy --workspace --all-targets -- -D warnings && cargo test --workspace",
+    "test:ui": "playwright test"
   },
   "dependencies": {
     "@tauri-apps/api": "^2.12.4",
@@ -32,7 +33,9 @@
     "zustand": "^5.0.16"
   },
   "devDependencies": {
+    "@axe-core/playwright": "^4.14.0",
     "@eslint/js": "^9.39.5",
+    "@playwright/test": "1.63.0",
     "@tailwindcss/vite": "^4.3.4",
     "@tauri-apps/cli": "^2.12.4",
     "@testing-library/jest-dom": "^7.0.1",
