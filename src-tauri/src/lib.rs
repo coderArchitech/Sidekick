@@ -8,6 +8,7 @@ use tauri::Manager;
 
 mod commands;
 mod events;
+mod housekeeping;
 mod ipc;
 mod logging;
 mod placement;
@@ -45,6 +46,7 @@ pub fn run() {
             app.manage(shortcuts::Registered::default());
             app.manage(placement::Generation::default());
             placement::restore(app.handle());
+            housekeeping::start(app.handle());
             if let Some(w) = app.get_webview_window("overlay") {
                 let handle = app.handle().clone();
                 w.on_window_event(move |e| {

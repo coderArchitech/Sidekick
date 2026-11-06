@@ -6,6 +6,7 @@ import {
   type Settings,
   type SettingsPatch,
 } from "@/ipc";
+import { DataSection } from "./DataSection";
 import { DiagnosticsPanel } from "./DiagnosticsPanel";
 import { ProfileSection } from "./ProfileSection";
 import { ProviderSection } from "./ProviderSection";
@@ -139,6 +140,7 @@ export function SettingsWindow() {
               </select>
             </section>
             <SkillsSection />
+            <DataSection />
             <ShortcutsSection
               shortcuts={settings.shortcuts}
               onSave={async (shortcuts) => {

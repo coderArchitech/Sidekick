@@ -119,3 +119,14 @@ pub fn exists(db: &Database) -> SidekickResult<bool> {
 fn to_blob(v: &[f32]) -> Vec<u8> {
     v.iter().flat_map(|f| f.to_le_bytes()).collect()
 }
+
+/// Deletes every vector of one owner (a deleted session or pack). The vector
+/// table has no foreign keys, so callers must do this explicitly.
+pub fn delete_owner(db: &Database, owner: &str) -> SidekickResult<usize> {
+    if !exists(db)? {
+        return Ok(0);
+    }
+    db.conn()
+        .execute("DELETE FROM chunk_vectors WHERE owner = ?1", [owner])
+        .map_err(|e| db_error("deleting vectors", &e))
+}

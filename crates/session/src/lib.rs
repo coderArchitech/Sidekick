@@ -9,6 +9,7 @@ pub mod answers;
 pub mod model;
 pub mod notes;
 pub mod repo;
+pub mod retention;
 pub mod runner;
 
 pub use model::{ConsentOption, Session, SessionStatus, streams_for};

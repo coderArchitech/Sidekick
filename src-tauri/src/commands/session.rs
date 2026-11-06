@@ -57,6 +57,7 @@ pub fn create_session(
                 .as_deref()
                 .unwrap_or(sidekick_gateway::DEFAULT_ANSWER_MODEL),
             auto_answer: settings.auto_answer,
+            retention: settings.retention,
         },
     )?;
     changed(&app, &session);
@@ -241,7 +242,13 @@ pub async fn end_session(
 #[specta::specta]
 pub async fn delete_session(state: State<'_, AppState>, session_id: String) -> SidekickResult<()> {
     stop_if_live(&state, &session_id).await;
-    repo::delete(&state.db(), &session_id)
+    repo::delete(&state.db(), &session_id)?;
+    // Clear the deleted rows from free pages once idle (tech doc 4.4).
+    state
+        .vacuum_pending
+        .store(true, std::sync::atomic::Ordering::SeqCst);
+    crate::housekeeping::vacuum_if_idle(&state).await;
+    Ok(())
 }
 
 #[tauri::command]

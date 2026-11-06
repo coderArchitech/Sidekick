@@ -20,19 +20,7 @@ pub struct ProviderChoice {
     pub model: Option<String>,
 }
 
-/// How long session data is kept after a session ends (tech doc 4.4).
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
-#[cfg_attr(feature = "specta", derive(specta::Type))]
-pub enum Retention {
-    #[serde(rename = "session")]
-    SessionOnly,
-    #[serde(rename = "7d")]
-    SevenDays,
-    #[serde(rename = "30d")]
-    ThirtyDays,
-    #[serde(rename = "forever")]
-    Forever,
-}
+pub use sidekick_core::retention::Retention;
 
 /// Who the user is, for directed questions and STT boosts (PRD QA-2, LIS-5a).
 #[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]

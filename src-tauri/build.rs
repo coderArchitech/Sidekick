@@ -51,6 +51,8 @@ const COMMANDS: &[&str] = &[
     "export_skill",
     "set_session_skill",
     "set_overlay",
+    "set_session_retention",
+    "delete_all_data",
     "ingest_document",
     "ingest_url",
     "list_documents",

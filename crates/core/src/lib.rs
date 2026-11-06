@@ -7,5 +7,6 @@ pub mod embed;
 pub mod error;
 pub mod keys;
 pub mod llm;
+pub mod retention;
 
 pub use error::{ErrorCode, SidekickError, SidekickResult};

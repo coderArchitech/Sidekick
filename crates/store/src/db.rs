@@ -96,10 +96,29 @@ impl Database {
         self.conn
             .pragma_update(None, "foreign_keys", "ON")
             .map_err(|e| db_error("enabling foreign keys", &e))?;
+        // Overwrite deleted content instead of leaving it in free pages
+        // (tech doc 4.4: deleted means gone).
+        self.conn
+            .pragma_update(None, "secure_delete", "ON")
+            .map_err(|e| db_error("enabling secure delete", &e))?;
         if self.path.is_some() {
             self.conn
                 .pragma_update(None, "journal_mode", "WAL")
                 .map_err(|e| db_error("enabling WAL", &e))?;
+        }
+        Ok(())
+    }
+
+    /// Rebuilds the file so space from deleted rows is released and no old
+    /// pages remain (`VACUUM`), then truncates the WAL. Run when idle.
+    pub fn vacuum(&self) -> SidekickResult<()> {
+        self.conn
+            .execute_batch("VACUUM;")
+            .map_err(|e| db_error("compacting the database", &e))?;
+        if self.path.is_some() {
+            self.conn
+                .pragma_update(None, "wal_checkpoint", "TRUNCATE")
+                .map_err(|e| db_error("compacting the database", &e))?;
         }
         Ok(())
     }

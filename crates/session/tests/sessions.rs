@@ -31,6 +31,7 @@ fn new(title: &str) -> NewSession<'_> {
         llm_provider: "anthropic",
         llm_model: "claude-opus-5-5",
         auto_answer: true,
+        retention: sidekick_core::retention::Retention::ThirtyDays,
     }
 }
 

@@ -181,6 +181,19 @@ const err = (code: SidekickError["code"], message: string) => ({
   error: { code, message, retryable: false },
 });
 
+/** Deletes a session and everything in it, like crates/session `repo::delete`. */
+function forgetSession(id: string) {
+  sessions.delete(id);
+  transcripts.delete(id);
+  bookmarks.delete(id);
+  documents.delete(id);
+  notesBySession.delete(id);
+  for (let i = screenshots.length - 1; i >= 0; i--)
+    if (screenshots[i]?.sessionId === id) screenshots.splice(i, 1);
+  for (let i = savedAnswers.length - 1; i >= 0; i--)
+    if (savedAnswers[i]?.answer.sessionId === id) savedAnswers.splice(i, 1);
+}
+
 function save(session: Session) {
   sessions.set(session.id, session);
   mockSessionBus.emit("session", { session: structuredClone(session) });
@@ -459,6 +472,7 @@ export const mockCommands: Commands = {
       endedAt: null,
       consent: null,
       skillId: null,
+      retention: settings.retention,
     };
     return Promise.resolve(save(session));
   },
@@ -514,8 +528,22 @@ export const mockCommands: Commands = {
   },
   deleteSession: (sessionId) => {
     if (liveSessionId === sessionId) liveSessionId = null;
-    sessions.delete(sessionId);
+    forgetSession(sessionId);
     return Promise.resolve({ status: "ok", data: null });
+  },
+  setSessionRetention: (sessionId, retention) => {
+    const s = sessions.get(sessionId);
+    if (!s) return Promise.resolve(err("INTERNAL", "That session no longer exists."));
+    const updated = save({ ...s, retention });
+    // "Until the session ends" applies at once to an ended session.
+    if (s.status === "ended" && retention === "session") forgetSession(sessionId);
+    return Promise.resolve(updated);
+  },
+  deleteAllData: () => {
+    const n = sessions.size;
+    liveSessionId = null;
+    for (const id of [...sessions.keys()]) forgetSession(id);
+    return Promise.resolve({ status: "ok", data: n });
   },
   setAutoAnswer: (sessionId, on) => {
     const s = sessions.get(sessionId);

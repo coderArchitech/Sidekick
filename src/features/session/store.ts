@@ -1,5 +1,11 @@
 import { create } from "zustand";
-import { commands, type ConsentOption, type Session, type SidekickError } from "@/ipc";
+import {
+  commands,
+  type ConsentOption,
+  type Retention,
+  type Session,
+  type SidekickError,
+} from "@/ipc";
 
 interface SessionState {
   session: Session | null;
@@ -16,6 +22,10 @@ interface SessionState {
   toggleAuto: () => Promise<void>;
   /** Sets the session's active Skill, or none (PRD SKL-1). */
   setSkill: (skillId: string | null) => Promise<void>;
+  /** How long this session's data is kept (tech doc 4.4). "session" deletes an ended one now. */
+  setRetention: (retention: Retention) => Promise<void>;
+  /** Deletes the session and everything in it. */
+  remove: () => Promise<void>;
   /** Clears an ended session so a new one can be created. */
   reset: () => void;
   /** Applies a `session-changed` event for the current session. */
@@ -93,6 +103,23 @@ export const useSessionStore = create<SessionState>((set, get) => {
       if (updated) set({ session: updated });
     },
 
+    setRetention: async (retention) => {
+      const s = get().session;
+      if (!s) return;
+      const updated = await run(() => commands.setSessionRetention(s.id, retention));
+      if (!updated) return;
+      if (updated.status === "ended" && retention === "session") get().reset();
+      else set({ session: updated });
+    },
+    remove: async () => {
+      const s = get().session;
+      if (!s) return;
+      set({ busy: true, error: null });
+      const r = await commands.deleteSession(s.id);
+      set({ busy: false });
+      if (r.status === "error") set({ error: message(r.error) });
+      else get().reset();
+    },
     reset: () => set({ session: null, warnings: [], error: null }),
 
     applyChange: (session) => {

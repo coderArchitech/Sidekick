@@ -515,6 +515,35 @@ export const commands = {
     }
   },
   /**
+   * How long one session's data is kept after it ends (overlay).
+   */
+  async setSessionRetention(
+    sessionId: string,
+    retention: Retention,
+  ): Promise<Result<Session, SidekickError>> {
+    try {
+      return {
+        status: "ok",
+        data: await TAURI_INVOKE("set_session_retention", { sessionId, retention }),
+      };
+    } catch (e) {
+      if (e instanceof Error) throw e;
+      else return { status: "error", error: e as any };
+    }
+  },
+  /**
+   * Deletes every session and knowledge pack (Settings window). Settings,
+   * keys, Skills and the consent log stay. Returns the number of sessions.
+   */
+  async deleteAllData(): Promise<Result<number, SidekickError>> {
+    try {
+      return { status: "ok", data: await TAURI_INVOKE("delete_all_data") };
+    } catch (e) {
+      if (e instanceof Error) throw e;
+      else return { status: "error", error: e as any };
+    }
+  },
+  /**
    * Queues a file for parsing and embedding.
    */
   async ingestDocument(sessionId: string, path: string): Promise<Result<null, SidekickError>> {
@@ -971,10 +1000,11 @@ export type QuestionSource = "detected" | "chat" | "screenshot";
  * can select on a small preview without knowing the display's pixel size.
  */
 export type Region = { x: number; y: number; width: number; height: number };
-/**
- * How long session data is kept after a session ends (tech doc 4.4).
- */
-export type Retention = "session" | "7d" | "30d" | "forever";
+export type Retention =
+  /**
+   * Deleted as soon as the session ends.
+   */
+  "session" | "7d" | "30d" | "forever";
 /**
  * Who wrote a message.
  */
@@ -1049,6 +1079,10 @@ export type Session = {
    * The active Skill, if any (PRD SKL-1).
    */
   skillId: string | null;
+  /**
+   * How long its data is kept after it ends (tech doc 4.4).
+   */
+  retention: Retention;
 };
 /**
  * A session was created or changed status (`session.state`).

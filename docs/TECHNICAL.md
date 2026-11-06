@@ -560,7 +560,7 @@ Foreign keys are enforced (`PRAGMA foreign_keys = ON`), and the database runs in
 | Usage records | 12 months | Aggregated monthly after that |
 | Logs | 14 days, max 50 MB | Rotated daily |
 
-A cleanup job runs at app start and every 6 hours (section 10.7). "Delete session" removes all its rows immediately via cascading deletes, then runs `VACUUM` on the next idle period so deleted data is not left in free pages. There is no archival tier: deleted means gone.
+A cleanup job runs at app start and every 6 hours (section 10.7). Each session stores its own retention (from Settings at creation; changeable after the meeting from the session bar, which also offers "Delete session…"). The database runs with `secure_delete` on, and Settings → Your data has "Delete everything…" (type DELETE to confirm). Vectors live in a virtual table without foreign keys, so deletion removes them by owner explicitly; the keyword index is cleaned by triggers. "Delete session" removes all its rows immediately via cascading deletes, then runs `VACUUM` on the next idle period so deleted data is not left in free pages. There is no archival tier: deleted means gone.
 
 ### 4.5 Migrations and seed data
 
@@ -593,7 +593,9 @@ Commands are request/response calls from the frontend to Rust (`invoke`). All re
 | `start_session` | `session_id` | `SessionStarted` (`session`, `warnings`) | Start audio capture and STT for the streams the consent allows; `CONSENT_REQUIRED` without consent; one live session at a time. With `SIDEKICK_AUDIO_FIXTURE`, the file plays as a single stream |
 | `pause_session` / `resume_session` | `session_id` | `Session` | Pause or resume listening (paused audio is dropped, never sent) |
 | `end_session` | `session_id` | `Session` | Stop capture and let STT flush; the overlay then writes the summary (`save_summary`) |
-| `delete_session` | `session_id` | `()` | Delete all session data (the consent record is kept, 4.4) |
+| `delete_session` | `session_id` | `()` | Delete all session data, including its vectors (the consent record is kept, 4.4); VACUUM follows when idle |
+| `set_session_retention` | `session_id, retention` (`session`, `7d`, `30d`, `forever`) | `Session` | How long this session is kept after it ends; `session` on an ended session deletes it now (overlay) |
+| `delete_all_data` | none | `u32` (sessions deleted) | Delete every session and knowledge pack; settings, keys, Skills and the consent log stay; stops a live session first (Settings window) |
 | `list_sessions` | `cursor?, limit?` | `SessionPage` (`items`, `nextCursor`) | Session history, newest first |
 | `get_transcript` | `session_id` | `Transcript` (`lines`, `bookmarks`) | Saved transcript in time order, for opening the Transcript tab |
 | `rename_speaker` | `session_id, from, to` | `u32` (lines changed) | Rename a speaker in every line; renaming to an existing name merges (LIS-3) |
@@ -1287,8 +1289,8 @@ Escalation contact is the owner listed in section 14.2.
 
 | Job | When | What it does |
 | --- | --- | --- |
-| Retention cleanup | App start and every 6 hours | Deletes data past its retention period |
-| Vacuum | When idle after deletions | Reclaims space and clears deleted pages |
+| Retention cleanup | App start and every 6 hours | Deletes ended sessions past their own retention (`sessions.retention`, copied from Settings when created, changeable per session) and consent records older than a year (`crates/session/src/retention.rs`, `src-tauri/src/housekeeping.rs`) |
+| Vacuum | After deletions, when no session is live (checked every 5 minutes) | `VACUUM` plus a WAL checkpoint; with `secure_delete` on, deleted content is also overwritten in place |
 | Log rotation | Daily | Rotates and prunes logs |
 | Update check | App start and every 12 hours | Checks the update manifest for the user's channel |
 | Re-embedding | When embedding model changes | Re-embeds affected documents in the background |

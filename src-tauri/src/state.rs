@@ -23,6 +23,8 @@ pub struct AppState {
     pub capturer: Arc<dyn sidekick_capture::Capturer>,
     /// The app data folder (database, Whisper models).
     pub data_dir: PathBuf,
+    /// Set after deletions; the housekeeping job runs VACUUM when idle.
+    pub vacuum_pending: std::sync::atomic::AtomicBool,
     pub mock: bool,
 }
 
@@ -103,6 +105,7 @@ impl AppState {
                 Arc::new(sidekick_capture::OsCapturer)
             },
             data_dir,
+            vacuum_pending: std::sync::atomic::AtomicBool::new(false),
             mock,
         })
     }

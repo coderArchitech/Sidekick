@@ -3,6 +3,7 @@
 
 pub mod app;
 pub mod capture;
+pub mod data;
 pub mod diagnostics;
 pub mod documents;
 pub mod keys;

@@ -69,7 +69,7 @@ All Phase 0 code and automated tests are done and green on Linux, Windows and ma
 | T-027 | More STT providers: AssemblyAI, Soniox, local Whisper | 🟡 In progress: testing | Code and automated tests done. Waiting on: Whisper accuracy run with a real model (Hugging Face is blocked in the cloud dev environment), live AssemblyAI/Soniox checks, Hinglish comparison (PRD open question). Whisper ships behind the `local-whisper` cargo feature |
 | T-028 | `skills` crate and Skill builder | ✅ Done | Golden cases run against live models in T-039; tool use itself comes with Agents (T-045) |
 | T-029 | Overlay controls and private display | 🟡 In progress: testing | 🖥️ Waiting on hardware: multi-monitor restore on Windows/macOS. Snap and restore verified in the real app on Linux (Xvfb, one monitor) |
-| T-030 | Data control: retention, delete session | ⬜ To do | |
+| T-030 | Data control: retention, delete session | ✅ Done | Also fixed: deleting a session now deletes its vectors (they have no foreign key) |
 | T-031 | Logging to file and log export | ⬜ To do | |
 | T-032 | UI test suite (Playwright) | ⬜ To do | |
 | T-033 | End-to-end test suite (WebdriverIO) | ⬜ To do | |
@@ -506,9 +506,9 @@ All Phase 0 code and automated tests are done and green on Linux, Windows and ma
 **Scope:** Retention job at startup and every 6 hours; per-session retention setting; delete everything button; VACUUM when idle; consent log kept 1 year.
 
 **Tests**
-- [ ] Unit: retention cut-off per option (session, 7d, 30d, forever).
-- [ ] Integration: expired sessions deleted with all child rows; consent log kept.
-- [ ] Integration: after delete and VACUUM, deleted text isn't found in the database file.
+- [x] Unit: retention cut-off per option (session, 7d, 30d, forever).
+- [x] Integration: expired sessions deleted with all child rows; consent log kept.
+- [x] Integration: after delete and VACUUM, deleted text isn't found in the database file.
 
 ### T-031 Logging to file and log export
 
