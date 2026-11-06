@@ -221,7 +221,7 @@ Each module below is its own crate at `crates/<module>/`, named `sidekick-<modul
 
 | Module | Responsibility |
 | --- | --- |
-| `overlay` | Window chrome: drag region, opacity slider (saved once it settles), text size A−/A+ (12–20 px; scales the overlay webview's root so rem-based sizes follow, 14 px = the default 16 px root), Compact (hides the session bar and documents), protection shield, Settings, tabs. Appearance loads from `settings.overlay` and saves with `set_overlay` |
+| `overlay` | Window chrome: drag region with the brand mark and version, protection shield, a **View** menu (text size A−/A+ at 12–20 px, which scales the overlay webview's root so rem-based sizes follow, 14 px = the default 16 px root; opacity, saved once it settles; Compact, which hides the session bar and documents), Settings, and underlined tabs. Appearance loads from `settings.overlay` and saves with `set_overlay` |
 | `answers` | Live Answers tab, newest first: cue line (Stop while streaming), expandable full answer (open by default when the question used your name), numbered sources, thumbs up/down (`rate_answer`, click again to clear). Markdown via `react-markdown` with raw HTML skipped and links shown as text, never opened. Fenced code uses Shiki, loaded lazily on first code block with 13 languages and the JavaScript regex engine (no WASM); unknown languages fall back to plain text. Copy writes only the code, only on click. Follow-up chips are not built yet |
 | `chat` | Chat tab: **Screenshot** menu (Full screen, A window…, An area… with a drag-to-select preview) for capture-and-ask: the capture shows as an attached thumbnail and the next question is asked with `source = screenshot`, so both cue and full answer see the image. Typed questions answered through the same `AnswerRouter` with `source = chat` and the session context (transcript, notes, documents), plus the last 3 finished exchanges as history so follow-ups make sense. Enter sends, Shift+Enter adds a line, Stop cancels. History is per session: saved chat and screenshot answers reload with `list_answers`. The Ask hotkey shows and focuses the overlay, switches to Chat and focuses the input. A chat question shares the 2-in-flight limit, so it can stop the oldest detected answer. Voice input arrives later |
 | `transcript` | Transcript tab: loads saved lines, applies live `transcript-partial` / `transcript-segment` events batched every 50 ms (`lib/batcher`), shows partial text until the final line arrives, rename/merge speakers, bookmarks, listening indicator |
@@ -880,12 +880,11 @@ Run from the repository root. Cargo commands apply to the whole workspace.
 | Type check | `pnpm typecheck` | Yes |
 | UI tests (Playwright, mocked backend) | `pnpm test:ui` (first time: `pnpm exec playwright install chromium`) | Yes (`UI` job) |
 | End-to-end tests (WebdriverIO, real app) | `pnpm build:e2e`, then `pnpm test:e2e` (Linux without a display: `xvfb-run -a pnpm test:e2e`) | Yes (`E2E` job) |
-| Full-app end-to-end tests | `pnpm test:e2e` (builds a debug app first) | Not yet |
 | Lint and format check | `pnpm lint`, `cargo clippy --workspace --all-targets -- -D warnings`, `cargo fmt --all --check` | Yes |
 | Format everything | `pnpm format` and `cargo fmt --all` | Yes |
 | Regenerate IPC bindings | `pnpm ipc:gen` | Yes |
 | Regenerate app icons from `src-tauri/app-icon.png` | `pnpm icons` (then delete `icons/android` and `icons/ios`) | Yes |
-| Everything CI runs (except E2E) | `pnpm verify` (not `pnpm ci`, which is a built-in pnpm command) | Yes |
+| Everything CI runs except the UI and E2E suites | `pnpm verify` (not `pnpm ci`, which is a built-in pnpm command) | Yes |
 
 ### 6.6 Troubleshooting setup
 
@@ -972,6 +971,17 @@ Folders are created when their first file lands; the tree shows where things go,
 - Function components and hooks only; one feature per folder under `features/`.
 - All IPC through `src/ipc`; components never call `invoke` directly.
 - Tailwind for styling; no inline style objects except dynamic values like opacity.
+- **Design system.** Colours, fonts and shared component styles live only in `src/styles.css`. Use the semantic tokens, never raw palette colours (`slate-700`, `blue-600`):
+
+  | Token | Use |
+  | --- | --- |
+  | `canvas`, `surface`, `surface-2`, `surface-3` | Backgrounds, darkest to lightest: inputs and code; panels; cards and selected items; hover |
+  | `line`, `line-strong` | Borders and dividers; input and button borders |
+  | `fg`, `fg-2`, `fg-muted` | Primary, secondary and supporting text |
+  | `accent`, `accent-hover`, `accent-text`, `accent-soft` | Primary actions (indigo), their hover, accent-coloured text and badges |
+  | `success`, `warning`, `danger` (+ `-soft`, `danger-solid`) | Status text and backgrounds |
+
+  Components: `btn` with `btn-primary`, `btn-secondary`, `btn-ghost`, `btn-danger`, `btn-danger-ghost` (and `btn-sm`); `field` (and `field-sm`) for inputs, selects and textareas; `card`; `badge` with `badge-accent`. The font is Inter (bundled with `@fontsource-variable/inter`, so it works offline under the app's CSP), with the `cv11`, `ss01` and `ss03` features; `tabular` lines up numbers. Every token pair used for text meets WCAG AA on its background (body text 16:1, muted 7:1, white on the accent 5.4:1), and the Playwright suite checks contrast with axe.
 - Accessible by default: every interactive element has a label and keyboard support.
 
 **Naming:** Rust `snake_case`, TypeScript `camelCase`, React components `PascalCase`, events `domain-action` on the wire (e.g. `answer-token`; Tauri rejects dots), generated from Rust structs named `DomainAction` (e.g. `AnswerToken`).
@@ -1247,7 +1257,7 @@ There's no on-call; alerts are in-app notices shown to the user:
 
 | Item | Detail |
 | --- | --- |
-| Location (Windows) | `%APPDATA%/com.sidekick.app/logs/` |
+| Location (Windows) | `%LOCALAPPDATA%/com.sidekick.app/logs/` |
 | Location (macOS) | `~/Library/Logs/com.sidekick.app/` |
 | Format | JSON lines (`tracing-subscriber` JSON): `timestamp`, `level`, `target` (module), `fields.message`, plus `request_id` (LLM streams: first token, done or failed with timing and token counts; frontend answer failures) or `session_id` (every session state change) |
 | Rotation | `sidekick-YYYY-MM-DD.log` per UTC day, a new `.1`, `.2`… part past 10 MB, files older than 14 days deleted, and the oldest deleted first above 50 MB in total (`sidekick_diagnostics::logfile`). With `SIDEKICK_DATA_DIR`, logs go to `<dir>/logs` |
