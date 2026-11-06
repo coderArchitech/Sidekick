@@ -71,8 +71,8 @@ All Phase 0 code and automated tests are done and green on Linux, Windows and ma
 | T-029 | Overlay controls and private display | 🟡 In progress: testing | 🖥️ Waiting on hardware: multi-monitor restore on Windows/macOS. Snap and restore verified in the real app on Linux (Xvfb, one monitor) |
 | T-030 | Data control: retention, delete session | ✅ Done | Also fixed: deleting a session now deletes its vectors (they have no foreign key) |
 | T-031 | Logging to file and log export | ✅ Done | Log scan runs after every E2E pass |
-| T-032 | UI test suite (Playwright) | 🟡 In progress: testing | Waiting on CI: the new UI job's first run on the PR. 16 specs pass locally, 48/48 repeated 3x. axe found and fixed: unnamed-text mismatch on A−/A+, low-contrast grey text |
-| T-033 | End-to-end test suite (WebdriverIO) | 🟡 In progress: testing | Waiting on CI: the first E2E runs on Windows and macOS. All specs pass on Linux (Xvfb), 4/4 on each of 4 runs. One suite runs on every PR (about a minute once built), so there's no separate nightly |
+| T-032 | UI test suite (Playwright) | ✅ Done | 16 specs; UI job green in CI. axe found and fixed: A−/A+ names, low-contrast grey text |
+| T-033 | End-to-end test suite (WebdriverIO) | ✅ Done | Green on Ubuntu, Windows (WebView2) and macOS (WebKit) in CI; one suite on every PR (about a minute once built), no separate nightly |
 | T-034 | MVP acceptance pass | ⬜ To do | 🖥️ TECHNICAL.md 2.6 |
 
 ### Phase 2: V1 launch readiness
@@ -527,7 +527,7 @@ All Phase 0 code and automated tests are done and green on Linux, Windows and ma
 
 **Tests**
 - [x] UI: each flow above has a spec; axe passes on every screen.
-- [ ] CI: UI job green.
+- [x] CI: UI job green.
 
 ### T-033 End-to-end test suite (WebdriverIO)
 
@@ -539,7 +539,7 @@ All Phase 0 code and automated tests are done and green on Linux, Windows and ma
 - [x] E2E: screenshot capture and ask.
 - [x] E2E: settings: add, test and remove a key (mock provider).
 - [x] E2E: LLM failure keeps transcript running (NFR-5).
-- [ ] CI: smoke suite green on Windows and macOS.
+- [x] CI: suite green on Windows and macOS (and Ubuntu).
 
 ### T-034 MVP acceptance pass 🖥️
 
