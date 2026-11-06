@@ -19,19 +19,17 @@ export function AnswerCard({ view }: { view: AnswerView }) {
   return (
     <article
       aria-label={`Answer to: ${view.question}`}
-      className={`rounded-lg border p-2 ${view.directed ? "border-sky-600" : "border-slate-700"}`}
+      className={`card p-3 ${view.directed ? "border-accent/60 shadow-[0_0_0_1px_var(--color-accent-soft)]" : ""}`}
     >
-      <header className="flex items-start gap-2 text-xs text-slate-400">
+      <header className="flex items-start gap-2 text-xs text-fg-muted">
         <span className="min-w-0 flex-1">
-          {view.directed && (
-            <span className="mr-1 rounded bg-sky-900 px-1 text-sky-200">For you</span>
-          )}
+          {view.directed && <span className="badge badge-accent mr-1.5 align-[1px]">For you</span>}
           {view.question}
         </span>
         {streaming && (
           <button
             type="button"
-            className="rounded px-1 hover:bg-slate-800"
+            className="btn btn-ghost btn-sm"
             onClick={() => activeRouter()?.router.cancel(view.id)}
           >
             Stop
@@ -39,17 +37,17 @@ export function AnswerCard({ view }: { view: AnswerView }) {
         )}
       </header>
 
-      <p className="mt-1 text-base font-medium text-slate-50" aria-live="polite">
+      <p className="mt-1.5 text-[0.9375rem] leading-snug font-semibold text-fg" aria-live="polite">
         {view.cue ||
           (view.status === "thinking" ? "Thinking…" : view.status === "streaming" ? "…" : "")}
       </p>
 
       {view.status === "error" && (
-        <p role="alert" className="mt-1 text-sm text-red-300">
+        <p role="alert" className="mt-1 text-sm text-danger">
           {view.error}
         </p>
       )}
-      {view.status === "cancelled" && <p className="mt-1 text-xs text-slate-400">Stopped.</p>}
+      {view.status === "cancelled" && <p className="mt-1 text-xs text-fg-muted">Stopped.</p>}
 
       {(view.body || view.sources.length > 0) && view.body !== view.cue && (
         <>
@@ -57,7 +55,7 @@ export function AnswerCard({ view }: { view: AnswerView }) {
             <button
               type="button"
               aria-expanded={open}
-              className="mt-1 text-xs text-slate-400 hover:text-slate-200"
+              className="mt-2 text-xs font-medium text-accent-text hover:underline"
               onClick={() => setOpen((o) => !o)}
             >
               {open ? "▾ Hide full answer" : "▸ Full answer"}
@@ -65,12 +63,12 @@ export function AnswerCard({ view }: { view: AnswerView }) {
           )}
           {/* No cue (a full-only Skill): the answer itself is the content. */}
           {(open || !view.cue) && (
-            <div className="mt-1 text-sm text-slate-200">
+            <div className="mt-2 border-t border-line pt-2 text-sm leading-relaxed text-fg-2">
               <Markdown text={view.body} />
               {view.sources.length > 0 && (
-                <ol aria-label="Sources" className="mt-1 space-y-0.5 text-xs text-slate-400">
+                <ol aria-label="Sources" className="mt-2 flex flex-wrap gap-1">
                   {view.sources.map((s) => (
-                    <li key={s.n}>
+                    <li key={s.n} className="badge bg-surface-3 font-normal text-fg-2">
                       [{s.n}] {s.label}
                     </li>
                   ))}
@@ -82,12 +80,12 @@ export function AnswerCard({ view }: { view: AnswerView }) {
       )}
 
       {view.status === "done" && view.answerId && (
-        <div className="mt-1 flex gap-1 text-xs">
+        <div className="mt-2 flex gap-0.5 text-xs">
           <button
             type="button"
             aria-label="Helpful"
             aria-pressed={rating === 1}
-            className={`rounded px-1.5 hover:bg-slate-800 ${rating === 1 ? "text-emerald-300" : "text-slate-400"}`}
+            className={`btn btn-ghost btn-sm px-1.5 ${rating === 1 ? "bg-success-soft" : "opacity-70"}`}
             onClick={() => void rate(1)}
           >
             👍
@@ -96,7 +94,7 @@ export function AnswerCard({ view }: { view: AnswerView }) {
             type="button"
             aria-label="Not helpful"
             aria-pressed={rating === -1}
-            className={`rounded px-1.5 hover:bg-slate-800 ${rating === -1 ? "text-red-300" : "text-slate-400"}`}
+            className={`btn btn-ghost btn-sm px-1.5 ${rating === -1 ? "bg-danger-soft" : "opacity-70"}`}
             onClick={() => void rate(-1)}
           >
             👎

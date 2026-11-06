@@ -4,8 +4,7 @@ import { useSkillsStore } from "@/orchestrator";
 import { ConsentDialog } from "./ConsentDialog";
 import { useSessionStore } from "./store";
 
-const button =
-  "rounded-md border border-slate-600 px-2 py-0.5 text-xs hover:bg-slate-700 disabled:opacity-50";
+const button = "btn btn-secondary btn-sm";
 
 /** Session controls in the overlay: create, start (with consent), pause, resume, end (PRD CTX-1, LIS-6). */
 export function SessionBar() {
@@ -34,7 +33,7 @@ export function SessionBar() {
   }, [applyChange]);
 
   return (
-    <div className="space-y-1 border-b border-slate-700 px-3 py-2 text-xs">
+    <div className="space-y-1.5 border-b border-line bg-surface px-3 py-2 text-xs">
       {!session || session.status === "ended" ? (
         <form
           className="flex items-center gap-2"
@@ -44,7 +43,7 @@ export function SessionBar() {
             void create(title).then(() => setTitle(""));
           }}
         >
-          {session?.status === "ended" && <span className="text-slate-400">Session ended.</span>}
+          {session?.status === "ended" && <span className="text-fg-muted">Session ended.</span>}
           <label htmlFor={inputId} className="sr-only">
             Session name
           </label>
@@ -53,7 +52,7 @@ export function SessionBar() {
             value={title}
             placeholder="New session name"
             onChange={(e) => setTitle(e.target.value)}
-            className="min-w-0 flex-1 rounded-md border border-slate-600 bg-slate-950 px-2 py-0.5"
+            className="field field-sm min-w-0 flex-1"
           />
           <button type="submit" className={button} disabled={busy || !title.trim()}>
             New session
@@ -76,10 +75,10 @@ export function SessionBar() {
           )}
           {session.status === "live" && (
             <>
-              <span role="status" className="flex items-center gap-1 text-red-300">
+              <span role="status" className="flex items-center gap-1 text-danger">
                 <span
                   aria-hidden="true"
-                  className="inline-block h-2 w-2 animate-pulse rounded-full bg-red-500"
+                  className="inline-block h-2 w-2 animate-pulse rounded-full bg-danger"
                 />
                 {session.consent === "me_only" ? "Listening (you only)" : "Listening"}
               </span>
@@ -90,7 +89,7 @@ export function SessionBar() {
           )}
           {session.status === "paused" && (
             <>
-              <span role="status" className="text-amber-300">
+              <span role="status" className="text-warning">
                 Paused
               </span>
               <button
@@ -105,7 +104,7 @@ export function SessionBar() {
           )}
           <button
             type="button"
-            className={`${button} ${session.autoAnswer ? "border-emerald-500 text-emerald-300" : ""}`}
+            className={`${button} ${session.autoAnswer ? "border-success text-success" : ""}`}
             aria-pressed={session.autoAnswer}
             title="Auto-answer: on answers every question; off answers only questions that use your name"
             disabled={busy}
@@ -121,12 +120,12 @@ export function SessionBar() {
       )}
       {session?.status === "ended" && <EndedSessionData />}
       {warnings.map((w) => (
-        <p key={w} role="status" className="text-amber-300">
+        <p key={w} role="status" className="text-warning">
           {w}
         </p>
       ))}
       {error && (
-        <p role="alert" className="text-red-300">
+        <p role="alert" className="text-danger">
           {error}
         </p>
       )}
@@ -159,7 +158,7 @@ function SkillPicker() {
     <select
       aria-label="Skill"
       title="Skill: how Sidekick answers in this session"
-      className="max-w-32 rounded-md border border-slate-600 bg-slate-950 px-1 py-0.5 text-xs"
+      className="max-w-32 field field-sm text-xs"
       value={session.skillId ?? ""}
       disabled={busy}
       onFocus={() => void load()}
@@ -191,12 +190,12 @@ function EndedSessionData() {
   const [confirming, setConfirming] = useState(false);
   if (!session) return null;
   return (
-    <div className="flex items-center gap-2 text-slate-400">
+    <div className="flex items-center gap-2 text-fg-muted">
       <label className="flex items-center gap-1">
         Keep “{session.title}”
         <select
           aria-label="Keep this session"
-          className="rounded-md border border-slate-600 bg-slate-950 px-1 py-0.5"
+          className="field field-sm"
           value={session.retention}
           disabled={busy}
           onChange={(e) => void setRetention(e.target.value as Retention)}
@@ -210,10 +209,10 @@ function EndedSessionData() {
       </label>
       {confirming ? (
         <>
-          <span className="text-amber-300">Delete transcript, notes, answers and documents?</span>
+          <span className="text-warning">Delete transcript, notes, answers and documents?</span>
           <button
             type="button"
-            className={`${button} text-red-300`}
+            className={`${button} text-danger`}
             disabled={busy}
             onClick={() => void remove()}
           >

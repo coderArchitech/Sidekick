@@ -8,16 +8,9 @@ import { TranscriptView } from "@/features/transcript";
 import { commands, type AppInfo } from "@/ipc";
 import { useAnswering, useNotes, useQuestionDetection } from "@/orchestrator";
 import { ProtectionShield } from "./ProtectionShield";
+import { ViewMenu } from "./ViewMenu";
 import { useHotkeyActions } from "./useHotkeyActions";
-import {
-  MAX_FONT,
-  MAX_OPACITY,
-  MIN_FONT,
-  MIN_OPACITY,
-  TABS,
-  useOverlayStore,
-  type Tab,
-} from "./store";
+import { TABS, useOverlayStore, type Tab } from "./store";
 
 const TAB_LABELS: Record<Tab, string> = {
   answers: "Live Answers",
@@ -33,8 +26,7 @@ export function rootFontSize(fontSize: number): string {
 
 /** The floating panel (PRD UI-1, UI-3, UI-7). Tab contents arrive with their features. */
 export function Overlay() {
-  const { tab, opacity, fontSize, compact, setTab, setOpacity, setFontSize, setCompact, load } =
-    useOverlayStore();
+  const { tab, opacity, fontSize, compact, setTab, load } = useOverlayStore();
   const [info, setInfo] = useState<AppInfo | null>(null);
   useHotkeyActions();
   const session = useSessionStore((s) => s.session);
@@ -59,67 +51,37 @@ export function Overlay() {
 
   return (
     <div
-      className="flex h-full flex-col rounded-xl bg-slate-900 text-slate-100 shadow-xl"
+      className="flex h-full flex-col overflow-hidden rounded-xl border border-line bg-surface text-fg shadow-2xl shadow-black/50"
       style={{ opacity }}
       data-compact={compact || undefined}
     >
       <header
         data-tauri-drag-region
-        className={`flex items-center justify-between gap-1.5 border-b border-slate-700 ${compact ? "px-2 py-1" : "px-3 py-2"}`}
+        className={`flex items-center gap-2 border-b border-line ${compact ? "px-2 py-1" : "px-3 py-2"}`}
       >
-        <span className="font-semibold">Sidekick</span>
-        {!compact && (
-          <span className="text-xs text-slate-400">{info ? `v${info.version}` : ""}</span>
-        )}
+        <span data-tauri-drag-region className="flex min-w-0 items-center gap-2">
+          <span
+            aria-hidden="true"
+            className="grid h-5 w-5 shrink-0 place-items-center rounded-md bg-gradient-to-br from-accent-text to-accent text-[11px] font-bold text-white"
+          >
+            S
+          </span>
+          <span className="text-sm font-semibold tracking-tight">Sidekick</span>
+          {!compact && info && (
+            <span className="text-[11px] whitespace-nowrap text-fg-muted">v{info.version}</span>
+          )}
+        </span>
         <ProtectionShield />
-        <button
-          type="button"
-          className="rounded px-1.5 py-0.5 text-xs text-slate-300 hover:bg-slate-700"
-          onClick={() => void commands.openSettings()}
-        >
-          Settings
-        </button>
-        <div className="flex items-center text-xs" role="group" aria-label="Text size">
+        <div className="ml-auto flex items-center gap-0.5">
+          <ViewMenu />
           <button
             type="button"
-            className="rounded px-1 text-slate-300 hover:bg-slate-700 disabled:opacity-40"
-            disabled={fontSize <= MIN_FONT}
-            onClick={() => setFontSize(fontSize - 1)}
+            className="btn btn-ghost btn-sm"
+            onClick={() => void commands.openSettings()}
           >
-            <span aria-hidden="true">A−</span>
-            <span className="sr-only">Smaller text</span>
-          </button>
-          <button
-            type="button"
-            className="rounded px-1 text-slate-300 hover:bg-slate-700 disabled:opacity-40"
-            disabled={fontSize >= MAX_FONT}
-            onClick={() => setFontSize(fontSize + 1)}
-          >
-            <span aria-hidden="true">A+</span>
-            <span className="sr-only">Larger text</span>
+            Settings
           </button>
         </div>
-        <button
-          type="button"
-          aria-pressed={compact}
-          className={`rounded px-1.5 py-0.5 text-xs hover:bg-slate-700 ${compact ? "text-sky-300" : "text-slate-300"}`}
-          title="Compact: hide the session bar and documents"
-          onClick={() => setCompact(!compact)}
-        >
-          Compact
-        </button>
-        <label className="flex min-w-0 items-center text-xs text-slate-400" title="Opacity">
-          <input
-            type="range"
-            className="w-16 min-w-0"
-            aria-label="Panel opacity"
-            min={MIN_OPACITY}
-            max={MAX_OPACITY}
-            step={0.05}
-            value={opacity}
-            onChange={(e) => setOpacity(Number(e.target.value))}
-          />
-        </label>
       </header>
 
       {!compact && (
@@ -129,7 +91,7 @@ export function Overlay() {
         </>
       )}
 
-      <div role="tablist" aria-label="Sidekick views" className="flex border-b border-slate-700">
+      <div role="tablist" aria-label="Sidekick views" className="flex border-b border-line px-1">
         {TABS.map((id) => (
           <button
             key={id}
@@ -137,7 +99,11 @@ export function Overlay() {
             id={`tab-${id}`}
             aria-selected={tab === id}
             aria-controls={`panel-${id}`}
-            className={`flex-1 px-2 py-1.5 text-sm whitespace-nowrap ${tab === id ? "bg-slate-800 font-medium" : "text-slate-400"}`}
+            className={`relative flex-1 px-2 py-2 text-[0.8125rem] font-medium whitespace-nowrap transition-colors ${
+              tab === id
+                ? "text-fg after:absolute after:inset-x-3 after:-bottom-px after:h-0.5 after:rounded-full after:bg-accent"
+                : "text-fg-muted hover:text-fg-2"
+            }`}
             onClick={() => setTab(id)}
           >
             {TAB_LABELS[id]}
@@ -149,7 +115,7 @@ export function Overlay() {
         role="tabpanel"
         id={`panel-${tab}`}
         aria-labelledby={`tab-${tab}`}
-        className={`flex-1 overflow-auto text-slate-300 ${compact ? "p-2" : "p-3"}`}
+        className={`flex-1 overflow-auto text-fg-2 ${compact ? "p-2" : "p-3"}`}
       >
         {tab === "transcript" ? (
           <TranscriptView />

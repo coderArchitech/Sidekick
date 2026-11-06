@@ -43,28 +43,28 @@ export function SettingsWindow() {
   }
 
   return (
-    <main className="min-h-full bg-slate-900 p-6 text-slate-100">
+    <main className="min-h-full bg-surface p-6 text-fg">
       <div className="mx-auto max-w-2xl space-y-4">
         <header className="flex items-center justify-between">
           <h1 className="text-xl font-semibold">Settings</h1>
           <button
             type="button"
-            className="rounded-md border border-slate-600 px-3 py-1 text-sm hover:bg-slate-700"
+            className="btn btn-secondary"
             onClick={() => void hideCurrentWindow()}
           >
             Close
           </button>
         </header>
         {error && (
-          <p role="alert" className="text-sm text-red-300">
+          <p role="alert" className="text-sm text-danger">
             {error}
           </p>
         )}
         {!settings ? (
-          <p className="text-sm text-slate-400">Loading…</p>
+          <p className="text-sm text-fg-muted">Loading…</p>
         ) : (
           <>
-            <p className="text-sm text-slate-400">
+            <p className="text-sm text-fg-muted">
               Keys are stored in your operating system&apos;s keychain and only sent to the provider
               they belong to.
             </p>
@@ -108,10 +108,7 @@ export function SettingsWindow() {
               allowOff
               onChoose={(c) => void update({ search: c })}
             />
-            <section
-              aria-labelledby="general-heading"
-              className="rounded-lg border border-slate-700 p-4"
-            >
+            <section aria-labelledby="general-heading" className="card p-4">
               <h2 id="general-heading" className="text-base font-semibold">
                 General
               </h2>
@@ -123,12 +120,12 @@ export function SettingsWindow() {
                 />
                 Auto-answer every detected question (off: only questions that use your name)
               </label>
-              <label className="mt-3 block text-sm text-slate-300" htmlFor="retention">
+              <label className="mt-3 block text-sm text-fg-2" htmlFor="retention">
                 Keep session data
               </label>
               <select
                 id="retention"
-                className="mt-1 rounded-md border border-slate-600 bg-slate-950 px-2 py-1 text-sm"
+                className="field mt-1"
                 value={settings.retention}
                 onChange={(e) => void update({ retention: e.target.value as Retention })}
               >

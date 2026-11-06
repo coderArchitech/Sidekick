@@ -83,18 +83,18 @@ export function SkillsSection() {
   }
 
   return (
-    <section aria-labelledby={headingId} className="rounded-lg border border-slate-700 p-4">
+    <section aria-labelledby={headingId} className="card p-4">
       <h2 id={headingId} className="text-base font-semibold">
         Skills
       </h2>
-      <p className="mb-3 text-sm text-slate-400">
+      <p className="mb-3 text-sm text-fg-muted">
         Tell Sidekick how to behave for a kind of meeting. Pick one for a session from the overlay.
       </p>
 
       {message && (
         <p
           role={message.error ? "alert" : "status"}
-          className={`mb-2 text-sm ${message.error ? "text-red-300" : "text-emerald-300"}`}
+          className={`mb-2 text-sm ${message.error ? "text-danger" : "text-success"}`}
         >
           {message.text}
         </p>
@@ -116,11 +116,11 @@ export function SkillsSection() {
         <div
           role="dialog"
           aria-label={`Import ${preview.skill.name}`}
-          className="space-y-2 rounded-md border border-amber-700 p-3 text-sm"
+          className="space-y-2 rounded-md border border-warning p-3 text-sm"
         >
           <p className="font-medium">Import “{preview.skill.name}”?</p>
           {preview.skill.description && (
-            <p className="text-slate-400">{preview.skill.description}</p>
+            <p className="text-fg-muted">{preview.skill.description}</p>
           )}
           {preview.requestedTools.length ? (
             <>
@@ -137,39 +137,31 @@ export function SkillsSection() {
             <p>This Skill uses no tools.</p>
           )}
           {preview.replacesExisting && (
-            <p className="text-amber-300">
+            <p className="text-warning">
               It replaces your Skill with the same id ({preview.skill.id}).
             </p>
           )}
           <div className="flex justify-end gap-2">
-            <button
-              type="button"
-              className="rounded-md px-3 py-1 hover:bg-slate-800"
-              onClick={() => setPreview(null)}
-            >
+            <button type="button" className="btn btn-ghost" onClick={() => setPreview(null)}>
               Cancel
             </button>
-            <button
-              type="button"
-              className="rounded-md bg-blue-600 px-3 py-1 hover:bg-blue-500"
-              onClick={() => void approveImport()}
-            >
+            <button type="button" className="btn btn-primary" onClick={() => void approveImport()}>
               Allow and import
             </button>
           </div>
         </div>
       ) : (
         <>
-          <ul aria-label="Your Skills" className="divide-y divide-slate-800 text-sm">
+          <ul aria-label="Your Skills" className="divide-y divide-line text-sm">
             {skills.map((s) => (
               <li key={s.id} className="flex items-center gap-2 py-1.5">
                 <span className="min-w-0 flex-1">
                   <span className="font-medium">{s.name}</span>
                   {s.description && (
-                    <span className="block truncate text-xs text-slate-400">{s.description}</span>
+                    <span className="block truncate text-xs text-fg-muted">{s.description}</span>
                   )}
                 </span>
-                <label className="flex items-center gap-1 text-xs text-slate-400">
+                <label className="flex items-center gap-1 text-xs text-fg-muted">
                   <input
                     type="checkbox"
                     checked={s.enabled}
@@ -180,7 +172,7 @@ export function SkillsSection() {
                 </label>
                 <button
                   type="button"
-                  className="rounded px-1.5 hover:bg-slate-800"
+                  className="rounded px-1.5 hover:bg-surface-2"
                   aria-label={`Edit ${s.name}`}
                   onClick={() => setEditing({ skill: s, existing: true })}
                 >
@@ -188,7 +180,7 @@ export function SkillsSection() {
                 </button>
                 <button
                   type="button"
-                  className="rounded px-1.5 hover:bg-slate-800"
+                  className="rounded px-1.5 hover:bg-surface-2"
                   aria-label={`Export ${s.name}`}
                   onClick={() => void exportSkill(s)}
                 >
@@ -196,7 +188,7 @@ export function SkillsSection() {
                 </button>
                 <button
                   type="button"
-                  className="rounded px-1.5 text-red-300 hover:bg-slate-800"
+                  className="rounded px-1.5 text-danger hover:bg-surface-2"
                   aria-label={`Delete ${s.name}`}
                   onClick={() => void remove(s)}
                 >
@@ -208,16 +200,16 @@ export function SkillsSection() {
           <div className="mt-3 flex flex-wrap items-center gap-2 text-sm">
             <button
               type="button"
-              className="rounded-md bg-blue-600 px-3 py-1 hover:bg-blue-500"
+              className="btn btn-primary"
               onClick={() => setEditing({ skill: BLANK, existing: false })}
             >
               New Skill
             </button>
-            <label className="flex items-center gap-1 text-slate-300">
+            <label className="flex items-center gap-1 text-fg-2">
               From template
               <select
                 aria-label="Start from a template"
-                className="rounded-md border border-slate-600 bg-slate-950 px-2 py-1"
+                className="field"
                 value=""
                 onChange={(e) => {
                   const t = templates.find((x) => x.id === e.target.value);
@@ -236,11 +228,7 @@ export function SkillsSection() {
                 ))}
               </select>
             </label>
-            <button
-              type="button"
-              className="rounded-md border border-slate-600 px-3 py-1 hover:bg-slate-700"
-              onClick={() => void startImport()}
-            >
+            <button type="button" className="btn btn-secondary" onClick={() => void startImport()}>
               Import…
             </button>
           </div>

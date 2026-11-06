@@ -43,18 +43,18 @@ export function ConsentDialog({ onConfirm, onCancel }: Props) {
         role="dialog"
         aria-modal="true"
         aria-labelledby={titleId}
-        className="w-full max-w-sm rounded-lg border border-slate-700 bg-slate-900 p-4 text-sm"
+        className="w-full max-w-sm rounded-lg border border-line bg-surface p-4 text-sm"
       >
         <h2 id={titleId} className="text-base font-semibold">
           Before Sidekick listens
         </h2>
-        <p className="mt-1 text-slate-400">
+        <p className="mt-1 text-fg-muted">
           Recording rules differ by place and company. Sidekick never tells the meeting for you.
         </p>
         <fieldset className="mt-3 space-y-2">
           <legend className="sr-only">Who may be transcribed</legend>
           {OPTIONS.map((o, i) => (
-            <div key={o.value} className="flex gap-2 rounded-md border border-slate-700 p-2">
+            <div key={o.value} className="flex gap-2 rounded-md border border-line p-2">
               <input
                 ref={i === 0 ? first : undefined}
                 id={`${titleId}-${o.value}`}
@@ -70,7 +70,7 @@ export function ConsentDialog({ onConfirm, onCancel }: Props) {
                 <label htmlFor={`${titleId}-${o.value}`} className="block font-medium">
                   {o.label}
                 </label>
-                <p id={`${titleId}-${o.value}-detail`} className="text-slate-400">
+                <p id={`${titleId}-${o.value}-detail`} className="text-fg-muted">
                   {o.detail}
                 </p>
               </div>
@@ -78,16 +78,12 @@ export function ConsentDialog({ onConfirm, onCancel }: Props) {
           ))}
         </fieldset>
         <div className="mt-4 flex justify-end gap-2">
-          <button
-            type="button"
-            className="rounded-md border border-slate-600 px-3 py-1 hover:bg-slate-700"
-            onClick={onCancel}
-          >
+          <button type="button" className="btn btn-secondary" onClick={onCancel}>
             Cancel
           </button>
           <button
             type="button"
-            className="rounded-md bg-blue-600 px-3 py-1 hover:bg-blue-500 disabled:opacity-50"
+            className="btn btn-primary"
             disabled={!choice}
             onClick={() => choice && onConfirm(choice)}
           >

@@ -45,7 +45,7 @@ export function ChatView() {
     <div className="flex h-full flex-col gap-2">
       <div role="log" aria-label="Chat" className="min-h-0 flex-1 space-y-3 overflow-y-auto">
         {turns.length === 0 && (
-          <p className="text-slate-400">
+          <p className="text-fg-muted">
             {canAsk
               ? "Ask anything about this meeting or your documents."
               : "Start a session to chat with its context."}
@@ -57,7 +57,7 @@ export function ChatView() {
         <div ref={end} />
       </div>
       {(error ?? captureError) && (
-        <p role="alert" className="text-sm text-red-300">
+        <p role="alert" className="text-sm text-danger">
           {error ?? captureError}
         </p>
       )}
@@ -75,17 +75,13 @@ export function ChatView() {
               ? ""
               : pending
                 ? "What do you want to know about this screenshot?"
-                : "Ask a question (Enter to send, Shift+Enter for a new line)"
+                : "Ask anything… (Enter to send)"
           }
           onChange={(e) => setText(e.target.value)}
           onKeyDown={onKeyDown}
-          className="min-w-0 flex-1 resize-none rounded-md border border-slate-700 bg-slate-950 p-2 text-sm text-slate-100 disabled:opacity-50"
+          className="field min-w-0 flex-1 resize-none"
         />
-        <button
-          type="submit"
-          disabled={!canAsk || !text.trim()}
-          className="rounded-md bg-sky-700 px-3 py-1.5 text-sm text-white disabled:opacity-40"
-        >
+        <button type="submit" disabled={!canAsk || !text.trim()} className="btn btn-primary">
           Send
         </button>
       </form>
@@ -98,30 +94,30 @@ function ChatTurn({ turn }: { turn: AnswerView }) {
   const text = turn.body || turn.cue;
   return (
     <article aria-label={`Chat: ${turn.question}`} className="space-y-1">
-      <p className="ml-8 rounded-lg bg-slate-800 px-2 py-1 text-sm whitespace-pre-wrap text-slate-100">
+      <p className="ml-auto w-fit max-w-[85%] rounded-2xl rounded-br-md bg-accent-soft px-3 py-1.5 text-sm whitespace-pre-wrap text-fg">
         {turn.question}
       </p>
-      <div className="mr-4 text-sm text-slate-200" aria-live="polite">
-        {text ? <Markdown text={text} /> : streaming && <p className="text-slate-400">Thinking…</p>}
+      <div className="mr-4 text-sm leading-relaxed text-fg-2" aria-live="polite">
+        {text ? <Markdown text={text} /> : streaming && <p className="text-fg-muted">Thinking…</p>}
         {turn.status === "error" && (
-          <p role="alert" className="text-red-300">
+          <p role="alert" className="text-danger">
             {turn.error}
           </p>
         )}
-        {turn.status === "cancelled" && <p className="text-xs text-slate-400">Stopped.</p>}
+        {turn.status === "cancelled" && <p className="text-xs text-fg-muted">Stopped.</p>}
         {streaming && (
           <button
             type="button"
-            className="rounded px-1 text-xs text-slate-400 hover:bg-slate-800"
+            className="btn btn-ghost btn-sm"
             onClick={() => activeRouter()?.router.cancel(turn.id)}
           >
             Stop
           </button>
         )}
         {turn.status === "done" && turn.sources.length > 0 && (
-          <ol aria-label="Sources" className="mt-1 space-y-0.5 text-xs text-slate-400">
+          <ol aria-label="Sources" className="mt-2 flex flex-wrap gap-1">
             {turn.sources.map((s) => (
-              <li key={s.n}>
+              <li key={s.n} className="badge bg-surface-3 font-normal text-fg-2">
                 [{s.n}] {s.label}
               </li>
             ))}

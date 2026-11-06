@@ -26,11 +26,11 @@ export function DataSection() {
   }
 
   return (
-    <section aria-labelledby={headingId} className="rounded-lg border border-slate-700 p-4">
+    <section aria-labelledby={headingId} className="card p-4">
       <h2 id={headingId} className="text-base font-semibold">
         Your data
       </h2>
-      <p className="mb-3 text-sm text-slate-400">
+      <p className="mb-3 text-sm text-fg-muted">
         Everything stays on this computer, encrypted. Deleting removes transcripts, notes, answers,
         screenshots and documents for good. Settings, keys and Skills stay; the record that
         participants agreed to transcription is kept for a year.
@@ -38,35 +38,31 @@ export function DataSection() {
       {message && (
         <p
           role={message.error ? "alert" : "status"}
-          className={`mb-2 text-sm ${message.error ? "text-red-300" : "text-emerald-300"}`}
+          className={`mb-2 text-sm ${message.error ? "text-danger" : "text-success"}`}
         >
           {message.text}
         </p>
       )}
       {asking ? (
         <div className="space-y-2 text-sm">
-          <label className="block text-slate-300">
+          <label className="block text-fg-2">
             Type DELETE to confirm
             <input
               value={confirm}
               onChange={(e) => setConfirm(e.target.value)}
-              className="mt-1 block rounded-md border border-slate-600 bg-slate-950 px-2 py-1"
+              className="field mt-1 block"
             />
           </label>
           <div className="flex gap-2">
             <button
               type="button"
               disabled={confirm !== "DELETE" || busy}
-              className="rounded-md bg-red-700 px-3 py-1 text-white disabled:opacity-40"
+              className="btn btn-danger"
               onClick={() => void deleteAll()}
             >
               Delete all meeting data
             </button>
-            <button
-              type="button"
-              className="rounded-md px-3 py-1 hover:bg-slate-800"
-              onClick={() => setAsking(false)}
-            >
+            <button type="button" className="btn btn-ghost" onClick={() => setAsking(false)}>
               Cancel
             </button>
           </div>
@@ -74,7 +70,7 @@ export function DataSection() {
       ) : (
         <button
           type="button"
-          className="rounded-md border border-red-800 px-3 py-1 text-sm text-red-300 hover:bg-red-950"
+          className="btn btn-danger-ghost"
           onClick={() => {
             setMessage(null);
             setAsking(true);

@@ -24,12 +24,12 @@ export function CodeBlock({ code, lang }: Props) {
   }, [code, lang]);
 
   return (
-    <div className="relative my-1.5 rounded-md border border-slate-700 bg-slate-950 text-xs">
-      <div className="flex items-center justify-between border-b border-slate-800 px-2 py-0.5 text-slate-400">
+    <div className="relative my-1.5 rounded-md border border-line bg-canvas text-xs">
+      <div className="flex items-center justify-between border-b border-line px-2 py-0.5 text-fg-muted">
         <span>{lang || "code"}</span>
         <button
           type="button"
-          className="rounded px-1.5 hover:bg-slate-800"
+          className="rounded px-1.5 hover:bg-surface-2"
           aria-label={copied ? "Copied" : "Copy code"}
           onClick={() =>
             void navigator.clipboard.writeText(code).then(() => {

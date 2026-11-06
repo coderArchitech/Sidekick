@@ -46,7 +46,7 @@ export function TranscriptView() {
   }, [applyEvents]);
 
   if (!session) {
-    return <p className="text-slate-400">Start a session to see the transcript.</p>;
+    return <p className="text-fg-muted">Start a session to see the transcript.</p>;
   }
 
   async function rename(from: string) {
@@ -68,7 +68,7 @@ export function TranscriptView() {
   return (
     <div className="space-y-2">
       <div className="flex items-center justify-between text-xs">
-        <span role="status" className={live ? "text-red-300" : "text-slate-400"}>
+        <span role="status" className={live ? "text-danger" : "text-fg-muted"}>
           {live
             ? "● Listening"
             : session.status === "paused"
@@ -77,7 +77,7 @@ export function TranscriptView() {
         </span>
         <button
           type="button"
-          className="rounded-md border border-slate-600 px-2 py-0.5 hover:bg-slate-700 disabled:opacity-50"
+          className="btn btn-secondary btn-sm"
           disabled={!session.startedAt || session.status === "ended"}
           onClick={() => void bookmarkNow(session)}
         >
@@ -85,17 +85,17 @@ export function TranscriptView() {
         </button>
       </div>
       {error && (
-        <p role="alert" className="text-xs text-red-300">
+        <p role="alert" className="text-xs text-danger">
           {error}
         </p>
       )}
       {lines.length === 0 && !partialText && (
-        <p className="text-slate-400">{live ? "Waiting for speech…" : "No transcript yet."}</p>
+        <p className="text-fg-muted">{live ? "Waiting for speech…" : "No transcript yet."}</p>
       )}
       <ol aria-label="Transcript" className="space-y-1.5">
         {lines.map((l) => (
           <li key={l.id} className="leading-snug">
-            <span className="mr-1 text-xs text-slate-400">{clock(l.startMs)}</span>
+            <span className="mr-1 text-xs text-fg-muted">{clock(l.startMs)}</span>
             {editing === l.speakerLabel ? (
               <form
                 className="inline"
@@ -112,14 +112,14 @@ export function TranscriptView() {
                   value={name}
                   onChange={(e) => setName(e.target.value)}
                   onBlur={() => void rename(l.speakerLabel)}
-                  className="w-28 rounded border border-slate-600 bg-slate-950 px-1 text-xs"
+                  className="field field-sm w-28"
                 />
               </form>
             ) : (
               <button
                 type="button"
                 title="Rename this speaker"
-                className={`mr-1 font-medium hover:underline ${l.isUser ? "text-sky-300" : "text-amber-200"}`}
+                className={`mr-1 font-medium hover:underline ${l.isUser ? "text-accent-text" : "text-warning"}`}
                 onClick={() => {
                   setEditing(l.speakerLabel);
                   setName(displayName(l.speakerLabel));
@@ -133,14 +133,14 @@ export function TranscriptView() {
         ))}
       </ol>
       {partialText && (
-        <p aria-live="polite" className="italic text-slate-400">
+        <p aria-live="polite" className="italic text-fg-muted">
           {partialText}
         </p>
       )}
       {bookmarks.length > 0 && (
         <div>
-          <h3 className="text-xs font-semibold text-slate-400">Bookmarks</h3>
-          <ul className="text-xs text-slate-300">
+          <h3 className="text-xs font-semibold text-fg-muted">Bookmarks</h3>
+          <ul className="text-xs text-fg-2">
             {bookmarks.map((b) => (
               <li key={b.id}>
                 {clock(b.atMs)}
