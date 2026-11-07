@@ -46,7 +46,7 @@ export function CaptureMenu({ sessionId, disabled }: { sessionId: string; disabl
         <div
           role="menu"
           aria-label="Capture"
-          className="absolute bottom-full left-0 z-10 mb-1 w-40 rounded-md border border-line bg-surface p-1 text-sm shadow-lg"
+          className="absolute bottom-full left-0 z-10 mb-1 w-40 rounded-md border border-line bg-popover p-1 text-sm shadow-lg"
         >
           <MenuItem onClick={() => void take({ mode: "screen" })}>Full screen</MenuItem>
           <MenuItem
@@ -65,7 +65,7 @@ export function CaptureMenu({ sessionId, disabled }: { sessionId: string; disabl
         <div
           role="dialog"
           aria-label="Choose a window"
-          className="absolute bottom-full left-0 z-10 mb-1 max-h-64 w-64 overflow-y-auto rounded-md border border-line bg-surface p-1 text-sm shadow-lg"
+          className="absolute bottom-full left-0 z-10 mb-1 max-h-64 w-64 overflow-y-auto rounded-md border border-line bg-popover p-1 text-sm shadow-lg"
         >
           {error && <p className="p-1 text-danger">{error}</p>}
           {!windows && !error && <p className="p-1 text-fg-muted">Finding windows…</p>}

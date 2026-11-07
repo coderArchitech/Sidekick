@@ -38,7 +38,7 @@ export function ViewMenu() {
         <div
           role="dialog"
           aria-label="View options"
-          className="absolute right-0 z-20 mt-1 w-56 space-y-3 rounded-lg border border-line bg-surface-2 p-3 text-xs text-fg-2 shadow-xl shadow-black/40"
+          className="absolute right-0 z-20 mt-1 w-56 space-y-3 rounded-lg border border-line bg-popover p-3 text-xs text-fg-2 shadow-xl shadow-black/40"
         >
           <div className="flex items-center justify-between">
             <span>Text size</span>
@@ -65,11 +65,14 @@ export function ViewMenu() {
             </div>
           </div>
           <label className="flex items-center justify-between gap-2">
-            <span>Opacity</span>
+            <span>
+              Background
+              <span className="block text-fg-muted tabular">{Math.round(opacity * 100)}%</span>
+            </span>
             <input
               type="range"
               className="w-28"
-              aria-label="Panel opacity"
+              aria-label="Background opacity"
               min={MIN_OPACITY}
               max={MAX_OPACITY}
               step={0.05}

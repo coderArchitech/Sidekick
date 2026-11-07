@@ -98,6 +98,7 @@ All Phase 0 code and automated tests are done and green on Linux, Windows and ma
 | T-046 | Web search provider and per-session overrides | ⬜ To do | |
 | T-047 | Custom vocabulary | ⬜ To do | |
 | T-048 | Click-through mode and themes | ⬜ To do | |
+| T-049 | Glass overlay: translucent background, crisp text | 🟡 In progress: testing | 🖥️ Built and tested (Vitest, Playwright over a busy backdrop). Needs a manual look over a live call on Windows and macOS |
 
 ---
 
@@ -616,3 +617,21 @@ Each P1 task gets full scope and tests when it moves to In progress.
 | T-046 | KEY-8, KEY-9; T-003 (P2) | Unit: Tavily and Brave adapters; Integration: per-session override |
 | T-047 | LIS-5 | Unit: vocabulary passed to each STT provider |
 | T-048 | UI-5, UI-8 | Manual: click-through on both OSes; axe: each theme passes contrast |
+
+### T-049 Glass overlay: translucent background, crisp text
+
+**Refs:** PRD UI-1, UI-3, Accessibility (NFR table); TECHNICAL.md 7.2
+**Scope**
+- [x] The panel background is a dark translucent tint, so the screen behind (the meeting video, slides) stays visible through it.
+- [x] The opacity setting (20% to 100%) controls only the background tint. Text, buttons and icons stay fully opaque; today the whole panel fades.
+- [x] Raised surfaces (cards, inputs, chips, the session bar) are translucent layers on the glass, not opaque blocks, so the backdrop shows through the whole panel.
+- [x] Menus and dialogs (View menu, capture menu, region picker, consent dialog) stay solid so they are always readable.
+- [x] Text stays readable over bright or busy content: a soft text shadow that strengthens as the tint gets lighter, and hairline borders on the glass.
+- [x] Settings window unchanged (opaque). New installs default to 80% so the glass is visible out of the box (was 90%); saved settings are kept.
+- [x] No native blur (macOS vibrancy, Windows acrylic) for now: it hides what is behind the panel, which is the point of this task, and acrylic lags while dragging on Windows 10.
+**Tests**
+- [x] Component: the opacity setting sets the background tint, and the panel itself is never faded (no CSS `opacity` on the root).
+- [x] Component: the slider is labelled "Background opacity".
+- [x] Playwright: overlay over a busy backdrop image at 40% and 100%; axe on every tab still passes.
+- [ ] E2E: suite passes unchanged (CI).
+- [ ] Manual 🖥️: over a live video call on Windows and macOS, the call is visible behind the panel and answers stay readable at the default opacity.

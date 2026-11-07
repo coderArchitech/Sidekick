@@ -43,7 +43,7 @@ export function ConsentDialog({ onConfirm, onCancel }: Props) {
         role="dialog"
         aria-modal="true"
         aria-labelledby={titleId}
-        className="w-full max-w-sm rounded-lg border border-line bg-surface p-4 text-sm"
+        className="w-full max-w-sm rounded-lg border border-line bg-popover p-4 text-sm"
       >
         <h2 id={titleId} className="text-base font-semibold">
           Before Sidekick listens

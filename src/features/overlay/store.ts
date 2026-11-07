@@ -42,7 +42,7 @@ function save(patch: OverlayPatch, delayMs = 300) {
 
 export const useOverlayStore = create<OverlayState>((set) => ({
   tab: "answers",
-  opacity: 0.9,
+  opacity: 0.8,
   fontSize: 14,
   compact: false,
   setTab: (tab) => set({ tab }),

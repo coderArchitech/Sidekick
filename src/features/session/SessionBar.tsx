@@ -33,7 +33,7 @@ export function SessionBar() {
   }, [applyChange]);
 
   return (
-    <div className="space-y-1.5 border-b border-line bg-surface px-3 py-2 text-xs">
+    <div className="space-y-1.5 border-b border-line px-3 py-2 text-xs">
       {!session || session.status === "ended" ? (
         <form
           className="flex items-center gap-2"
