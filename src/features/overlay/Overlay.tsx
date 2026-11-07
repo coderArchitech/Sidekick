@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, type CSSProperties } from "react";
 import { LiveAnswers } from "@/features/answers";
 import { ChatView } from "@/features/chat";
 import { Library } from "@/features/library";
@@ -22,6 +22,11 @@ const TAB_LABELS: Record<Tab, string> = {
 /** The 14 px default matches the browser's 16 px root, so other sizes scale from it. */
 export function rootFontSize(fontSize: number): string {
   return `${(16 * fontSize) / 14}px`;
+}
+
+/** The opacity setting tints the background only; text stays opaque (T-049). */
+export function glassStyle(opacity: number): CSSProperties {
+  return { "--glass-alpha": String(opacity) } as CSSProperties;
 }
 
 /** The floating panel (PRD UI-1, UI-3, UI-7). Tab contents arrive with their features. */
@@ -51,8 +56,8 @@ export function Overlay() {
 
   return (
     <div
-      className="flex h-full flex-col overflow-hidden rounded-xl border border-line bg-surface text-fg shadow-2xl shadow-black/50"
-      style={{ opacity }}
+      className="glass flex h-full flex-col overflow-hidden rounded-xl border border-line text-fg shadow-2xl shadow-black/40"
+      style={glassStyle(opacity)}
       data-compact={compact || undefined}
     >
       <header

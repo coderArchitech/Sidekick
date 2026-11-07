@@ -325,7 +325,7 @@ The full tree is in [section 7.1](docs/TECHNICAL.md#71-repository-structure).
 
 ## Design system
 
-The UI uses a dark graphite theme with an indigo accent and the [Inter](https://rsms.me/inter/) typeface (bundled, so it works offline). Colours, fonts and shared component styles are defined once, as semantic tokens in [`src/styles.css`](src/styles.css): `surface`, `line`, `fg`, `accent`, `success` and so on, plus `btn`, `field`, `card` and `badge` classes. Components use only these, so the theme changes in one place. Every text colour meets WCAG AA contrast, and the UI test suite checks it. Details are in [technical doc section 7.2](docs/TECHNICAL.md#72-coding-standards).
+The UI uses a dark graphite theme with an indigo accent and the [Inter](https://rsms.me/inter/) typeface (bundled, so it works offline). Colours, fonts and shared component styles are defined once, as semantic tokens in [`src/styles.css`](src/styles.css): `surface`, `line`, `fg`, `accent`, `success` and so on, plus `btn`, `field`, `card` and `badge` classes. Components use only these, so the theme changes in one place. Every text colour meets WCAG AA contrast, and the UI test suite checks it. The overlay is glass: a dark translucent panel, so the call or slides behind it stay visible, with the background opacity (20–100%, default 80%) under **View**; only the tint changes, text stays crisp. Details are in [technical doc section 7.2](docs/TECHNICAL.md#72-coding-standards).
 
 ## Contributing
 

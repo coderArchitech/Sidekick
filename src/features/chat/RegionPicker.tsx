@@ -55,7 +55,7 @@ export function RegionPicker({
     <div
       role="dialog"
       aria-label="Select an area"
-      className="absolute bottom-full left-0 z-10 mb-1 w-80 rounded-md border border-line bg-surface p-2 text-xs shadow-lg"
+      className="absolute bottom-full left-0 z-10 mb-1 w-80 rounded-md border border-line bg-popover p-2 text-xs shadow-lg"
     >
       <p className="mb-1 text-fg-2">Drag over the area to capture.</p>
       {error && <p className="text-danger">{error}</p>}

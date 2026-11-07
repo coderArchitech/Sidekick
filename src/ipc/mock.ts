@@ -42,7 +42,7 @@ export const DEFAULT_SETTINGS: Settings = {
     { action: "bookmark", keys: "CmdOrCtrl+Shift+B" },
   ],
   profile: { name: "", nicknames: [] },
-  overlay: { opacity: 90, fontSize: 14, compact: false, positions: [] },
+  overlay: { opacity: 80, fontSize: 14, compact: false, positions: [] },
 };
 
 type CatalogRow = [id: string, kind: ProviderKind, displayName: string, keyRequired: boolean];

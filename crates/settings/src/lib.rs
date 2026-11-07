@@ -73,7 +73,7 @@ pub struct OverlayPrefs {
 impl Default for OverlayPrefs {
     fn default() -> Self {
         Self {
-            opacity: 90,
+            opacity: 80,
             font_size: 14,
             compact: false,
             positions: Vec::new(),

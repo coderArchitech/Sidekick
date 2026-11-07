@@ -104,10 +104,31 @@ describe("Overlay appearance (PRD UI-1, UI-3)", () => {
   it("opacity is saved as a percentage once it settles", async () => {
     render(<Overlay />);
     await userEvent.click(screen.getByRole("button", { name: "View" }));
-    const slider = screen.getByRole("slider", { name: "Panel opacity" });
+    const slider = screen.getByRole("slider", { name: "Background opacity" });
     fireEvent.change(slider, { target: { value: "0.5" } });
     fireEvent.change(slider, { target: { value: "0.45" } });
     expect((await savedOverlay()).opacity).toBe(45);
+  });
+
+  it("opacity tints the background only; text is never faded (T-049)", async () => {
+    render(<Overlay />);
+    const panel = screen.getByRole("tablist").parentElement as HTMLElement;
+    expect(panel).toHaveClass("glass");
+    expect(panel.style.getPropertyValue("--glass-alpha")).toBe("0.9");
+    expect(panel.style.opacity).toBe("");
+    await userEvent.click(screen.getByRole("button", { name: "View" }));
+    fireEvent.change(screen.getByRole("slider", { name: "Background opacity" }), {
+      target: { value: "0.4" },
+    });
+    expect(panel.style.getPropertyValue("--glass-alpha")).toBe("0.4");
+    expect(panel.style.opacity).toBe("");
+    expect(screen.getByText("40%")).toBeInTheDocument();
+  });
+
+  it("menus stay solid on the glass", async () => {
+    render(<Overlay />);
+    await userEvent.click(screen.getByRole("button", { name: "View" }));
+    expect(screen.getByRole("dialog", { name: "View options" })).toHaveClass("bg-popover");
   });
 
   it("the View menu closes on Escape and outside clicks", async () => {
