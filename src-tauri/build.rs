@@ -63,6 +63,18 @@ const COMMANDS: &[&str] = &[
     "ingest_url",
     "list_documents",
     "delete_document",
+    "create_pack",
+    "rename_pack",
+    "delete_pack",
+    "list_packs",
+    "list_pack_documents",
+    "ingest_pack_document",
+    "ingest_pack_url",
+    "list_session_packs",
+    "set_session_packs",
+    "brief_material",
+    "get_brief",
+    "save_brief",
     "retrieve_context",
 ];
 

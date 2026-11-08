@@ -53,6 +53,8 @@ import type { Unlisten } from "./answerEvents";
 export type {
   ActionItem,
   AgendaItem,
+  Brief,
+  BriefSource,
   AgendaStatus,
   AgendaUpdate,
   AnswerFormat,
@@ -77,6 +79,7 @@ export type {
   ContextPack,
   DocStatus,
   DocumentInfo,
+  PackInfo,
   Diagnostics,
   Effort,
   ErrorCode,

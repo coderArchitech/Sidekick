@@ -1,4 +1,5 @@
 import { useEffect, useId, useState } from "react";
+import { PackPicker } from "@/features/packs";
 import { useSessionStore } from "@/features/session";
 import { onFileDrop, pickFiles, sessionEvents, type DocStatus } from "@/ipc";
 import { useLibraryStore } from "./store";
@@ -150,6 +151,7 @@ export function Library() {
                 {d.name}: {d.error}
               </p>
             ))}
+          <PackPicker sessionId={sessionId} />
         </div>
       )}
     </div>

@@ -4,6 +4,7 @@ import { useEffect } from "react";
 import { commands } from "@/ipc";
 import { useNotesStore } from "@/orchestrator";
 import { Agenda } from "./Agenda";
+import { BriefPanel } from "./BriefPanel";
 import { MissedRecap } from "./MissedRecap";
 
 /**
@@ -31,6 +32,7 @@ export function NotesView() {
   return (
     <div className="space-y-3">
       {started && <MissedRecap sessionId={session.id} />}
+      <BriefPanel sessionId={session.id} />
       <Agenda sessionId={session.id} notes={notes} />
       {activity !== "idle" && (
         <p role="status" className="text-xs text-fg-muted">

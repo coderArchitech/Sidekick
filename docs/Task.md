@@ -93,7 +93,7 @@ All Phase 0 code and automated tests are done and green on Linux, Windows and ma
 | T-041 | Meeting memory extras: agenda, recap, action items | 🟡 In progress: testing | 🖥️ Built with unit, Playwright and E2E tests. Needs a real-model check of agenda and recap quality (T-039) |
 | T-042 | Answer follow-up chips | 🟡 In progress: testing | 🖥️ Built with unit, Playwright and E2E tests. Needs a real-model check that each chip reshapes the answer (T-039) |
 | T-043 | Screenshot quick actions and strip | 🟡 In progress: testing | 🖥️ Built with unit, Playwright and E2E tests. Needs a real-model check of each action on real screenshots (T-039) |
-| T-044 | Pre-meeting brief and Knowledge Packs | ⬜ To do | |
+| T-044 | Pre-meeting brief and Knowledge Packs | 🟡 In progress: testing | 🖥️ Built with Rust, unit, Playwright and E2E tests. Needs a real-model check of brief quality (T-039) |
 | T-045 | Agents (tools) and multiple active Skills | ⬜ To do | |
 | T-046 | Web search provider and per-session overrides | ⬜ To do | |
 | T-047 | Custom vocabulary | ⬜ To do | |
@@ -662,6 +662,22 @@ Each P1 task gets full scope and tests when it moves to In progress.
 - [x] Playwright (`tests/ui/screenshot-actions.spec.ts`): a quick action, strip re-ask and delete, axe.
 - [x] E2E (`tests/e2e/specs/screenshot-actions.e2e.ts`): quick action, strip, re-ask and delete in the real app.
 - [ ] Manual 🖥️: each action on real screenshots (a table, an error, a question) with a vision model (T-039).
+
+### T-044 Pre-meeting brief and Knowledge Packs
+
+**Refs:** PRD CTX-4, CTX-5; TECHNICAL.md 4.2, 6.5, 7.1 (`retrieval`, `library`, `notes`, `settings`)
+**Scope**
+- [x] Knowledge Packs in Settings: create, add files or links (`Owner::Pack`, the pack's own vector partition), document status, remove documents, rename, delete (with its documents, chunks, vectors and attachments).
+- [x] Turn packs on per session in the overlay's Documents panel (`session_packs`, migration 0005); one pack can be on in many sessions.
+- [x] Retrieval searches the session's documents plus its attached packs (vector partitions merged by distance; keyword search includes them); other sessions never see them.
+- [x] Pre-meeting brief in the Notes tab: Summary, Key numbers, Likely questions from the start of every ready document (session first, then packs, 40k characters shared fairly); saved per session (`briefs`); no documents → a hint, no model call.
+**Tests**
+- [x] Rust: packs list/rename/limits, attach to several sessions, unknown pack leaves attachments unchanged, delete removes documents, vectors and attachments; attached packs found by vector and keyword search and in the context pack, detached ones and other sessions not; brief material order and budget; brief save/get.
+- [x] Unit: brief prompt fencing, main model and sections, no material → no call, empty reply not saved.
+- [x] Component: Settings pack create/link/rename/delete and errors, axe; overlay picker toggles and makes retrieval include the pack; brief writes, saves and reloads.
+- [x] Playwright (`tests/ui/knowledge-packs.spec.ts`): Settings pack with a link; overlay pack picker, cited pack document in Chat, brief; axe.
+- [x] E2E (`tests/e2e/specs/knowledge-packs.e2e.ts`): pack made in Settings and ingested by the real pipeline, turned on in the overlay, cited in Chat, read by the brief.
+- [ ] Manual 🖥️: brief quality on real documents with a real model (T-039).
 
 ### T-049 Glass overlay: translucent background, crisp text
 

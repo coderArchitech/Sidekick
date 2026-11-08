@@ -188,6 +188,11 @@ pub fn list_for_session(db: &Database, session_id: &str) -> SidekickResult<Vec<D
     list_where(db, "d.session_id = ?1", session_id)
 }
 
+/// Documents of a Knowledge Pack, oldest first.
+pub fn list_for_pack(db: &Database, pack_id: &str) -> SidekickResult<Vec<DocumentInfo>> {
+    list_where(db, "d.pack_id = ?1", pack_id)
+}
+
 fn list_where(db: &Database, condition: &str, arg: &str) -> SidekickResult<Vec<DocumentInfo>> {
     let mut stmt = db
         .conn()

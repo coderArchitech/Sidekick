@@ -38,6 +38,7 @@ export const config: WebdriverIO.Config = {
         "./specs/follow-ups.e2e.ts",
         "./specs/screenshot.e2e.ts",
         "./specs/screenshot-actions.e2e.ts",
+        "./specs/knowledge-packs.e2e.ts",
         "./specs/settings.e2e.ts",
       ],
   maxInstances: 1,

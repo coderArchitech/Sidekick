@@ -330,3 +330,199 @@ async fn searches_20k_chunks_quickly() {
         "vector {vector_ms} ms, pack {pack_ms} ms"
     );
 }
+
+async fn add_to_pack(db: &Arc<Mutex<Database>>, pack: &str, name: &str, text: &str) {
+    let dir = tempfile::tempdir().unwrap();
+    let path = dir.path().join(name);
+    std::fs::write(&path, text).unwrap();
+    ingest(
+        Arc::clone(db),
+        Owner::Pack(pack.into()),
+        Source::File(path),
+        Arc::new(MockEmbedder),
+        None,
+        Arc::new(|_| {}),
+    )
+    .await
+    .unwrap();
+}
+
+#[tokio::test]
+async fn attached_knowledge_packs_are_searched_and_detached_ones_are_not() {
+    use sidekick_ingest::packs;
+    let db = db();
+    let pack = packs::create(&db.lock().unwrap(), "Product specs").unwrap();
+    add_to_pack(
+        &db,
+        &pack.id,
+        "sla.md",
+        "Enterprise customers get a 99.95 percent uptime SLA with service credits.",
+    )
+    .await;
+    let q = "What uptime SLA do enterprise customers get?";
+    let found = |s: &str| {
+        let guard = db.lock().unwrap();
+        let by_vector: Vec<i64> = vector(&guard, s, &embed_one(q), 5)
+            .unwrap()
+            .into_iter()
+            .map(|h| h.chunk_id)
+            .collect();
+        let by_keyword: Vec<i64> = keyword(&guard, s, q, 5)
+            .unwrap()
+            .into_iter()
+            .map(|h| h.chunk_id)
+            .collect();
+        (by_vector.len(), by_keyword.len())
+    };
+    assert_eq!(found("s1"), (0, 0), "not attached: not searched");
+
+    packs::set_for_session(
+        &mut db.lock().unwrap(),
+        "s1",
+        std::slice::from_ref(&pack.id),
+    )
+    .unwrap();
+    let (v, k) = found("s1");
+    assert!(
+        v >= 1 && k >= 1,
+        "attached: found by vector ({v}) and keyword ({k})"
+    );
+    let ctx = build_pack(
+        &db.lock().unwrap(),
+        "s1",
+        q,
+        Some(&embed_one(q)),
+        ContextOptions::default(),
+    )
+    .unwrap();
+    assert_eq!(ctx.chunks[0].document_name, "sla.md");
+    assert_eq!(found("s2"), (0, 0), "other sessions don't see it");
+
+    packs::set_for_session(&mut db.lock().unwrap(), "s1", &[]).unwrap();
+    assert_eq!(found("s1"), (0, 0), "detached again");
+}
+
+#[tokio::test]
+async fn packs_list_attach_and_delete_with_their_documents() {
+    use sidekick_ingest::packs;
+    let db = db();
+    let a = packs::create(&db.lock().unwrap(), "  Specs  ").unwrap();
+    assert_eq!(a.name, "Specs");
+    let b = packs::create(&db.lock().unwrap(), "api reference").unwrap();
+    assert!(packs::create(&db.lock().unwrap(), "  ").is_err());
+    assert!(packs::create(&db.lock().unwrap(), &"x".repeat(101)).is_err());
+    add_to_pack(&db, &a.id, "one.md", "Alpha content about pricing tiers.").await;
+    add_to_pack(&db, &a.id, "two.md", "Beta content about the roadmap.").await;
+
+    let guard = db.lock().unwrap();
+    let listed = packs::list(&guard).unwrap();
+    assert_eq!(
+        listed
+            .iter()
+            .map(|p| (p.name.as_str(), p.documents, p.ready))
+            .collect::<Vec<_>>(),
+        [("api reference", 0, 0), ("Specs", 2, 2)],
+        "sorted by name, with counts"
+    );
+    assert_eq!(packs::documents(&guard, &a.id).unwrap().len(), 2);
+    assert_eq!(packs::rename(&guard, &b.id, "API").unwrap().name, "API");
+    drop(guard);
+
+    let mut guard = db.lock().unwrap();
+    let both = vec![a.id.clone(), b.id.clone()];
+    assert_eq!(
+        packs::set_for_session(&mut guard, "s1", &both)
+            .unwrap()
+            .len(),
+        2
+    );
+    assert_eq!(
+        packs::set_for_session(&mut guard, "s2", std::slice::from_ref(&a.id)).unwrap(),
+        std::slice::from_ref(&a.id)
+    );
+    assert!(packs::set_for_session(&mut guard, "s1", &["missing".into()]).is_err());
+    assert_eq!(
+        packs::for_session(&guard, "s1").unwrap().len(),
+        2,
+        "unchanged after an error"
+    );
+
+    packs::delete(&guard, &a.id).unwrap();
+    assert_eq!(
+        packs::for_session(&guard, "s1").unwrap(),
+        std::slice::from_ref(&b.id)
+    );
+    assert!(packs::for_session(&guard, "s2").unwrap().is_empty());
+    let left: i64 = guard
+        .conn()
+        .query_row(
+            "SELECT count(*) FROM documents WHERE pack_id = ?1",
+            [&a.id],
+            |r| r.get(0),
+        )
+        .unwrap();
+    assert_eq!(left, 0, "documents go with the pack");
+    let vecs: i64 = guard
+        .conn()
+        .query_row("SELECT count(*) FROM chunk_vectors", [], |r| r.get(0))
+        .unwrap();
+    assert_eq!(vecs, 0, "and their vectors");
+    assert!(packs::get(&guard, &a.id).is_err());
+}
+
+#[tokio::test]
+async fn brief_material_shares_the_budget_and_includes_packs() {
+    use sidekick_ingest::packs;
+    use sidekick_retrieval::brief;
+    let db = db();
+    add(
+        &db,
+        "s1",
+        "agenda.md",
+        &"Agenda item about pricing. ".repeat(50),
+    )
+    .await;
+    let pack = packs::create(&db.lock().unwrap(), "Specs").unwrap();
+    add_to_pack(
+        &db,
+        &pack.id,
+        "spec.md",
+        &"The Pro tier allows 600 requests. ".repeat(50),
+    )
+    .await;
+
+    let guard = db.lock().unwrap();
+    assert!(
+        brief::material(&guard, "s1", 1000).unwrap().len() == 1,
+        "pack not attached yet"
+    );
+    drop(guard);
+    packs::set_for_session(
+        &mut db.lock().unwrap(),
+        "s1",
+        std::slice::from_ref(&pack.id),
+    )
+    .unwrap();
+    let guard = db.lock().unwrap();
+    let m = brief::material(&guard, "s1", 1000).unwrap();
+    assert_eq!(
+        m.iter()
+            .map(|s| (s.document_name.as_str(), s.pack_name.as_deref()))
+            .collect::<Vec<_>>(),
+        [("agenda.md", None), ("spec.md", Some("Specs"))],
+        "session documents first"
+    );
+    let total: usize = m.iter().map(|s| s.text.chars().count()).sum();
+    assert!(total <= 1000, "within budget: {total}");
+    assert!(
+        m.iter().all(|s| s.text.chars().count() >= 400),
+        "shared fairly"
+    );
+    assert!(brief::material(&guard, "s2", 1000).unwrap().is_empty());
+
+    assert_eq!(brief::get(&guard, "s1").unwrap(), None);
+    brief::save(&guard, "s1", "## Summary\n- one").unwrap();
+    let saved = brief::save(&guard, "s1", "## Summary\n- two").unwrap();
+    assert_eq!(brief::get(&guard, "s1").unwrap(), Some(saved));
+    assert!(brief::save(&guard, "missing", "x").is_err());
+}
