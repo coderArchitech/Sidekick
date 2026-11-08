@@ -1,6 +1,22 @@
 import { expect } from "@wdio/globals";
 import { createAndStart, openTab, waitForLine, waitForText } from "../helpers";
 
+// Looked up afresh each time: the Notes tab remounts when the test switches
+// tabs, and `aria/Agenda` could also match the section's "Agenda" heading.
+const AGENDA = 'section[aria-label="Agenda"]';
+
+async function waitForAgenda(text: string, timeout = 15_000) {
+  let last = "";
+  await browser.waitUntil(
+    async () => {
+      const el = await $(AGENDA);
+      last = (await el.isExisting()) ? await el.getText() : "(no agenda section)";
+      return last.includes(text);
+    },
+    { timeout, timeoutMsg: `agenda never showed "${text}"; last: ${JSON.stringify(last)}` },
+  );
+}
+
 /**
  * T-041 against the real app (mock providers, fixture audio): the agenda is
  * stored in the encrypted database, moved on by the notes job and closed when
@@ -14,8 +30,7 @@ describe("meeting memory (PRD MEM-2, MEM-3)", () => {
     await $("button=Add agenda").click();
     await $("aria/Agenda items, one per line").setValue("Pro tier pricing\nDashboard\nHiring");
     await $("button=Save agenda").click();
-    const agenda = await $("aria/Agenda");
-    await waitForText(agenda, "0/3 covered");
+    await waitForAgenda("0/3 covered");
 
     // The fixture script mentions the Pro tier, then the dashboard.
     await waitForLine("Let's also look at the dashboard.");
@@ -28,8 +43,8 @@ describe("meeting memory (PRD MEM-2, MEM-3)", () => {
     await waitForText(card, "rate limit for the Pro tier");
 
     await $("button=End").click();
-    await waitForText(agenda, "2/3 covered", 30_000);
-    await expect($("aria/Status of Pro tier pricing")).toHaveValue("covered");
-    await expect($("aria/Status of Hiring")).toHaveValue("not_started");
+    await waitForAgenda("2/3 covered", 30_000);
+    await expect($('select[aria-label="Status of Pro tier pricing"]')).toHaveValue("covered");
+    await expect($('select[aria-label="Status of Hiring"]')).toHaveValue("not_started");
   });
 });
