@@ -4,6 +4,7 @@ import { createBatcher } from "@/lib/batcher";
 import { AnswerRouter, type AnswerView } from "./answerer";
 import { useAnswersStore } from "./answersStore";
 import { chatHistory, useChatStore } from "./chatStore";
+import { followUpInput, type FollowUpKind } from "./followUps";
 import { modelPlan, type ModelPlan } from "./models";
 import type { SkillPrompt } from "./prompt";
 import { skillFor, useSkillsStore } from "./skills";
@@ -114,6 +115,31 @@ export async function askChat(text: string): Promise<string | null> {
     endedAt: Date.now(),
     models: active.models(),
     history: chatHistory(useChatStore.getState().turns),
+  });
+  return null;
+}
+
+/**
+ * Asks a follow-up chip ("Shorter", "More detail", …) on a finished answer
+ * (PRD QA-9). The new answer goes to Chat, with the original exchange as
+ * history, and the overlay switches to Chat to show it.
+ */
+export async function askFollowUp(view: AnswerView, kind: FollowUpKind): Promise<string | null> {
+  const active = current;
+  if (!active) return "Start a session to ask questions.";
+  const f = followUpInput(view, kind);
+  useChatStore.getState().requestShow();
+  await active.router.ask({
+    sessionId: active.sessionId,
+    text: f.text,
+    label: f.label,
+    query: f.query,
+    directed: true,
+    source: "chat",
+    skill: active.skill("chat"),
+    endedAt: Date.now(),
+    models: active.models(),
+    history: f.history,
   });
   return null;
 }

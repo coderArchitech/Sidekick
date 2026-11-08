@@ -35,6 +35,7 @@ export const config: WebdriverIO.Config = {
     : [
         "./specs/session.e2e.ts",
         "./specs/meeting-memory.e2e.ts",
+        "./specs/follow-ups.e2e.ts",
         "./specs/screenshot.e2e.ts",
         "./specs/settings.e2e.ts",
       ],

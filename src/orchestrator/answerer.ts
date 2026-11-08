@@ -66,6 +66,10 @@ export interface AskInput {
   models: ModelPlan;
   skill?: SkillPrompt | null;
   history?: LlmRequest["messages"];
+  /** Shown and saved as the question instead of `text` (follow-up chips, PRD QA-9). */
+  label?: string;
+  /** Searched in the documents instead of `text`. */
+  query?: string;
 }
 
 interface InFlight {
@@ -126,7 +130,7 @@ export class AnswerRouter {
     const id = `a${Date.now().toString(36)}${(counter++).toString(36)}`;
     const view: AnswerView = {
       id,
-      question: input.text,
+      question: input.label ?? input.text,
       directed: input.directed,
       source: input.source,
       cue: "",
@@ -160,7 +164,7 @@ export class AnswerRouter {
     };
     this.inFlight.set(id, flight);
 
-    const ctx = await this.deps.retrieveContext(input.sessionId, input.text, null);
+    const ctx = await this.deps.retrieveContext(input.sessionId, input.query ?? input.text, null);
     if (!this.inFlight.has(id)) return view; // cancelled meanwhile
     if (ctx.status === "error") return this.fail(flight, ctx.error.message);
     if (isEmpty(ctx.data)) {
@@ -305,7 +309,7 @@ export class AnswerRouter {
     this.onUpdate({ ...f.view });
     const saved = await this.deps.saveAnswer({
       sessionId: f.input.sessionId,
-      question: f.input.text,
+      question: f.input.label ?? f.input.text,
       source: f.input.source,
       directed: f.input.directed,
       segmentId: f.input.segmentId ?? null,

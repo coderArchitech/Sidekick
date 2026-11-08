@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState, type FormEvent, type KeyboardEvent } from "react";
-import { Markdown } from "@/features/answers";
+import { FollowUpChips, Markdown } from "@/features/answers";
 import { useSessionStore } from "@/features/session";
 import { activeRouter, askChat, useChatStore, type AnswerView } from "@/orchestrator";
 import { CaptureMenu, PendingScreenshot } from "./CaptureMenu";
@@ -123,6 +123,7 @@ function ChatTurn({ turn }: { turn: AnswerView }) {
             ))}
           </ol>
         )}
+        <FollowUpChips view={turn} />
       </div>
     </article>
   );
