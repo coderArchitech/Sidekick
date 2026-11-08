@@ -68,7 +68,7 @@ impl DeepgramProvider {
             if cfg.kind == StreamKind::System {
                 q.append_pair("diarize", "true");
             }
-            for term in &cfg.keyterms {
+            for term in crate::keyterms_for(cfg) {
                 q.append_pair("keyterm", term);
             }
         }
@@ -275,6 +275,23 @@ impl KeyVerifier for DeepgramVerifier {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    fn vocabulary(n: usize) -> Vec<String> {
+        std::iter::once("Nitesh".to_owned())
+            .chain((1..n).map(|i| format!("Term{i}")))
+            .collect()
+    }
+
+    #[test]
+    fn sends_the_custom_vocabulary_up_to_the_limit() {
+        let mut cfg = SttConfig::new(StreamKind::Mic);
+        cfg.keyterms = vocabulary(150);
+        let url = DeepgramProvider::default().listen_url(&cfg);
+        assert_eq!(url.matches("keyterm=").count(), crate::MAX_KEYTERMS);
+        assert!(url.contains("keyterm=Nitesh&keyterm=Term1&"), "names first");
+        assert!(url.contains("keyterm=Term99"));
+        assert!(!url.contains("keyterm=Term100"));
+    }
 
     #[test]
     fn builds_the_listen_url() {

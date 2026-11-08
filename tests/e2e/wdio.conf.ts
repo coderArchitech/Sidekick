@@ -42,6 +42,7 @@ export const config: WebdriverIO.Config = {
         "./specs/agents.e2e.ts",
         "./specs/web-search-overrides.e2e.ts",
         "./specs/settings.e2e.ts",
+        "./specs/vocabulary.e2e.ts",
       ],
   maxInstances: 1,
   // Typed loosely: the service reads these keys, its published types lag behind.

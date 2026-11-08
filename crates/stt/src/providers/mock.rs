@@ -18,6 +18,38 @@ pub struct MockSttProvider {
     script: Vec<String>,
 }
 
+/// Simulates keyterm boosting (PRD LIS-5): a keyterm said in any case is
+/// written the way the vocabulary spells it, so tests can see it applied.
+#[must_use]
+pub fn with_keyterms(text: &str, keyterms: &[String]) -> String {
+    let mut out = text.to_owned();
+    for term in keyterms {
+        let lower = out.to_lowercase();
+        let needle = term.to_lowercase();
+        if needle.is_empty() || lower.len() != out.len() {
+            continue; // only simple (ASCII-cased) text
+        }
+        let mut result = String::with_capacity(out.len());
+        let mut last = 0;
+        let mut from = 0;
+        while let Some(pos) = lower[from..].find(&needle).map(|p| p + from) {
+            let end = pos + needle.len();
+            let before = lower[..pos].chars().next_back();
+            let after = lower[end..].chars().next();
+            let boundary = |c: Option<char>| c.is_none_or(|c| !c.is_alphanumeric());
+            if boundary(before) && boundary(after) {
+                result.push_str(&out[last..pos]);
+                result.push_str(term);
+                last = end;
+            }
+            from = end;
+        }
+        result.push_str(&out[last..]);
+        out = result;
+    }
+    out
+}
+
 impl MockSttProvider {
     #[must_use]
     pub fn with_script(script: Vec<String>) -> Self {
@@ -65,10 +97,13 @@ impl SttProvider for MockSttProvider {
                 sink.segment(Segment {
                     speaker_label: speakers::label(config.kind, None),
                     is_user: config.kind == sidekick_audio::StreamKind::Mic,
-                    text: script
-                        .get(*count as usize - 1)
-                        .cloned()
-                        .unwrap_or_else(|| format!("Mock speech {count}")),
+                    text: with_keyterms(
+                        &script
+                            .get(*count as usize - 1)
+                            .cloned()
+                            .unwrap_or_else(|| format!("Mock speech {count}")),
+                        crate::keyterms_for(&config),
+                    ),
                     start_ms,
                     end_ms,
                     confidence: Some(1.0),
@@ -97,5 +132,25 @@ impl SttProvider for MockSttProvider {
         }
         flush(&mut burst, &mut count);
         Ok(())
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn simulates_keyterm_boosting() {
+        let terms = vec!["Pro Tier".to_owned(), "SOC 2".to_owned(), "Kube".to_owned()];
+        assert_eq!(
+            with_keyterms("What's the rate limit for the pro tier? soc 2 too.", &terms),
+            "What's the rate limit for the Pro Tier? SOC 2 too."
+        );
+        // Whole words only.
+        assert_eq!(
+            with_keyterms("Kubernetes is not kube.", &terms),
+            "Kubernetes is not Kube."
+        );
+        assert_eq!(with_keyterms("Nothing here", &[]), "Nothing here");
     }
 }

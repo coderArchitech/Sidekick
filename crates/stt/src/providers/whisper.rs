@@ -77,7 +77,8 @@ fn transcribe(ctx: &WhisperContext, cfg: &SttConfig, u: &Utterance) -> SidekickR
     params.set_print_timestamps(false);
     let threads = std::thread::available_parallelism().map_or(2, |n| n.get().min(4));
     params.set_n_threads(i32::try_from(threads).unwrap_or(2));
-    let prompt = cfg.keyterms.join(", ");
+    // Whisper's prompt window is about 224 tokens; keep well inside it.
+    let prompt = crate::keyterm_prompt(cfg, 600);
     if !prompt.is_empty() {
         // Names in the prompt make Whisper spell them right (PRD LIS-5a).
         params.set_initial_prompt(&prompt);

@@ -61,13 +61,44 @@ pub trait SttSink: Send + Sync {
     fn status(&self, kind: StreamKind, status: SttStatus);
 }
 
+/// Most keyterms sent to a provider (Deepgram and AssemblyAI accept 100).
+pub const MAX_KEYTERMS: usize = 100;
+
+/// The keyterms a provider gets: the first `MAX_KEYTERMS` (names come first).
+#[must_use]
+pub fn keyterms_for(cfg: &SttConfig) -> &[String] {
+    &cfg.keyterms[..cfg.keyterms.len().min(MAX_KEYTERMS)]
+}
+
+/// Whisper's prompt: keyterms joined, cut to stay inside its prompt window.
+#[must_use]
+pub fn keyterm_prompt(cfg: &SttConfig, max_chars: usize) -> String {
+    let mut prompt = String::new();
+    for t in keyterms_for(cfg) {
+        let extra = if prompt.is_empty() {
+            t.len()
+        } else {
+            t.len() + 2
+        };
+        if prompt.len() + extra > max_chars {
+            break;
+        }
+        if !prompt.is_empty() {
+            prompt.push_str(", ");
+        }
+        prompt.push_str(t);
+    }
+    prompt
+}
+
 /// Settings for one provider run.
 #[derive(Debug, Clone)]
 pub struct SttConfig {
     pub kind: StreamKind,
     /// BCP-47 code, or `multi` for code-switching (e.g. Hinglish).
     pub language: String,
-    /// Words to boost: the user's name and nicknames (PRD LIS-5a), later custom vocabulary.
+    /// Words to boost: the user's name and nicknames (PRD LIS-5a), then the
+    /// custom vocabulary (LIS-5). Each provider sends at most `MAX_KEYTERMS`.
     pub keyterms: Vec<String>,
     /// Silence longer than this sends a keep-alive.
     pub keepalive: Duration,
@@ -106,4 +137,22 @@ pub trait SttProvider: Send + Sync {
         sink: std::sync::Arc<dyn SttSink>,
         cancel: CancellationToken,
     ) -> SidekickResult<()>;
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn whisper_prompt_stays_inside_its_window() {
+        let mut cfg = SttConfig::new(sidekick_audio::StreamKind::Mic);
+        cfg.keyterms = (0..150).map(|i| format!("Vocabulary{i}")).collect();
+        let p = keyterm_prompt(&cfg, 600);
+        assert!(p.len() <= 600, "{}", p.len());
+        assert!(p.starts_with("Vocabulary0, Vocabulary1, "));
+        assert_eq!(
+            keyterm_prompt(&SttConfig::new(sidekick_audio::StreamKind::Mic), 600),
+            ""
+        );
+    }
 }
