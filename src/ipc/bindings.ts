@@ -611,6 +611,25 @@ export const commands = {
     }
   },
   /**
+   * Click-through (PRD UI-5): the overlay stays visible but mouse clicks go to
+   * the app behind it. Not saved: the overlay always starts clickable. The
+   * Click-through shortcut turns it off again.
+   */
+  async setClickThrough(on: boolean): Promise<Result<boolean, SidekickError>> {
+    try {
+      return { status: "ok", data: await TAURI_INVOKE("set_click_through", { on }) };
+    } catch (e) {
+      if (e instanceof Error) throw e;
+      else return { status: "error", error: e as any };
+    }
+  },
+  /**
+   * Whether click-through is on.
+   */
+  async getClickThrough(): Promise<boolean> {
+    return await TAURI_INVOKE("get_click_through");
+  },
+  /**
    * How long one session's data is kept after it ends (overlay).
    */
   async setSessionRetention(
@@ -863,11 +882,13 @@ export const events = __makeEvents__<{
   answerDone: AnswerDone;
   answerError: AnswerError;
   answerToken: AnswerToken;
+  clickThroughChanged: ClickThroughChanged;
   hotkeyPressed: HotkeyPressed;
   ingestProgress: IngestProgress;
   modelDownloadProgress: ModelDownloadProgress;
   screenshotCaptured: ScreenshotCaptured;
   sessionChanged: SessionChanged;
+  settingsChanged: SettingsChanged;
   sttStatusChanged: SttStatusChanged;
   transcriptPartial: TranscriptPartial;
   transcriptSegment: TranscriptSegment;
@@ -875,11 +896,13 @@ export const events = __makeEvents__<{
   answerDone: "answer-done",
   answerError: "answer-error",
   answerToken: "answer-token",
+  clickThroughChanged: "click-through-changed",
   hotkeyPressed: "hotkey-pressed",
   ingestProgress: "ingest-progress",
   modelDownloadProgress: "model-download-progress",
   screenshotCaptured: "screenshot-captured",
   sessionChanged: "session-changed",
+  settingsChanged: "settings-changed",
   sttStatusChanged: "stt-status-changed",
   transcriptPartial: "transcript-partial",
   transcriptSegment: "transcript-segment",
@@ -893,7 +916,17 @@ export const events = __makeEvents__<{
  * What a shortcut does.
  */
 export type Action =
-  "show_hide" | "ask" | "screenshot" | "auto_answer" | "pause_resume" | "switch_skill" | "bookmark";
+  | "show_hide"
+  | "ask"
+  | "screenshot"
+  | "auto_answer"
+  | "pause_resume"
+  | "switch_skill"
+  | "bookmark"
+  /**
+   * Clicks pass through the overlay to the app behind (PRD UI-5).
+   */
+  | "click_through";
 /**
  * One action item from the summary (PRD MEM-3).
  */
@@ -975,6 +1008,10 @@ export type ChatMessage = {
    */
   screenshotId?: string | null;
 };
+/**
+ * Click-through was turned on or off (PRD UI-5).
+ */
+export type ClickThroughChanged = { on: boolean };
 /**
  * What the user confirmed before listening started (PRD 8, "Session start confirmation").
  */
@@ -1471,7 +1508,13 @@ export type Settings = {
    * Product names, acronyms and people to boost in speech-to-text (PRD LIS-5).
    */
   vocabulary: string[];
+  theme: Theme;
 };
+/**
+ * Settings were saved (`settings.changed`), so the other window can follow,
+ * e.g. the theme (PRD UI-8).
+ */
+export type SettingsChanged = { settings: Settings };
 /**
  * A partial update. Only the sections present are replaced; unknown fields are
  * rejected so typos don't silently do nothing.
@@ -1496,6 +1539,7 @@ export type SettingsPatch = {
    * The full vocabulary list (PRD LIS-5).
    */
   vocabulary?: string[] | null;
+  theme?: Theme | null;
 };
 /**
  * Error returned by every fallible Sidekick function and IPC command.
@@ -1588,6 +1632,14 @@ export type SttState = "connecting" | "live" | "reconnecting" | "failed";
  * STT connection changes (`stt.status`).
  */
 export type SttStatusChanged = { sessionId: string; stream: Stream; state: SttState };
+/**
+ * Colour theme for both windows (PRD UI-8).
+ */
+export type Theme =
+  /**
+   * Follows the operating system (dark or light).
+   */
+  "system" | "dark" | "light" | "high_contrast";
 /**
  * The tool allowlist (tech doc 11.5). Tool use itself arrives with Agents (T-045).
  */

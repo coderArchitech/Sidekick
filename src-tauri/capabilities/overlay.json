@@ -34,6 +34,8 @@
     "allow-set-session-skill",
     "allow-set-session-extra-skills",
     "allow-set-overlay",
+    "allow-set-click-through",
+    "allow-get-click-through",
     "allow-set-session-retention",
     "allow-log",
     "allow-get-notes",

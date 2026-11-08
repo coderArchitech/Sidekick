@@ -191,6 +191,21 @@ pub struct HotkeyPressed {
     pub action: sidekick_hotkeys::Action,
 }
 
+/// Settings were saved (`settings.changed`), so the other window can follow,
+/// e.g. the theme (PRD UI-8).
+#[derive(Debug, Clone, Serialize, specta::Type, Event)]
+#[serde(rename_all = "camelCase")]
+pub struct SettingsChanged {
+    pub settings: sidekick_settings::Settings,
+}
+
+/// Click-through was turned on or off (PRD UI-5).
+#[derive(Debug, Clone, Serialize, specta::Type, Event)]
+#[serde(rename_all = "camelCase")]
+pub struct ClickThroughChanged {
+    pub on: bool,
+}
+
 /// Document ingest progress (`ingest.progress`).
 #[derive(Debug, Clone, Serialize, specta::Type, Event)]
 #[serde(rename_all = "camelCase")]

@@ -5,7 +5,7 @@ import { Library } from "@/features/library";
 import { NotesView } from "@/features/notes";
 import { SessionBar, useSessionStore } from "@/features/session";
 import { TranscriptView } from "@/features/transcript";
-import { commands, type AppInfo } from "@/ipc";
+import { commands, sessionEvents, type AppInfo } from "@/ipc";
 import { useAnswering, useChatStore, useNotes, useQuestionDetection } from "@/orchestrator";
 import { ProtectionShield } from "./ProtectionShield";
 import { ViewMenu } from "./ViewMenu";
@@ -42,6 +42,21 @@ export function Overlay() {
   useEffect(() => {
     void load();
   }, [load]);
+
+  // Click-through (PRD UI-5) can change from the shortcut: follow it.
+  const clickThrough = useOverlayStore((s) => s.clickThrough);
+  const clickThroughKeys = useOverlayStore((s) => s.clickThroughKeys);
+  useEffect(() => {
+    let unlisten: (() => void) | undefined;
+    let live = true;
+    void sessionEvents
+      .onClickThroughChanged((e) => useOverlayStore.setState({ clickThrough: e.on }))
+      .then((u) => (live ? (unlisten = u) : u()));
+    return () => {
+      live = false;
+      unlisten?.();
+    };
+  }, []);
 
   // A follow-up chip asked in Chat: show it.
   const showTick = useChatStore((s) => s.showTick);
@@ -94,6 +109,12 @@ export function Overlay() {
           </button>
         </div>
       </header>
+
+      {clickThrough && (
+        <p role="status" className="border-b border-line bg-accent-soft px-3 py-1 text-xs text-fg">
+          Click-through is on: clicks go to the app behind. {clickThroughKeys} turns it off.
+        </p>
+      )}
 
       {!compact && (
         <>

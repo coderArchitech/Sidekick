@@ -97,7 +97,7 @@ All Phase 0 code and automated tests are done and green on Linux, Windows and ma
 | T-045 | Agents (tools) and multiple active Skills | 🟡 In progress: testing | 🖥️ Built with Rust, unit, Playwright and E2E tests. Web search tool arrives with T-046; needs a real-model check of tool choice (T-039) |
 | T-046 | Web search provider and per-session overrides | 🟡 In progress: testing | 🖥️ Built with Rust (mock HTTP), unit, Playwright and E2E tests. Needs a live check with real Tavily and Brave keys |
 | T-047 | Custom vocabulary | 🟡 In progress: testing | 🖥️ Built with Rust, unit, Playwright and E2E tests. Needs a live accuracy check with real providers (T-021) |
-| T-048 | Click-through mode and themes | ⬜ To do | |
+| T-048 | Click-through mode and themes | 🟡 In progress: testing | 🖥️ Built with Rust, unit, Playwright (axe per theme) and E2E tests. Needs a manual check that clicks pass through on Windows and macOS |
 | T-049 | Glass overlay: translucent background, crisp text | 🟡 In progress: testing | 🖥️ Built and tested (Vitest, Playwright over a busy backdrop). Needs a manual look over a live call on Windows and macOS |
 
 ---
@@ -725,6 +725,22 @@ Each P1 task gets full scope and tests when it moves to In progress.
 - [x] Playwright (`tests/ui/vocabulary.spec.ts`): save, count, validation, axe.
 - [x] E2E (`tests/e2e/specs/vocabulary.e2e.ts`): vocabulary saved in Settings changes the live transcript's spelling through the real speech-to-text pipeline (mock provider).
 - [ ] Manual 🖥️: accuracy gain on real audio with Deepgram, AssemblyAI and Soniox (T-021, T-027).
+
+### T-048 Click-through mode and themes
+
+**Refs:** PRD UI-5, UI-8; TECHNICAL.md 6.5 (`set_click_through`), 7.2 (themes), 12.3 (shortcuts)
+**Scope**
+- [x] Click-through: View → Click-through makes the overlay ignore the mouse (`set_ignore_cursor_events`) while staying visible; a notice shows the shortcut to turn it off; never saved.
+- [x] New global shortcut Click-through on/off (Ctrl/Cmd+Shift+T). Saved shortcut sets from older versions get the new default added without losing custom keys (`complete`).
+- [x] Themes: Dark, Light, High contrast and System (follows the OS) in Settings → General; both windows switch live (`settings-changed` event); the glass panel has light and high-contrast variants (high contrast is solid).
+- [x] Light-theme fix: Save buttons that used the accent background with secondary text now use `btn-primary`.
+**Tests**
+- [x] Rust: Click-through action and label, `complete` adds missing defaults but keeps custom keys and refuses conflicts; theme defaults to dark, saves, rejects unknown values.
+- [x] Unit: theme resolution (System follows the OS), `data-theme`, following settings changes from another window.
+- [x] Component: Click-through switch → command and notice, shortcut turns it off, events from elsewhere; Settings Theme select and the new shortcut row.
+- [x] Playwright (`tests/ui/themes.spec.ts`): axe with contrast on every overlay tab and the Settings window in Light, High contrast and Dark; click-through on and off.
+- [x] E2E (`tests/e2e/specs/themes-click-through.e2e.ts`): a Settings theme reaches the overlay through Rust; click-through through the real window command and event.
+- [ ] Manual 🖥️: clicks really pass through to the app behind on Windows and macOS, and the shortcut brings the overlay back.
 
 ### T-049 Glass overlay: translucent background, crisp text
 

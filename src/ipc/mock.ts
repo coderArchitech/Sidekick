@@ -42,11 +42,16 @@ export const DEFAULT_SETTINGS: Settings = {
     { action: "pause_resume", keys: "CmdOrCtrl+Shift+P" },
     { action: "switch_skill", keys: "CmdOrCtrl+Shift+K" },
     { action: "bookmark", keys: "CmdOrCtrl+Shift+B" },
+    { action: "click_through", keys: "CmdOrCtrl+Shift+T" },
   ],
   profile: { name: "", nicknames: [] },
   overlay: { opacity: 80, fontSize: 14, compact: false, positions: [] },
   vocabulary: [],
+  theme: "dark",
 };
+
+/** Click-through state (Rust keeps it in AppState; never saved). */
+let clickThrough = false;
 
 /** Mirrors `clean_vocabulary` in crates/settings: trimmed, no blanks or duplicates. */
 export function cleanVocabulary(terms: string[]): string[] {
@@ -359,6 +364,7 @@ export function applyPatch(current: Settings, patch: SettingsPatch): Settings {
     next.profile = { name, nicknames };
   }
   if (patch.vocabulary) next.vocabulary = cleanVocabulary(patch.vocabulary);
+  if (patch.theme) next.theme = patch.theme;
   return next;
 }
 
@@ -380,6 +386,7 @@ const unknownProvider = {
 export function resetMocks(): void {
   settings = structuredClone(DEFAULT_SETTINGS);
   savedKeys.clear();
+  clickThrough = false;
   activeStreams.clear();
   latencySamples.clear();
   sessions.clear();
@@ -447,8 +454,16 @@ export const mockCommands: Commands = {
         );
     }
     settings = applyPatch(settings, patch);
+    // Like Rust: the other window hears about it.
+    mockSessionBus.emit("settings", { settings: structuredClone(settings) });
     return Promise.resolve({ status: "ok", data: structuredClone(settings) });
   },
+  setClickThrough: (on) => {
+    clickThrough = on;
+    mockSessionBus.emit("clickThrough", { on });
+    return Promise.resolve({ status: "ok", data: on });
+  },
+  getClickThrough: () => Promise.resolve(clickThrough),
   listProviders: (kind) => {
     const data: ProviderEntry[] = CATALOG.filter(([, k]) => k === kind).map(
       ([id, k, displayName, keyRequired]) => ({

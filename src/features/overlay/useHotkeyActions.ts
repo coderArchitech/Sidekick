@@ -55,6 +55,12 @@ export async function handle(action: Action): Promise<void> {
     case "auto_answer":
       await store.toggleAuto();
       break;
+    case "click_through": {
+      // The only way back when clicks pass through (PRD UI-5).
+      const overlay = useOverlayStore.getState();
+      await overlay.setClickThrough(!overlay.clickThrough);
+      break;
+    }
     default:
       break;
   }

@@ -8,6 +8,7 @@ const LABELS: Record<Action, string> = {
   auto_answer: "Auto-answer on/off",
   pause_resume: "Pause / resume listening",
   switch_skill: "Switch Skill",
+  click_through: "Click-through on/off",
   bookmark: "Bookmark this moment",
 };
 

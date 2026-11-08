@@ -58,6 +58,8 @@ const COMMANDS: &[&str] = &[
     "set_session_skill",
     "set_session_extra_skills",
     "set_overlay",
+    "set_click_through",
+    "get_click_through",
     "set_session_retention",
     "delete_all_data",
     "log",

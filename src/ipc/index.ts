@@ -110,6 +110,7 @@ export type {
   Result,
   Retention,
   Session,
+  Theme,
   SessionOverrides,
   SessionProviderOptions,
   SearchResult,
@@ -151,6 +152,8 @@ const tauriSessionEvents: SessionEvents = {
   onIngestProgress: (cb) => tauriEvents.ingestProgress.listen((e) => cb(e.payload)),
   onScreenshotCaptured: (cb) => tauriEvents.screenshotCaptured.listen((e) => cb(e.payload)),
   onModelDownloadProgress: (cb) => tauriEvents.modelDownloadProgress.listen((e) => cb(e.payload)),
+  onSettingsChanged: (cb) => tauriEvents.settingsChanged.listen((e) => cb(e.payload)),
+  onClickThroughChanged: (cb) => tauriEvents.clickThroughChanged.listen((e) => cb(e.payload)),
   onFileDrop: (cb) => onFileDrop(cb),
 };
 

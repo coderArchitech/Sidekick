@@ -21,10 +21,12 @@ pub enum Action {
     PauseResume,
     SwitchSkill,
     Bookmark,
+    /// Clicks pass through the overlay to the app behind (PRD UI-5).
+    ClickThrough,
 }
 
 impl Action {
-    pub const ALL: [Self; 7] = [
+    pub const ALL: [Self; 8] = [
         Self::ShowHide,
         Self::Ask,
         Self::Screenshot,
@@ -32,6 +34,7 @@ impl Action {
         Self::PauseResume,
         Self::SwitchSkill,
         Self::Bookmark,
+        Self::ClickThrough,
     ];
 }
 
@@ -54,6 +57,7 @@ pub fn defaults() -> Vec<Binding> {
         (Action::PauseResume, "CmdOrCtrl+Shift+P"),
         (Action::SwitchSkill, "CmdOrCtrl+Shift+K"),
         (Action::Bookmark, "CmdOrCtrl+Shift+B"),
+        (Action::ClickThrough, "CmdOrCtrl+Shift+T"),
     ]
     .into_iter()
     .map(|(action, keys)| Binding {
@@ -193,7 +197,26 @@ pub const fn label(action: Action) -> &'static str {
         Action::PauseResume => "Pause / resume listening",
         Action::SwitchSkill => "Switch Skill",
         Action::Bookmark => "Bookmark this moment",
+        Action::ClickThrough => "Click-through on/off",
     }
+}
+
+/// Adds the default shortcut of any action missing from a saved set (one
+/// added in a newer version), unless its keys are already taken. Then
+/// `validate` decides as usual.
+#[must_use]
+pub fn complete(bindings: &[Binding]) -> Vec<Binding> {
+    let mut out = bindings.to_vec();
+    for d in defaults() {
+        let missing = !out.iter().any(|b| b.action == d.action);
+        let taken = out
+            .iter()
+            .any(|b| normalize(&b.keys).ok().as_deref() == Some(d.keys.as_str()));
+        if missing && !taken {
+            out.push(d);
+        }
+    }
+    out
 }
 
 #[cfg(test)]
@@ -254,7 +277,7 @@ mod tests {
 
         let mut b = defaults();
         b.pop();
-        assert!(validate(&b).unwrap_err().message.contains("Bookmark"));
+        assert!(validate(&b).unwrap_err().message.contains("Click-through"));
 
         let mut b = defaults();
         b.push(Binding {
@@ -270,5 +293,23 @@ mod tests {
             serde_json::to_value(Action::PauseResume).unwrap(),
             "pause_resume"
         );
+    }
+
+    #[test]
+    fn complete_adds_new_actions_without_touching_custom_keys() {
+        let mut saved = defaults();
+        saved.retain(|b| b.action != Action::ClickThrough);
+        saved[0].keys = "CmdOrCtrl+Alt+O".into();
+        let done = validate(&complete(&saved)).unwrap();
+        assert_eq!(done[0].keys, "CmdOrCtrl+Alt+O", "custom key kept");
+        assert_eq!(
+            done.iter()
+                .find(|b| b.action == Action::ClickThrough)
+                .map(|b| b.keys.as_str()),
+            Some("CmdOrCtrl+Shift+T")
+        );
+        // If the default keys are taken, nothing is added and validation fails.
+        saved[0].keys = "CmdOrCtrl+Shift+T".into();
+        assert!(validate(&complete(&saved)).is_err());
     }
 }

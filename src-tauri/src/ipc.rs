@@ -67,6 +67,8 @@ pub fn builder() -> Builder<tauri::Wry> {
             commands::skills::set_session_skill,
             commands::skills::set_session_extra_skills,
             commands::overlay::set_overlay,
+            commands::overlay::set_click_through,
+            commands::overlay::get_click_through,
             commands::data::set_session_retention,
             commands::data::delete_all_data,
             commands::diagnostics::log,
@@ -101,6 +103,8 @@ pub fn builder() -> Builder<tauri::Wry> {
             events::IngestProgress,
             events::ScreenshotCaptured,
             events::ModelDownloadProgress,
+            events::SettingsChanged,
+            events::ClickThroughChanged,
         ])
 }
 

@@ -3,6 +3,7 @@ import {
   commands,
   hideCurrentWindow,
   type Retention,
+  type Theme,
   type Settings,
   type SettingsPatch,
 } from "@/ipc";
@@ -14,6 +15,13 @@ import { PacksSection } from "@/features/packs";
 import { SkillsSection } from "@/features/skills";
 import { ShortcutsSection } from "./ShortcutsSection";
 import { VocabularySection } from "./VocabularySection";
+
+const THEME_LABELS: Record<Theme, string> = {
+  dark: "Dark",
+  light: "Light",
+  high_contrast: "High contrast",
+  system: "Same as the system",
+};
 
 const RETENTION_LABELS: Record<Retention, string> = {
   session: "Until the session ends",
@@ -148,6 +156,24 @@ export function SettingsWindow() {
                   </option>
                 ))}
               </select>
+              <label className="mt-3 block text-sm text-fg-2" htmlFor="theme">
+                Theme
+              </label>
+              <select
+                id="theme"
+                className="field mt-1"
+                value={settings.theme}
+                onChange={(e) => void update({ theme: e.target.value as Theme })}
+              >
+                {(Object.keys(THEME_LABELS) as Theme[]).map((t) => (
+                  <option key={t} value={t}>
+                    {THEME_LABELS[t]}
+                  </option>
+                ))}
+              </select>
+              <p className="mt-1 text-xs text-fg-muted">
+                Applies to both windows. High contrast also makes the overlay solid.
+              </p>
             </section>
             <SkillsSection />
             <PacksSection />

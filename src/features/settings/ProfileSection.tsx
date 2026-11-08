@@ -92,7 +92,7 @@ export function ProfileSection({ profile, onSave }: Props) {
       </form>
       <button
         type="button"
-        className={`mt-3 ${button} bg-accent hover:bg-accent-hover`}
+        className="btn btn-primary mt-3"
         onClick={() =>
           void onSave({ name, nicknames }).then((r) => {
             if ("error" in r) {

@@ -25,6 +25,8 @@ pub struct AppState {
     pub data_dir: PathBuf,
     /// Set after deletions; the housekeeping job runs VACUUM when idle.
     pub vacuum_pending: std::sync::atomic::AtomicBool,
+    /// Clicks pass through the overlay (PRD UI-5); never saved.
+    pub click_through: std::sync::atomic::AtomicBool,
     pub mock: bool,
 }
 
@@ -106,6 +108,7 @@ impl AppState {
             },
             data_dir,
             vacuum_pending: std::sync::atomic::AtomicBool::new(false),
+            click_through: std::sync::atomic::AtomicBool::new(false),
             mock,
         })
     }
