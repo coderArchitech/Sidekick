@@ -3,6 +3,7 @@ import { commands } from "@/ipc";
 import { activeRouter, type AnswerView } from "@/orchestrator";
 import { FollowUpChips } from "./FollowUpChips";
 import { Markdown } from "./Markdown";
+import { ToolSteps } from "./ToolSteps";
 
 /** One answer: cue first, expandable full answer, then sources (PRD QA-5, QA-6). */
 export function AnswerCard({ view }: { view: AnswerView }) {
@@ -42,6 +43,8 @@ export function AnswerCard({ view }: { view: AnswerView }) {
         {view.cue ||
           (view.status === "thinking" ? "Thinking…" : view.status === "streaming" ? "…" : "")}
       </p>
+
+      <ToolSteps view={view} />
 
       {view.status === "error" && (
         <p role="alert" className="mt-1 text-sm text-danger">

@@ -86,8 +86,10 @@ pub struct Session {
     pub ended_at: Option<i64>,
     /// The consent recorded for this session, if any.
     pub consent: Option<ConsentOption>,
-    /// The active Skill, if any (PRD SKL-1).
+    /// The main Skill, if any (PRD SKL-1); the dropdown and hotkey switch it.
     pub skill_id: Option<String>,
+    /// Skills also in use alongside the main one, in order (PRD SKL-5).
+    pub extra_skill_ids: Vec<String>,
     /// How long its data is kept after it ends (tech doc 4.4).
     pub retention: sidekick_core::retention::Retention,
 }

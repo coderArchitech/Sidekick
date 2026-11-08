@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { SkillEntry } from "@/ipc";
-import { nextSkillId, skillFor } from "./skills";
+import { nextSkillId, skillFor, skillsFor } from "./skills";
 
 const skill = (id: string, over: Partial<SkillEntry> = {}): SkillEntry => ({
   id,
@@ -50,5 +50,38 @@ describe("nextSkillId (Switch Skill)", () => {
     expect(nextSkillId(skills, "c")).toBeNull();
     expect(nextSkillId(skills, "b")).toBe("a");
     expect(nextSkillId([], null)).toBeNull();
+  });
+});
+
+describe("skillsFor: several active Skills (PRD SKL-5)", () => {
+  const skills = [
+    skill("coach", { triggers: ["chat"], tools: ["calculator"] }),
+    skill("architect", { tools: ["doc_search", "calculator"] }),
+    skill("terse", { answerFormat: "full_only" }),
+    skill("brief", { answerFormat: "full_only" }),
+    skill("off", { enabled: false }),
+  ];
+
+  it("combines the Skills that apply, main first, pooling tools", () => {
+    expect(skillsFor(skills, ["coach", "architect", "off"], "chat")).toEqual({
+      name: "COACH + ARCHITECT",
+      instructions: "### COACH\nBe coach.\n\n### ARCHITECT\nBe architect.",
+      answerFormat: "cue_then_full",
+      tools: ["calculator", "doc_search"],
+    });
+    // Coach only applies to Chat.
+    expect(skillsFor(skills, ["coach", "architect"], "detected")?.name).toBe("ARCHITECT");
+  });
+
+  it("keeps the cue unless every Skill is full-only", () => {
+    expect(skillsFor(skills, ["terse", "architect"], "chat")?.answerFormat).toBe("cue_then_full");
+    expect(skillsFor(skills, ["terse", "brief"], "chat")?.answerFormat).toBe("full_only");
+  });
+
+  it("is a single Skill's prompt, or null, otherwise", () => {
+    expect(skillsFor(skills, ["architect", "architect", null], "chat")).toEqual(
+      skillFor(skills, "architect", "chat"),
+    );
+    expect(skillsFor(skills, [null, "off"], "chat")).toBeNull();
   });
 });

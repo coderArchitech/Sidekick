@@ -27,4 +27,5 @@ export { useNotes } from "./useNotes";
 export { agendaUpdates, keywords, matchAgenda, mentions, parseAgendaReply } from "./agenda";
 export { BRIEF_SYSTEM, NO_MATERIAL, briefPrompt, writeBrief, type BriefDeps } from "./brief";
 export { RECAP_MINUTES, recap, recapWindow, type RecapMinutes } from "./recap";
-export { nextSkillId, skillFor, useSkillsStore } from "./skills";
+export { nextSkillId, skillFor, skillsFor, useSkillsStore } from "./skills";
+export { MAX_TOOL_CALLS, calculate, parseStep, runAgent, type ToolResult } from "./agent";

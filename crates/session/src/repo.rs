@@ -59,7 +59,9 @@ pub fn create(db: &Database, new: &NewSession<'_>) -> SidekickResult<Session> {
 
 const SELECT: &str = "SELECT s.id, s.title, s.status, s.auto_answer, s.created_at, s.started_at, s.ended_at,
     (SELECT c.option FROM consent_log c WHERE c.session_id = s.id ORDER BY c.confirmed_at DESC, c.rowid DESC LIMIT 1),
-    s.skill_id, s.retention
+    s.skill_id, s.retention,
+    (SELECT group_concat(skill_id, char(31)) FROM
+       (SELECT ss.skill_id FROM session_skills ss WHERE ss.session_id = s.id ORDER BY ss.position))
     FROM sessions s";
 
 fn from_row(r: &Row<'_>) -> rusqlite::Result<(Session, String, Option<String>)> {
@@ -75,6 +77,10 @@ fn from_row(r: &Row<'_>) -> rusqlite::Result<(Session, String, Option<String>)> 
             consent: None,
             skill_id: r.get(8)?,
             retention: sidekick_core::retention::Retention::parse(&r.get::<_, String>(9)?),
+            extra_skill_ids: r
+                .get::<_, Option<String>>(10)?
+                .map(|s| s.split('\u{1f}').map(str::to_owned).collect())
+                .unwrap_or_default(),
         },
         r.get(2)?,
         r.get(7)?,
@@ -371,6 +377,56 @@ pub fn list_bookmarks(db: &Database, session_id: &str) -> SidekickResult<Vec<Boo
         .map_err(|e| db_err("reading bookmarks", &e))
 }
 
+/// Most Skills also in use alongside the main one (PRD SKL-5).
+pub const MAX_EXTRA_SKILLS: usize = 2;
+
+/// Replaces the Skills also in use (PRD SKL-5). Each must exist; the main
+/// Skill and repeats are left out.
+pub fn set_extra_skills(
+    db: &mut Database,
+    session_id: &str,
+    skill_ids: &[String],
+) -> SidekickResult<Session> {
+    let main = get(db, session_id)?.skill_id;
+    let mut ids: Vec<&str> = Vec::new();
+    for id in skill_ids {
+        if Some(id.as_str()) != main.as_deref() && !ids.contains(&id.as_str()) {
+            ids.push(id);
+        }
+    }
+    if ids.len() > MAX_EXTRA_SKILLS {
+        return Err(SidekickError::internal(format!(
+            "Use at most {} Skills at once.",
+            MAX_EXTRA_SKILLS + 1
+        )));
+    }
+    let tx = db
+        .conn_mut()
+        .transaction()
+        .map_err(|e| db_err("updating a session", &e))?;
+    tx.execute(
+        "DELETE FROM session_skills WHERE session_id = ?1",
+        [session_id],
+    )
+    .map_err(|e| db_err("updating a session", &e))?;
+    for (position, id) in ids.iter().enumerate() {
+        tx.execute(
+            "INSERT INTO session_skills (session_id, skill_id, position) VALUES (?1, ?2, ?3)",
+            params![session_id, id, i64::try_from(position).unwrap_or(i64::MAX)],
+        )
+        .map_err(|e| match e {
+            rusqlite::Error::SqliteFailure(f, _)
+                if f.code == rusqlite::ErrorCode::ConstraintViolation =>
+            {
+                SidekickError::internal("That Skill no longer exists.")
+            }
+            e => db_err("updating a session", &e),
+        })?;
+    }
+    tx.commit().map_err(|e| db_err("updating a session", &e))?;
+    get(db, session_id)
+}
+
 /// Sets or clears the session's active Skill (PRD SKL-1). The Skill must exist.
 pub fn set_skill(
     db: &Database,
@@ -393,6 +449,15 @@ pub fn set_skill(
         })?;
     if n == 0 {
         return Err(SidekickError::internal("That session no longer exists."));
+    }
+    // The main Skill is never also an extra one.
+    if let Some(id) = skill_id {
+        db.conn()
+            .execute(
+                "DELETE FROM session_skills WHERE session_id = ?1 AND skill_id = ?2",
+                params![session_id, id],
+            )
+            .map_err(|e| db_err("updating a session", &e))?;
     }
     get(db, session_id)
 }

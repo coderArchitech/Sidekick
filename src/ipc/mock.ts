@@ -143,6 +143,23 @@ function mockNotes(sessionId: string): Notes {
 
 let agendaSeq = 0;
 
+/** The longest arithmetic run with an operator between digits (like the Rust mock). */
+function arithmetic(text: string): string | null {
+  let best: string | null = null;
+  for (const raw of text.split(/[^0-9 .+\-*/^()%]/)) {
+    const run = raw.trim();
+    const digits = (run.match(/\d/g) ?? []).length;
+    if (digits >= 2 && /[+\-*/^]/.test(run) && (!best || run.length > best.length)) best = run;
+  }
+  return best;
+}
+
+/** Like the Rust mock: the agent step calls the calculator once for arithmetic, else done. */
+function mockAgentReply(content: string): string {
+  const expr = content.includes("<tool_results>") ? null : arithmetic(content);
+  return expr ? JSON.stringify({ tool: "calculator", input: expr }) : '{"done": true}';
+}
+
 /** Simulates ingest like the Rust pipeline: queued → parsing → embedding → ready (or failed). */
 function mockIngest(sessionId: string, name: string, sizeBytes: number) {
   const supported =
@@ -469,7 +486,10 @@ export const mockCommands: Commands = {
     const prefix = last?.screenshotId ? "Mock answer (with screenshot) to:" : "Mock answer to:";
     // Like the Rust mock: full answers (answer-sized budgets) cite source [1].
     const cite = request.maxTokens > 100 ? " [1]" : "";
-    const words = `${prefix} ${question}${cite}`.split(/(?<= )/);
+    const agent = request.system?.startsWith("You decide whether tools are needed");
+    const words = (agent ? mockAgentReply(question) : `${prefix} ${question}${cite}`).split(
+      /(?<= )/,
+    );
     const handle = { cancelled: false };
     activeStreams.set(requestId, handle);
     void (async () => {
@@ -512,6 +532,7 @@ export const mockCommands: Commands = {
       endedAt: null,
       consent: null,
       skillId: null,
+      extraSkillIds: [],
       retention: settings.retention,
     };
     return Promise.resolve(save(session));
@@ -788,7 +809,13 @@ export const mockCommands: Commands = {
   },
   deleteSkill: (id) => {
     mockSkills.delete(id);
-    for (const s of sessions.values()) if (s.skillId === id) save({ ...s, skillId: null });
+    for (const s of sessions.values())
+      if (s.skillId === id || s.extraSkillIds.includes(id))
+        save({
+          ...s,
+          skillId: s.skillId === id ? null : s.skillId,
+          extraSkillIds: s.extraSkillIds.filter((x) => x !== id),
+        });
     return Promise.resolve({ status: "ok", data: null });
   },
   importSkill: (path) => {
@@ -814,7 +841,19 @@ export const mockCommands: Commands = {
     if (!s) return Promise.resolve(err("INTERNAL", "That session no longer exists."));
     if (skillId !== null && !mockSkills.has(skillId))
       return Promise.resolve(err("INTERNAL", "That Skill no longer exists."));
-    return Promise.resolve(save({ ...s, skillId }));
+    // Like Rust: the main Skill is never also an extra one.
+    return Promise.resolve(
+      save({ ...s, skillId, extraSkillIds: s.extraSkillIds.filter((x) => x !== skillId) }),
+    );
+  },
+  setSessionExtraSkills: (sessionId, skillIds) => {
+    const s = sessions.get(sessionId);
+    if (!s) return Promise.resolve(err("INTERNAL", "That session no longer exists."));
+    const ids = [...new Set(skillIds)].filter((x) => x !== s.skillId);
+    if (ids.length > 2) return Promise.resolve(err("INTERNAL", "Use at most 3 Skills at once."));
+    if (ids.some((x) => !mockSkills.has(x)))
+      return Promise.resolve(err("INTERNAL", "That Skill no longer exists."));
+    return Promise.resolve(save({ ...s, extraSkillIds: ids }));
   },
   setOverlay: (patch) => {
     const o = settings.overlay;

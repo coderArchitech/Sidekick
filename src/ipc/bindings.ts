@@ -560,6 +560,23 @@ export const commands = {
       else return { status: "error", error: e as any };
     }
   },
+  /**
+   * Sets the Skills also in use alongside the main one (overlay; PRD SKL-5).
+   */
+  async setSessionExtraSkills(
+    sessionId: string,
+    skillIds: string[],
+  ): Promise<Result<Session, SidekickError>> {
+    try {
+      return {
+        status: "ok",
+        data: await TAURI_INVOKE("set_session_extra_skills", { sessionId, skillIds }),
+      };
+    } catch (e) {
+      if (e instanceof Error) throw e;
+      else return { status: "error", error: e as any };
+    }
+  },
   async setOverlay(patch: OverlayPatch): Promise<Result<OverlayPrefs, SidekickError>> {
     try {
       return { status: "ok", data: await TAURI_INVOKE("set_overlay", { patch }) };
@@ -1347,9 +1364,13 @@ export type Session = {
    */
   consent: ConsentOption | null;
   /**
-   * The active Skill, if any (PRD SKL-1).
+   * The main Skill, if any (PRD SKL-1); the dropdown and hotkey switch it.
    */
   skillId: string | null;
+  /**
+   * Skills also in use alongside the main one, in order (PRD SKL-5).
+   */
+  extraSkillIds: string[];
   /**
    * How long its data is kept after it ends (tech doc 4.4).
    */

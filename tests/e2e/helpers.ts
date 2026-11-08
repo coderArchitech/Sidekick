@@ -56,3 +56,25 @@ export async function waitForText(
     timeoutMsg: `never showed "${text}"`,
   });
 }
+
+/**
+ * Picks an option in a `<select>`. WebDriver's own select commands don't fire
+ * `change` on WebKitGTK, so set the value the way React listens for it.
+ */
+export async function selectValue(selector: string, value: string) {
+  await $(`${selector} option[value="${value}"]`).waitForExist();
+  await browser.execute(
+    (sel: string, v: string) => {
+      const el = document.querySelector<HTMLSelectElement>(sel);
+      const set = Object.getOwnPropertyDescriptor(HTMLSelectElement.prototype, "value")?.set;
+      if (!el || !set) throw new Error(`no select ${sel}`);
+      set.call(el, v);
+      el.dispatchEvent(new Event("change", { bubbles: true }));
+    },
+    selector,
+    value,
+  );
+  await browser.waitUntil(async () => (await $(selector).getValue()) === value, {
+    timeoutMsg: `${selector} never became "${value}"`,
+  });
+}

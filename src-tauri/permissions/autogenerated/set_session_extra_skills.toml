@@ -1,0 +1,11 @@
+# Automatically generated - DO NOT EDIT!
+
+[[permission]]
+identifier = "allow-set-session-extra-skills"
+description = "Enables the set_session_extra_skills command without any pre-configured scope."
+commands.allow = ["set_session_extra_skills"]
+
+[[permission]]
+identifier = "deny-set-session-extra-skills"
+description = "Denies the set_session_extra_skills command without any pre-configured scope."
+commands.deny = ["set_session_extra_skills"]

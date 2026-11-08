@@ -741,3 +741,56 @@ fn a_session_can_use_a_skill() {
     assert_eq!(repo::set_skill(&db, &s.id, None).unwrap().skill_id, None);
     assert!(repo::set_skill(&db, "nope", None).is_err());
 }
+
+#[test]
+fn a_session_can_use_more_than_one_skill() {
+    let mut db = db();
+    let s = repo::create(&db, &new("Many Skills")).unwrap();
+    assert!(s.extra_skill_ids.is_empty());
+    for id in ["coach", "architect", "sales", "teacher"] {
+        db.conn()
+            .execute(
+                "INSERT INTO skills (id, name, file_path, schema_version, updated_at) VALUES (?1, ?1, ?1, 1, 0)",
+                [id],
+            )
+            .unwrap();
+    }
+    repo::set_skill(&db, &s.id, Some("coach")).unwrap();
+    let ids = |v: &[&str]| v.iter().map(|s| (*s).to_owned()).collect::<Vec<_>>();
+
+    // The main Skill and repeats are left out; order is kept.
+    let got = repo::set_extra_skills(
+        &mut db,
+        &s.id,
+        &ids(&["sales", "coach", "architect", "sales"]),
+    )
+    .unwrap();
+    assert_eq!(got.skill_id.as_deref(), Some("coach"));
+    assert_eq!(got.extra_skill_ids, ["sales", "architect"]);
+    assert_eq!(
+        repo::get(&db, &s.id).unwrap().extra_skill_ids,
+        ["sales", "architect"]
+    );
+
+    assert!(
+        repo::set_extra_skills(&mut db, &s.id, &ids(&["sales", "architect", "teacher"])).is_err(),
+        "at most three Skills at once"
+    );
+    assert!(repo::set_extra_skills(&mut db, &s.id, &ids(&["missing"])).is_err());
+    assert_eq!(
+        repo::get(&db, &s.id).unwrap().extra_skill_ids,
+        ["sales", "architect"],
+        "unchanged after an error"
+    );
+
+    // Switching the main Skill to an extra one moves it.
+    let got = repo::set_skill(&db, &s.id, Some("sales")).unwrap();
+    assert_eq!(got.extra_skill_ids, ["architect"]);
+
+    // Deleting a Skill drops it from every session.
+    db.conn()
+        .execute("DELETE FROM skills WHERE id = 'architect'", [])
+        .unwrap();
+    assert!(repo::get(&db, &s.id).unwrap().extra_skill_ids.is_empty());
+    assert!(repo::set_extra_skills(&mut db, "nope", &[]).is_err());
+}

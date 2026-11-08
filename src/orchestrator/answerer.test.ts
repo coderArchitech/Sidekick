@@ -286,4 +286,39 @@ describe("AnswerRouter", () => {
     await h.router.ask({ ...input("About this?"), source: "screenshot", screenshotId: "shot-1" });
     expect(h.optionsSeen).toEqual([null, { windowMs: 180_000, topK: 5, screenshotId: "shot-1" }]);
   });
+
+  it("an agent Skill runs its tools first and the answer sees the results (SKL-4)", async () => {
+    const h = harness({ transcript: [], notes: null, chunks: [], screenshot: null });
+    const v = h.router.ask({
+      ...input("What is 15% of 2400?"),
+      skill: { name: "Analyst", instructions: "Be exact.", tools: ["calculator"] },
+    });
+    // The agent step: the fast model asks for the calculator, then is done.
+    await tick();
+    const step = h.streams.find((s) => s.id.startsWith("agent:"));
+    expect(step?.req.model).toBe("claude-haiku-5-5");
+    token(step?.id ?? "", '{"tool": "calculator", "input": "2400 * 15%"}');
+    done(step?.id ?? "");
+    await tick();
+    await tick();
+    const step2 = h.streams.filter((s) => s.id.startsWith("agent:"))[1];
+    token(step2?.id ?? "", '{"done": true}');
+    done(step2?.id ?? "");
+    const view = await v;
+
+    // Nothing else to answer from, but the tool result is enough.
+    const full = h.streams.find((s) => s.id === `${view.id}:full`);
+    const content = full?.req.messages.at(-1)?.content ?? "";
+    expect(content).toContain("<tool_results>\n- calculator(2400 * 15%) → 360\n</tool_results>");
+    expect(full?.req.system).toContain("Results in <tool_results> come from tools");
+    expect(h.views.get(view.id)?.tools).toEqual([
+      { tool: "calculator", input: "2400 * 15%", output: "360", ok: true },
+    ]);
+  });
+
+  it("a Skill without tools makes no agent call", async () => {
+    const h = harness();
+    await h.router.ask({ ...input(), skill: { name: "Plain", instructions: "Be plain." } });
+    expect(h.streams.some((s) => s.id.startsWith("agent:"))).toBe(false);
+  });
 });

@@ -8,7 +8,7 @@ import { followUpInput, type FollowUpKind } from "./followUps";
 import { screenshotAction, type ScreenshotActionKind } from "./screenshotActions";
 import { modelPlan, type ModelPlan } from "./models";
 import type { SkillPrompt } from "./prompt";
-import { skillFor, useSkillsStore } from "./skills";
+import { skillsFor, useSkillsStore } from "./skills";
 import { useOrchestratorStore } from "./store";
 
 /** The router for the current overlay, so Chat (T-023) can ask through it too. */
@@ -32,11 +32,12 @@ export function activeRouter() {
 export function useAnswering(session: Session | null) {
   const sessionId = session && session.status !== "ended" ? session.id : null;
   // Read at question time, so switching Skills applies to the next question.
-  const skillId = useRef<string | null>(null);
+  const skillIds = useRef<(string | null)[]>([]);
   const activeSkill = session?.skillId ?? null;
+  const extraSkills = (session?.extraSkillIds ?? []).join("\u0000");
   useEffect(() => {
-    skillId.current = activeSkill;
-  }, [activeSkill]);
+    skillIds.current = [activeSkill, ...(extraSkills ? extraSkills.split("\u0000") : [])];
+  }, [activeSkill, extraSkills]);
 
   useEffect(() => {
     if (!sessionId) return;
@@ -49,7 +50,7 @@ export function useAnswering(session: Session | null) {
     void useChatStore.getState().load(sessionId);
     void useSkillsStore.getState().load();
     const skill = (source: QuestionSource) =>
-      skillFor(useSkillsStore.getState().skills, skillId.current, source);
+      skillsFor(useSkillsStore.getState().skills, skillIds.current, source);
     // Questions the user asked (Chat, capture-and-ask) go to the Chat tab;
     // detected ones to Live Answers.
     const upsert = (v: AnswerView) =>

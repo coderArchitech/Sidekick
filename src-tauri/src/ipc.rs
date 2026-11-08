@@ -63,6 +63,7 @@ pub fn builder() -> Builder<tauri::Wry> {
             commands::skills::import_skill,
             commands::skills::export_skill,
             commands::skills::set_session_skill,
+            commands::skills::set_session_extra_skills,
             commands::overlay::set_overlay,
             commands::data::set_session_retention,
             commands::data::delete_all_data,

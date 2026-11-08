@@ -96,3 +96,18 @@ pub fn set_session_skill(
     crate::commands::session::changed(&app, &session);
     Ok(session)
 }
+
+/// Sets the Skills also in use alongside the main one (overlay; PRD SKL-5).
+#[tauri::command]
+#[specta::specta]
+pub fn set_session_extra_skills(
+    app: AppHandle,
+    state: State<'_, AppState>,
+    session_id: String,
+    skill_ids: Vec<String>,
+) -> SidekickResult<Session> {
+    let session =
+        sidekick_session::repo::set_extra_skills(&mut state.db(), &session_id, &skill_ids)?;
+    crate::commands::session::changed(&app, &session);
+    Ok(session)
+}

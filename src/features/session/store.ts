@@ -22,6 +22,8 @@ interface SessionState {
   toggleAuto: () => Promise<void>;
   /** Sets the session's active Skill, or none (PRD SKL-1). */
   setSkill: (skillId: string | null) => Promise<void>;
+  /** Skills also in use alongside the main one (PRD SKL-5). */
+  setExtraSkills: (skillIds: string[]) => Promise<void>;
   /** How long this session's data is kept (tech doc 4.4). "session" deletes an ended one now. */
   setRetention: (retention: Retention) => Promise<void>;
   /** Deletes the session and everything in it. */
@@ -94,6 +96,12 @@ export const useSessionStore = create<SessionState>((set, get) => {
       const s = get().session;
       if (!s || s.status === "ended") return;
       const updated = await run(() => commands.setSessionSkill(s.id, skillId));
+      if (updated) set({ session: updated });
+    },
+    setExtraSkills: async (skillIds) => {
+      const s = get().session;
+      if (!s || s.status === "ended") return;
+      const updated = await run(() => commands.setSessionExtraSkills(s.id, skillIds));
       if (updated) set({ session: updated });
     },
     toggleAuto: async () => {

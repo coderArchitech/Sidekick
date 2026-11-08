@@ -1,4 +1,5 @@
-import type { AnswerFormat, ChatMessage, ContextPack } from "@/ipc";
+import type { AnswerFormat, ChatMessage, ContextPack, Tool } from "@/ipc";
+import { resultsBlock, type ToolResult } from "./agent";
 
 /** A numbered source the model can cite as [n]. */
 export interface SourceRef {
@@ -13,6 +14,8 @@ export interface SkillPrompt {
   instructions: string;
   /** `full_only` skips the one-line cue. */
   answerFormat?: AnswerFormat;
+  /** Tools the Skill may use before answering (an agent, PRD SKL-4). */
+  tools?: Tool[];
 }
 
 export interface PromptInput {
@@ -23,6 +26,8 @@ export interface PromptInput {
   history?: ChatMessage[];
   /** The question is about the screenshot (capture-and-ask): the cue sees it too. */
   screenshotFocus?: boolean;
+  /** What the Skill's tools returned for this question (PRD SKL-4). */
+  toolResults?: ToolResult[];
 }
 
 export interface BuiltPrompt {
@@ -98,7 +103,11 @@ const FULL_RULES = `Reply in Markdown: lead with the answer, then short supporti
 export function buildPrompt(input: PromptInput, variant: "cue" | "full"): BuiltPrompt {
   const sources = numberSources(input.pack);
   const skill = input.skill
-    ? `\n\nActive Skill: ${input.skill.name}\n${input.skill.instructions.trim()}`
+    ? `\n\nActive Skill: ${input.skill.name}\n${input.skill.instructions.trim()}${
+        input.skill.tools?.length
+          ? "\nResults in <tool_results> come from tools run for this question; use them like the rest of the context."
+          : ""
+      }`
     : "";
   const system = `${SHARED_RULES}\n\n${variant === "cue" ? CUE_RULES : FULL_RULES}${skill}`;
 
@@ -128,6 +137,8 @@ export function buildPrompt(input: PromptInput, variant: "cue" | "full"): BuiltP
       `<screenshot>[${s?.n}] ${s?.label}: ${seen ? "the attached image of the user's screen" : "not shown in this reply"}</screenshot>`,
     );
   }
+  if (input.toolResults?.length)
+    parts.push(`<tool_results>\n${resultsBlock(input.toolResults)}\n</tool_results>`);
   parts.push("</context>");
 
   const shot = input.pack.screenshot;

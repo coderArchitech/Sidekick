@@ -94,7 +94,7 @@ All Phase 0 code and automated tests are done and green on Linux, Windows and ma
 | T-042 | Answer follow-up chips | 🟡 In progress: testing | 🖥️ Built with unit, Playwright and E2E tests. Needs a real-model check that each chip reshapes the answer (T-039) |
 | T-043 | Screenshot quick actions and strip | 🟡 In progress: testing | 🖥️ Built with unit, Playwright and E2E tests. Needs a real-model check of each action on real screenshots (T-039) |
 | T-044 | Pre-meeting brief and Knowledge Packs | 🟡 In progress: testing | 🖥️ Built with Rust, unit, Playwright and E2E tests. Needs a real-model check of brief quality (T-039) |
-| T-045 | Agents (tools) and multiple active Skills | ⬜ To do | |
+| T-045 | Agents (tools) and multiple active Skills | 🟡 In progress: testing | 🖥️ Built with Rust, unit, Playwright and E2E tests. Web search tool arrives with T-046; needs a real-model check of tool choice (T-039) |
 | T-046 | Web search provider and per-session overrides | ⬜ To do | |
 | T-047 | Custom vocabulary | ⬜ To do | |
 | T-048 | Click-through mode and themes | ⬜ To do | |
@@ -678,6 +678,23 @@ Each P1 task gets full scope and tests when it moves to In progress.
 - [x] Playwright (`tests/ui/knowledge-packs.spec.ts`): Settings pack with a link; overlay pack picker, cited pack document in Chat, brief; axe.
 - [x] E2E (`tests/e2e/specs/knowledge-packs.e2e.ts`): pack made in Settings and ingested by the real pipeline, turned on in the overlay, cited in Chat, read by the brief.
 - [ ] Manual 🖥️: brief quality on real documents with a real model (T-039).
+
+### T-045 Agents (tools) and multiple active Skills
+
+**Refs:** PRD SKL-4, SKL-5; TECHNICAL.md 3.3 (agent tool step), 6.5 (`set_session_extra_skills`), 7.1 (`skills`)
+**Scope**
+- [x] Agent tool step: a Skill listing tools (allowlist doc_search, web_search, calculator) lets the fast model call them one at a time (JSON) before the answer; provider-agnostic.
+- [x] Limits: only the Skill's tools run (anything else is refused and ends the loop), at most 3 calls, 8 s, no repeats; failures never block the answer.
+- [x] Calculator without `eval` (+ − × ÷ ^, parentheses, percent); doc search through `retrieve_context`; web search hook for T-046.
+- [x] Tool results go into the answer's context as untrusted `<tool_results>`; answers show **Tools used**.
+- [x] Several Skills per session: the main Skill (dropdown, Switch Skill shortcut) plus up to two more (`session_skills`, migration 0006); prompts combined, tools pooled, cue unless all are full-only.
+**Tests**
+- [x] Rust: extra Skills stored in order, main and repeats dropped, limit of 3, unknown Skill refused, moving the main Skill, deleted Skill drops out; mock model's agent step.
+- [x] Unit: calculator (precedence, percent, powers, refuses non-arithmetic and division by zero); step parsing; tool loop with allowlist, call/time/repeat limits, failures, web search hook; combined Skills; router passes tool results and answers from them.
+- [x] Component: Tools used list and "checking" state; More Skills picker (main excluded, limit, moving the main Skill).
+- [x] Playwright (`tests/ui/agents.spec.ts`): Negotiation Coach uses the calculator; two Skills at once; axe.
+- [x] E2E (`tests/e2e/specs/agents.e2e.ts`): calculator step through the real gateway; extra Skill saved.
+- [ ] Manual 🖥️: with a real model, tools are used when they help and not otherwise (T-039); web search after T-046.
 
 ### T-049 Glass overlay: translucent background, crisp text
 
