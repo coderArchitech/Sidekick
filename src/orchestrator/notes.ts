@@ -113,7 +113,8 @@ export function parseSummary(raw: string): ParsedSummary {
 export class NotesJob {
   /** End of the last transcript line already in the notes. */
   private cursorMs = -1;
-  private running = false;
+  /** The update in progress, if any. */
+  private running: Promise<Notes | null> | null = null;
 
   constructor(
     private readonly deps: NotesDeps,
@@ -125,31 +126,45 @@ export class NotesJob {
   /** Returns the saved notes, or null when there was nothing new (or a run is in progress). */
   async tick(): Promise<Notes | null> {
     if (this.running) return null;
-    this.running = true;
+    this.running = this.run();
     try {
-      const t = await this.deps.getTranscript(this.sessionId);
-      if (t.status === "error") throw new Error(t.error.message);
-      const fresh = t.data.lines.filter((l) => l.endMs > this.cursorMs);
-      if (fresh.length === 0) return null;
-      const newCursor = Math.max(...fresh.map((l) => l.endMs));
-      let current = await this.deps.getNotes(this.sessionId);
-      for (let attempt = 0; attempt < 2; attempt++) {
-        if (current.status === "error") throw new Error(current.error.message);
-        const merged = await this.merge(current.data.contentMd, fresh);
-        const saved = await this.deps.saveNotes(this.sessionId, merged, current.data.version);
-        if (saved.status === "ok") {
-          this.cursorMs = newCursor;
-          this.onNotes(saved.data);
-          return (await this.trackAgenda(saved.data.agenda, fresh)) ?? saved.data;
-        }
-        if (saved.error.code !== "VERSION_CONFLICT") throw new Error(saved.error.message);
-        // Someone saved first: merge the same new lines into their notes.
-        current = await this.deps.getNotes(this.sessionId);
-      }
-      throw new Error("The notes kept changing; will try again next time.");
+      return await this.running;
     } finally {
-      this.running = false;
+      this.running = null;
     }
+  }
+
+  /**
+   * The last update, once any update in progress has finished. When the
+   * session ends this catches up after a scheduled update that was still
+   * running, instead of skipping (and closing the agenda too early).
+   */
+  async catchUp(): Promise<Notes | null> {
+    await this.running?.catch(() => null);
+    return this.tick();
+  }
+
+  private async run(): Promise<Notes | null> {
+    const t = await this.deps.getTranscript(this.sessionId);
+    if (t.status === "error") throw new Error(t.error.message);
+    const fresh = t.data.lines.filter((l) => l.endMs > this.cursorMs);
+    if (fresh.length === 0) return null;
+    const newCursor = Math.max(...fresh.map((l) => l.endMs));
+    let current = await this.deps.getNotes(this.sessionId);
+    for (let attempt = 0; attempt < 2; attempt++) {
+      if (current.status === "error") throw new Error(current.error.message);
+      const merged = await this.merge(current.data.contentMd, fresh);
+      const saved = await this.deps.saveNotes(this.sessionId, merged, current.data.version);
+      if (saved.status === "ok") {
+        this.cursorMs = newCursor;
+        this.onNotes(saved.data);
+        return (await this.trackAgenda(saved.data.agenda, fresh)) ?? saved.data;
+      }
+      if (saved.error.code !== "VERSION_CONFLICT") throw new Error(saved.error.message);
+      // Someone saved first: merge the same new lines into their notes.
+      current = await this.deps.getNotes(this.sessionId);
+    }
+    throw new Error("The notes kept changing; will try again next time.");
   }
 
   /**

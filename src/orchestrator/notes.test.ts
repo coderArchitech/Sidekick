@@ -275,3 +275,44 @@ describe("NotesJob agenda (PRD MEM-2)", () => {
     expect(f.requests[0]?.system).toContain("Owner: task (due");
   });
 });
+
+describe("NotesJob catch-up when the meeting ends", () => {
+  beforeEach(() => vi.restoreAllMocks());
+
+  it("waits for an update in progress, then closes the agenda it set", async () => {
+    // Slow model: the scheduled update is still running when the meeting ends.
+    let release!: () => void;
+    const gate = new Promise<void>((r) => (release = r));
+    const f = fakeDeps((req) =>
+      req.system?.includes("recap")
+        ? '{"summary": "Done.", "decisions": [], "actionItems": []}'
+        : "## Topics\n- x",
+    );
+    const slowNotes = f.deps.getNotes;
+    let first = true;
+    f.deps.getNotes = vi.fn(async (id: string) => {
+      if (first) {
+        first = false;
+        await gate;
+      }
+      return slowNotes(id);
+    });
+    f.setNotes({
+      agenda: [
+        { id: "a1", text: "Pro tier pricing", status: "not_started" },
+        { id: "a2", text: "Dashboard", status: "not_started" },
+      ],
+    });
+    f.lines.push(line(1, "What's the rate limit for the Pro tier?", 1000));
+    f.lines.push(line(2, "Let's also look at the dashboard.", 2000));
+    const job = new NotesJob(f.deps, "s1", plan, () => {});
+
+    const scheduled = job.tick(); // in progress
+    expect(await job.tick()).toBeNull(); // a plain tick still skips
+    const ending = job.catchUp().then(() => job.summarize());
+    release();
+    await scheduled;
+    const n = await ending;
+    expect(n.agenda.map((a) => a.status)).toEqual(["covered", "covered"]);
+  });
+});
