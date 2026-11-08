@@ -10,12 +10,16 @@ use crate::fusion::fuse;
 use crate::search::{keyword, vector};
 
 /// How much context to gather (tech doc 13.5: last 3 minutes, top 5 chunks).
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[cfg_attr(feature = "specta", derive(specta::Type))]
-#[serde(rename_all = "camelCase")]
+#[serde(rename_all = "camelCase", default)]
 pub struct ContextOptions {
     pub window_ms: u32,
     pub top_k: u32,
+    /// Answer about this screenshot of the session, whatever its age (the
+    /// screenshot strip's re-ask, PRD SCR-6). Otherwise the latest from the
+    /// last 10 minutes.
+    pub screenshot_id: Option<String>,
 }
 
 impl Default for ContextOptions {
@@ -23,6 +27,7 @@ impl Default for ContextOptions {
         Self {
             window_ms: 180_000,
             top_k: 5,
+            screenshot_id: None,
         }
     }
 }
@@ -141,8 +146,14 @@ pub fn build_pack(
     let now = std::time::SystemTime::now()
         .duration_since(std::time::UNIX_EPOCH)
         .map_or(0, |d| i64::try_from(d.as_millis()).unwrap_or(i64::MAX));
-    let screenshot =
-        sidekick_capture::repo::latest(db, session_id, now.saturating_sub(SCREENSHOT_MAX_AGE_MS))?;
+    let screenshot = match &opts.screenshot_id {
+        Some(id) => Some(sidekick_capture::repo::get(db, session_id, id)?),
+        None => sidekick_capture::repo::latest(
+            db,
+            session_id,
+            now.saturating_sub(SCREENSHOT_MAX_AGE_MS),
+        )?,
+    };
     Ok(ContextPack {
         transcript,
         notes: notes.filter(|n| !n.trim().is_empty()),

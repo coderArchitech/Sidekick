@@ -42,6 +42,7 @@ const COMMANDS: &[&str] = &[
     "preview_screen",
     "list_screenshots",
     "screenshot_image",
+    "delete_screenshot",
     "whisper_models",
     "download_whisper_model",
     "list_skills",

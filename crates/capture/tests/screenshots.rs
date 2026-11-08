@@ -57,3 +57,24 @@ fn screenshot_is_stored_encrypted_and_linked_to_the_session() {
     assert!(repo::image(&db, &shot.id).is_err());
     assert!(repo::save(&db, "missing", &encoded).is_err());
 }
+
+#[test]
+fn one_screenshot_can_be_read_by_session_and_deleted() {
+    let db = Database::open_in_memory(&SecretString::from("c".repeat(64))).unwrap();
+    session(&db, "s1");
+    session(&db, "s2");
+    let encoded = prepare(MockCapturer.capture(CaptureTarget::Screen).unwrap()).unwrap();
+    let a = repo::save(&db, "s1", &encoded).unwrap();
+    let b = repo::save(&db, "s1", &encoded).unwrap();
+
+    assert_eq!(repo::get(&db, "s1", &a.id).unwrap(), a);
+    assert!(
+        repo::get(&db, "s2", &a.id).is_err(),
+        "never another session's"
+    );
+
+    repo::delete(&db, &a.id).unwrap();
+    assert!(repo::get(&db, "s1", &a.id).is_err());
+    assert_eq!(repo::list(&db, "s1").unwrap(), vec![b]);
+    repo::delete(&db, &a.id).unwrap(); // idempotent
+}

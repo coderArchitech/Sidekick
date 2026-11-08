@@ -195,6 +195,7 @@ async fn pack_has_recent_transcript_notes_and_citation_fields() {
         ContextOptions {
             window_ms: 180_000,
             top_k: 2,
+            screenshot_id: None,
         },
     )
     .unwrap();
@@ -250,6 +251,26 @@ async fn pack_has_the_latest_recent_screenshot_of_this_session_only() {
         )
         .unwrap();
     assert_eq!(pack("s1"), None);
+
+    // Re-ask (PRD SCR-6): a chosen screenshot of the session, whatever its age.
+    let chosen = |s: &str, id: &str| {
+        build_pack(
+            &db.lock().unwrap(),
+            s,
+            "q",
+            None,
+            ContextOptions {
+                screenshot_id: Some(id.into()),
+                ..ContextOptions::default()
+            },
+        )
+    };
+    assert_eq!(
+        chosen("s1", &second.id).unwrap().screenshot.map(|s| s.id),
+        Some(second.id.clone())
+    );
+    assert!(chosen("s2", &second.id).is_err(), "never another session's");
+    assert!(chosen("s1", "missing").is_err());
 }
 
 /// Tech doc 13.2 target: vector search over 20k chunks under 50 ms (release

@@ -5,6 +5,7 @@ import { AnswerRouter, type AnswerView } from "./answerer";
 import { useAnswersStore } from "./answersStore";
 import { chatHistory, useChatStore } from "./chatStore";
 import { followUpInput, type FollowUpKind } from "./followUps";
+import { screenshotAction, type ScreenshotActionKind } from "./screenshotActions";
 import { modelPlan, type ModelPlan } from "./models";
 import type { SkillPrompt } from "./prompt";
 import { skillFor, useSkillsStore } from "./skills";
@@ -104,7 +105,8 @@ export async function askChat(text: string): Promise<string | null> {
   if (!active) return "Start a session to ask questions.";
   // A question asked right after a capture is about that screenshot (SCR-4).
   const chat = useChatStore.getState();
-  const aboutScreenshot = !!chat.pending;
+  const screenshot = chat.pending;
+  const aboutScreenshot = !!screenshot;
   chat.clearPending();
   await active.router.ask({
     sessionId: active.sessionId,
@@ -115,6 +117,34 @@ export async function askChat(text: string): Promise<string | null> {
     endedAt: Date.now(),
     models: active.models(),
     history: chatHistory(useChatStore.getState().turns),
+    // That exact screenshot, also when it was re-attached from the strip.
+    screenshotId: screenshot?.id,
+  });
+  return null;
+}
+
+/**
+ * Runs a quick action ("Explain", "Extract table", …) on the attached
+ * screenshot (PRD SCR-5). The turn shows as "Extract table (screenshot)".
+ */
+export async function askScreenshotAction(kind: ScreenshotActionKind): Promise<string | null> {
+  const active = current;
+  if (!active) return "Start a session to ask questions.";
+  const chat = useChatStore.getState();
+  const screenshot = chat.pending;
+  if (!screenshot) return "Take or pick a screenshot first.";
+  chat.clearPending();
+  const action = screenshotAction(kind);
+  await active.router.ask({
+    sessionId: active.sessionId,
+    text: action.prompt,
+    label: `${action.label} (screenshot)`,
+    directed: true,
+    source: "screenshot",
+    skill: active.skill("screenshot"),
+    endedAt: Date.now(),
+    models: active.models(),
+    screenshotId: screenshot.id,
   });
   return null;
 }

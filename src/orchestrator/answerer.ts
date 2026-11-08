@@ -70,6 +70,8 @@ export interface AskInput {
   label?: string;
   /** Searched in the documents instead of `text`. */
   query?: string;
+  /** Answer about this screenshot (quick actions, re-ask; PRD SCR-5, SCR-6). */
+  screenshotId?: string;
 }
 
 interface InFlight {
@@ -164,7 +166,12 @@ export class AnswerRouter {
     };
     this.inFlight.set(id, flight);
 
-    const ctx = await this.deps.retrieveContext(input.sessionId, input.query ?? input.text, null);
+    const ctx = await this.deps.retrieveContext(
+      input.sessionId,
+      input.query ?? input.text,
+      // The defaults match ContextOptions::default() in Rust.
+      input.screenshotId ? { windowMs: 180_000, topK: 5, screenshotId: input.screenshotId } : null,
+    );
     if (!this.inFlight.has(id)) return view; // cancelled meanwhile
     if (ctx.status === "error") return this.fail(flight, ctx.error.message);
     if (isEmpty(ctx.data)) {

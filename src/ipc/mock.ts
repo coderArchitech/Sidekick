@@ -715,6 +715,11 @@ export const mockCommands: Commands = {
         ? { status: "ok", data: MOCK_IMAGE_URL }
         : err("INTERNAL", "That screenshot no longer exists."),
     ),
+  deleteScreenshot: (id) => {
+    const i = screenshots.findIndex((s) => s.id === id);
+    if (i !== -1) screenshots.splice(i, 1);
+    return Promise.resolve({ status: "ok", data: null });
+  },
   whisperModels: () =>
     Promise.resolve(
       WHISPER_MODELS.map((m) => ({ ...m, downloaded: downloadedModels.has(m.name) })),
@@ -852,6 +857,12 @@ export const mockCommands: Commands = {
         : err("UNSUPPORTED_FILE", "Only http and https links can be added."),
     ),
   retrieveContext: (sessionId, query, options) => {
+    // Like Rust: a chosen screenshot of this session, whatever its age.
+    const chosen = options?.screenshotId
+      ? screenshots.find((s) => s.id === options.screenshotId && s.sessionId === sessionId)
+      : undefined;
+    if (options?.screenshotId && !chosen)
+      return Promise.resolve(err("INTERNAL", "That screenshot no longer exists."));
     const windowMs = options?.windowMs ?? 180_000;
     const lines = transcripts.get(sessionId) ?? [];
     const end = Math.max(0, ...lines.map((l) => l.endMs));
@@ -877,9 +888,10 @@ export const mockCommands: Commands = {
         chunks,
         screenshot:
           structuredClone(
-            screenshots
-              .filter((s) => s.sessionId === sessionId && s.createdAt >= Date.now() - 600_000)
-              .at(-1),
+            chosen ??
+              screenshots
+                .filter((s) => s.sessionId === sessionId && s.createdAt >= Date.now() - 600_000)
+                .at(-1),
           ) ?? null,
       },
     });

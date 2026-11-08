@@ -31,6 +31,12 @@ interface ChatState {
   /** Captures for `sessionId`, attaches it to the next question and focuses Chat. */
   capture: (sessionId: string, request: CaptureRequest) => Promise<Screenshot | null>;
   clearPending: () => void;
+  /** All captures in the session, oldest first (the strip, PRD SCR-6). */
+  screenshots: Screenshot[];
+  /** Attaches an earlier capture to the next question (re-ask). */
+  attach: (s: Screenshot) => void;
+  /** Deletes a capture; detaches it if it was attached. */
+  removeScreenshot: (id: string) => Promise<void>;
 }
 
 function fromSaved(a: SavedAnswer): AnswerView {
@@ -68,8 +74,18 @@ export const useChatStore = create<ChatState>((set, get) => ({
       return { turns };
     }),
   load: async (sessionId) => {
-    set({ sessionId, turns: [], pending: null, captureError: null });
+    set({ sessionId, turns: [], pending: null, captureError: null, screenshots: [] });
     if (!sessionId) return;
+    void commands.listScreenshots(sessionId).then((s) => {
+      if (s.status === "ok" && get().sessionId === sessionId)
+        // Keep anything captured while loading.
+        set((st) => ({
+          screenshots: [
+            ...s.data,
+            ...st.screenshots.filter((x) => !s.data.some((y) => y.id === x.id)),
+          ],
+        }));
+    });
     const r = await commands.listAnswers(sessionId, null);
     if (r.status !== "ok" || get().sessionId !== sessionId) return;
     const mine = r.data.filter((a) => a.source !== "detected").map(fromSaved);
@@ -87,10 +103,28 @@ export const useChatStore = create<ChatState>((set, get) => ({
       set({ capturing: false, captureError: r.error.message });
       return null;
     }
-    set((s) => ({ capturing: false, pending: r.data, focusTick: s.focusTick + 1 }));
+    set((s) => ({
+      capturing: false,
+      pending: r.data,
+      focusTick: s.focusTick + 1,
+      screenshots: [...s.screenshots, r.data],
+    }));
     return r.data;
   },
   clearPending: () => set({ pending: null }),
+  screenshots: [],
+  attach: (shot) => set((s) => ({ pending: shot, focusTick: s.focusTick + 1, captureError: null })),
+  removeScreenshot: async (id) => {
+    const r = await commands.deleteScreenshot(id);
+    if (r.status === "error") {
+      set({ captureError: r.error.message });
+      return;
+    }
+    set((s) => ({
+      screenshots: s.screenshots.filter((x) => x.id !== id),
+      pending: s.pending?.id === id ? null : s.pending,
+    }));
+  },
 }));
 
 /**

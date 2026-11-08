@@ -51,6 +51,7 @@ pub fn builder() -> Builder<tauri::Wry> {
             commands::capture::preview_screen,
             commands::capture::list_screenshots,
             commands::capture::screenshot_image,
+            commands::capture::delete_screenshot,
             commands::stt::whisper_models,
             commands::stt::download_whisper_model,
             commands::skills::list_skills,
