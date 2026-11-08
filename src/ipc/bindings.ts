@@ -330,6 +330,49 @@ export const commands = {
     }
   },
   /**
+   * Replaces the session's agenda; items already on it keep their status (PRD MEM-2).
+   */
+  async setAgenda(sessionId: string, items: string[]): Promise<Result<Notes, SidekickError>> {
+    try {
+      return { status: "ok", data: await TAURI_INVOKE("set_agenda", { sessionId, items }) };
+    } catch (e) {
+      if (e instanceof Error) throw e;
+      else return { status: "error", error: e as any };
+    }
+  },
+  /**
+   * Sets agenda item statuses (from the notes job or the user).
+   */
+  async updateAgenda(
+    sessionId: string,
+    updates: AgendaUpdate[],
+  ): Promise<Result<Notes, SidekickError>> {
+    try {
+      return { status: "ok", data: await TAURI_INVOKE("update_agenda", { sessionId, updates }) };
+    } catch (e) {
+      if (e instanceof Error) throw e;
+      else return { status: "error", error: e as any };
+    }
+  },
+  /**
+   * Ticks an action item off or back on (PRD MEM-4).
+   */
+  async setActionItemDone(
+    sessionId: string,
+    itemId: string,
+    done: boolean,
+  ): Promise<Result<Notes, SidekickError>> {
+    try {
+      return {
+        status: "ok",
+        data: await TAURI_INVOKE("set_action_item_done", { sessionId, itemId, done }),
+      };
+    } catch (e) {
+      if (e instanceof Error) throw e;
+      else return { status: "error", error: e as any };
+    }
+  },
+  /**
    * Captures, downscales to 1568 px and stores the screenshot with the session.
    */
   async captureScreenshot(
@@ -670,6 +713,18 @@ export type ActionItem = {
   due: string | null;
   done: boolean;
 };
+/**
+ * One agenda item.
+ */
+export type AgendaItem = { id: string; text: string; status: AgendaStatus };
+/**
+ * Where the meeting is with an agenda item (PRD MEM-2).
+ */
+export type AgendaStatus = "not_started" | "in_progress" | "covered";
+/**
+ * A status change for one agenda item.
+ */
+export type AgendaUpdate = { id: string; status: AgendaStatus };
 export type AnswerDone = { requestId: string; usage: Usage; finishReason: FinishReason };
 export type AnswerError = { requestId: string; error: SidekickError };
 export type AnswerFormat = "cue_then_full" | "full_only";
@@ -940,6 +995,10 @@ export type Notes = {
    */
   summaryMd: string | null;
   actionItems: ActionItem[];
+  /**
+   * The agenda, in order (PRD MEM-2).
+   */
+  agenda: AgendaItem[];
 };
 /**
  * Fields to change; omitted ones stay as they are.

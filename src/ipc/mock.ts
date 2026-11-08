@@ -108,9 +108,12 @@ function mockNotes(sessionId: string): Notes {
       updatedAt: 0,
       summaryMd: null,
       actionItems: [],
+      agenda: [],
     }
   );
 }
+
+let agendaSeq = 0;
 
 /** Simulates ingest like the Rust pipeline: queued → parsing → embedding → ready (or failed). */
 function mockIngest(sessionId: string, name: string, sizeBytes: number) {
@@ -607,6 +610,55 @@ export const mockCommands: Commands = {
       actionItems: actionItems
         .filter((a) => a.text.trim() !== "")
         .map((a, i) => ({ ...a, text: a.text.trim(), id: `mock-item-${i}`, done: false })),
+    };
+    notesBySession.set(sessionId, next);
+    return Promise.resolve({ status: "ok", data: structuredClone(next) });
+  },
+  setAgenda: (sessionId, items) => {
+    if (!sessions.has(sessionId))
+      return Promise.resolve(err("INTERNAL", "That session no longer exists."));
+    const texts = items.map((i) => i.trim()).filter(Boolean);
+    if (texts.length > 30 || texts.some((t) => t.length > 200))
+      return Promise.resolve(
+        err("INTERNAL", "An agenda can have up to 30 items of up to 200 characters."),
+      );
+    const n = mockNotes(sessionId);
+    // Like Rust: an item already on the agenda keeps its id and status.
+    const agenda = texts.map(
+      (text) =>
+        n.agenda.find((a) => a.text === text) ?? {
+          id: `mock-agenda-${++agendaSeq}`,
+          text,
+          status: "not_started" as const,
+        },
+    );
+    const next = { ...n, agenda };
+    notesBySession.set(sessionId, next);
+    return Promise.resolve({ status: "ok", data: structuredClone(next) });
+  },
+  updateAgenda: (sessionId, updates) => {
+    if (!sessions.has(sessionId))
+      return Promise.resolve(err("INTERNAL", "That session no longer exists."));
+    const n = mockNotes(sessionId);
+    const next = {
+      ...n,
+      agenda: n.agenda.map((a) => {
+        const u = updates.find((x) => x.id === a.id);
+        return u ? { ...a, status: u.status } : a;
+      }),
+    };
+    notesBySession.set(sessionId, next);
+    return Promise.resolve({ status: "ok", data: structuredClone(next) });
+  },
+  setActionItemDone: (sessionId, itemId, done) => {
+    if (!sessions.has(sessionId))
+      return Promise.resolve(err("INTERNAL", "That session no longer exists."));
+    const n = mockNotes(sessionId);
+    if (!n.actionItems.some((a) => a.id === itemId))
+      return Promise.resolve(err("INTERNAL", "That action item no longer exists."));
+    const next = {
+      ...n,
+      actionItems: n.actionItems.map((a) => (a.id === itemId ? { ...a, done } : a)),
     };
     notesBySession.set(sessionId, next);
     return Promise.resolve({ status: "ok", data: structuredClone(next) });

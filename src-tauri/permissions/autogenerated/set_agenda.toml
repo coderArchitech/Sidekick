@@ -1,0 +1,11 @@
+# Automatically generated - DO NOT EDIT!
+
+[[permission]]
+identifier = "allow-set-agenda"
+description = "Enables the set_agenda command without any pre-configured scope."
+commands.allow = ["set_agenda"]
+
+[[permission]]
+identifier = "deny-set-agenda"
+description = "Denies the set_agenda command without any pre-configured scope."
+commands.deny = ["set_agenda"]

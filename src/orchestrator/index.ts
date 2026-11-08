@@ -12,4 +12,6 @@ export { CHAT_HISTORY_TURNS, chatHistory, useChatStore } from "./chatStore";
 export { NOTES_INTERVAL_MS, NotesJob, parseSummary, type NotesDeps } from "./notes";
 export { useNotesStore, type NotesActivity } from "./notesStore";
 export { useNotes } from "./useNotes";
+export { agendaUpdates, keywords, matchAgenda, mentions, parseAgendaReply } from "./agenda";
+export { RECAP_MINUTES, recap, recapWindow, type RecapMinutes } from "./recap";
 export { nextSkillId, skillFor, useSkillsStore } from "./skills";
