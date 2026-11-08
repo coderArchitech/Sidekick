@@ -1,0 +1,11 @@
+# Automatically generated - DO NOT EDIT!
+
+[[permission]]
+identifier = "allow-web-search"
+description = "Enables the web_search command without any pre-configured scope."
+commands.allow = ["web_search"]
+
+[[permission]]
+identifier = "deny-web-search"
+description = "Denies the web_search command without any pre-configured scope."
+commands.deny = ["web_search"]

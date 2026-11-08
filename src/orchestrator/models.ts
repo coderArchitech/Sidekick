@@ -16,6 +16,19 @@ const DEFAULTS: Record<string, { full: string; cue: string }> = {
   // Ollama: "default" is the first installed model, for both (local, no small/large pair).
 };
 
+/**
+ * The plan for a session (PRD KEY-9): its own answer provider, with the
+ * Settings model when that is also the Settings provider, else the
+ * provider's defaults.
+ */
+export function sessionPlan(
+  settingsLlm: ProviderChoice,
+  session: { llmProvider: string } | null | undefined,
+): ModelPlan {
+  if (!session || session.llmProvider === settingsLlm.provider) return modelPlan(settingsLlm);
+  return modelPlan({ provider: session.llmProvider, model: null });
+}
+
 export function modelPlan(llm: ProviderChoice): ModelPlan {
   const d = DEFAULTS[llm.provider];
   const full = llm.model ?? d?.full ?? "default";

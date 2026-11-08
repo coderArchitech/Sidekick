@@ -40,6 +40,7 @@ export const config: WebdriverIO.Config = {
         "./specs/screenshot-actions.e2e.ts",
         "./specs/knowledge-packs.e2e.ts",
         "./specs/agents.e2e.ts",
+        "./specs/web-search-overrides.e2e.ts",
         "./specs/settings.e2e.ts",
       ],
   maxInstances: 1,

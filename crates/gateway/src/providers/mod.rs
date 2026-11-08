@@ -9,3 +9,4 @@ pub mod ollama;
 pub mod openai;
 pub mod openai_chat;
 pub mod pump;
+pub mod search;

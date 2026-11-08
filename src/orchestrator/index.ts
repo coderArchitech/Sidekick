@@ -5,7 +5,7 @@ export { useOrchestratorStore, type QueuedQuestion } from "./store";
 export { useQuestionDetection } from "./useQuestionDetection";
 export { AnswerRouter, type AnswerView, type AnswerStatus } from "./answerer";
 export { useAnswersStore } from "./answersStore";
-export { modelPlan, type ModelPlan } from "./models";
+export { modelPlan, sessionPlan, type ModelPlan } from "./models";
 export { NOT_FOUND, buildPrompt, citedSources, type SourceRef } from "./prompt";
 export {
   activeRouter,

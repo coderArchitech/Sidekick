@@ -794,3 +794,25 @@ fn a_session_can_use_more_than_one_skill() {
     assert!(repo::get(&db, &s.id).unwrap().extra_skill_ids.is_empty());
     assert!(repo::set_extra_skills(&mut db, "nope", &[]).is_err());
 }
+
+#[test]
+fn a_session_keeps_its_own_providers() {
+    let db = db();
+    let s = repo::create(
+        &db,
+        &NewSession {
+            stt_provider: "assemblyai",
+            llm_provider: "openai",
+            llm_model: "",
+            ..new("Override")
+        },
+    )
+    .unwrap();
+    assert_eq!(
+        (s.stt_provider.as_str(), s.llm_provider.as_str()),
+        ("assemblyai", "openai")
+    );
+    let again = repo::get(&db, &s.id).unwrap();
+    assert_eq!(again.stt_provider, "assemblyai");
+    assert_eq!(again.llm_provider, "openai");
+}

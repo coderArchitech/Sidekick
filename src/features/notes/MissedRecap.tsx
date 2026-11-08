@@ -1,7 +1,8 @@
 import { useState } from "react";
 import { Markdown } from "@/features/answers";
+import { useSessionStore } from "@/features/session";
 import { answerEvents, commands } from "@/ipc";
-import { modelPlan, recap, RECAP_MINUTES, type RecapMinutes } from "@/orchestrator";
+import { modelPlan, recap, sessionPlan, RECAP_MINUTES, type RecapMinutes } from "@/orchestrator";
 
 type State =
   | { kind: "idle" }
@@ -18,9 +19,10 @@ export function MissedRecap({ sessionId }: { sessionId: string }) {
     setState({ kind: "loading" });
     try {
       const s = await commands.getSettings();
-      const plan = modelPlan(
-        s.status === "ok" ? s.data.llm : { provider: "anthropic", model: null },
-      );
+      const plan =
+        s.status === "ok"
+          ? sessionPlan(s.data.llm, useSessionStore.getState().session)
+          : modelPlan({ provider: "anthropic", model: null });
       const text = await recap({ ...commands, events: answerEvents }, sessionId, minutes, plan);
       setState({ kind: "done", minutes, text });
     } catch (e) {

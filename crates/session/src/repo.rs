@@ -61,7 +61,8 @@ const SELECT: &str = "SELECT s.id, s.title, s.status, s.auto_answer, s.created_a
     (SELECT c.option FROM consent_log c WHERE c.session_id = s.id ORDER BY c.confirmed_at DESC, c.rowid DESC LIMIT 1),
     s.skill_id, s.retention,
     (SELECT group_concat(skill_id, char(31)) FROM
-       (SELECT ss.skill_id FROM session_skills ss WHERE ss.session_id = s.id ORDER BY ss.position))
+       (SELECT ss.skill_id FROM session_skills ss WHERE ss.session_id = s.id ORDER BY ss.position)),
+    s.stt_provider, s.llm_provider
     FROM sessions s";
 
 fn from_row(r: &Row<'_>) -> rusqlite::Result<(Session, String, Option<String>)> {
@@ -81,6 +82,8 @@ fn from_row(r: &Row<'_>) -> rusqlite::Result<(Session, String, Option<String>)> 
                 .get::<_, Option<String>>(10)?
                 .map(|s| s.split('\u{1f}').map(str::to_owned).collect())
                 .unwrap_or_default(),
+            stt_provider: r.get(11)?,
+            llm_provider: r.get(12)?,
         },
         r.get(2)?,
         r.get(7)?,

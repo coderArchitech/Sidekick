@@ -9,7 +9,7 @@ import { TranscriptView } from "./TranscriptView";
 import { useTranscriptStore } from "./store";
 
 async function liveSession(): Promise<Session> {
-  const s = await mockCommands.createSession("Review");
+  const s = await mockCommands.createSession("Review", null);
   if (s.status !== "ok") throw new Error("create");
   await mockCommands.confirmConsent(s.data.id, "participants_agreed");
   const started = await mockCommands.startSession(s.data.id);

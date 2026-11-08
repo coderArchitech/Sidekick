@@ -9,7 +9,7 @@ import { useLibraryStore } from "./store";
 const wait = (ms: number) => act(() => new Promise((r) => setTimeout(r, ms)));
 
 async function draftSession() {
-  const s = await mockCommands.createSession("Library");
+  const s = await mockCommands.createSession("Library", null);
   if (s.status !== "ok") throw new Error("create");
   useSessionStore.setState({ session: s.data });
   return s.data;

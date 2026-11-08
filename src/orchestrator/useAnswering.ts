@@ -6,7 +6,7 @@ import { useAnswersStore } from "./answersStore";
 import { chatHistory, useChatStore } from "./chatStore";
 import { followUpInput, type FollowUpKind } from "./followUps";
 import { screenshotAction, type ScreenshotActionKind } from "./screenshotActions";
-import { modelPlan, type ModelPlan } from "./models";
+import { modelPlan, sessionPlan, type ModelPlan } from "./models";
 import type { SkillPrompt } from "./prompt";
 import { skillsFor, useSkillsStore } from "./skills";
 import { useOrchestratorStore } from "./store";
@@ -39,11 +39,15 @@ export function useAnswering(session: Session | null) {
     skillIds.current = [activeSkill, ...(extraSkills ? extraSkills.split("\u0000") : [])];
   }, [activeSkill, extraSkills]);
 
+  // The session's own answer provider (PRD KEY-9).
+  const llmProvider = session?.llmProvider ?? null;
+
   useEffect(() => {
     if (!sessionId) return;
-    let models: ModelPlan = modelPlan({ provider: "anthropic", model: null });
+    const own = llmProvider ? { llmProvider } : null;
+    let models: ModelPlan = modelPlan({ provider: llmProvider ?? "anthropic", model: null });
     void commands.getSettings().then((r) => {
-      if (r.status === "ok") models = modelPlan(r.data.llm);
+      if (r.status === "ok") models = sessionPlan(r.data.llm, own);
     });
     const { clear } = useAnswersStore.getState();
     clear();
@@ -91,7 +95,7 @@ export function useAnswering(session: Session | null) {
       batcher.dispose();
       if (current?.router === router) current = null;
     };
-  }, [sessionId]);
+  }, [sessionId, llmProvider]);
 }
 
 /**

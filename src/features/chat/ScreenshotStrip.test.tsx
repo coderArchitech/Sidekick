@@ -16,7 +16,7 @@ function Harness({ session }: { session: Session }) {
 const wait = (ms: number) => act(() => new Promise((r) => setTimeout(r, ms)));
 
 async function liveSession(): Promise<Session> {
-  const s = await mockCommands.createSession("Screens");
+  const s = await mockCommands.createSession("Screens", null);
   if (s.status !== "ok") throw new Error("create");
   await mockCommands.confirmConsent(s.data.id, "participants_agreed");
   const started = await mockCommands.startSession(s.data.id);

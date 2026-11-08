@@ -30,9 +30,18 @@ fn arithmetic(text: &str) -> Option<String> {
     best
 }
 
+/// The question inside the agent prompt's `<question>` tags.
+fn question_of(content: &str) -> &str {
+    content
+        .split_once("<question>")
+        .and_then(|(_, rest)| rest.split_once("</question>"))
+        .map_or(content, |(q, _)| q.trim())
+}
+
 /// The text the mock answers with, for assertions. For the agent's tool
-/// step (PRD SKL-4) it is deterministic: the calculator for arithmetic in
-/// the question, once; otherwise done.
+/// step (PRD SKL-4) it is deterministic, once per question: the calculator
+/// for arithmetic, web search for "today", "latest", "current" or "now"
+/// (when the Skill allows them); otherwise done.
 #[must_use]
 pub fn mock_answer(req: &LlmRequest) -> String {
     let last = req.messages.iter().rev().find(|m| m.role == Role::User);
@@ -42,10 +51,22 @@ pub fn mock_answer(req: &LlmRequest) -> String {
         .is_some_and(|s| s.starts_with(AGENT_PROMPT))
     {
         let content = last.map_or("", |m| m.content.as_str());
-        if !content.contains("<tool_results>")
-            && let Some(expr) = arithmetic(content)
-        {
-            return format!("{{\"tool\": \"calculator\", \"input\": \"{expr}\"}}");
+        let system = req.system.as_deref().unwrap_or_default();
+        if !content.contains("<tool_results>") {
+            let question = question_of(content);
+            if system.contains("- calculator:")
+                && let Some(expr) = arithmetic(question)
+            {
+                return format!("{{\"tool\": \"calculator\", \"input\": \"{expr}\"}}");
+            }
+            let lower = question.to_lowercase();
+            let current = ["today", "latest", "current", "now"]
+                .iter()
+                .any(|w| lower.split(|c: char| !c.is_alphanumeric()).any(|x| x == *w));
+            if system.contains("- web_search:") && current {
+                let q = question.replace('"', "'");
+                return format!("{{\"tool\": \"web_search\", \"input\": \"{q}\"}}");
+            }
         }
         return "{\"done\": true}".to_owned();
     }
@@ -140,7 +161,9 @@ mod tests {
 
     #[test]
     fn agent_step_uses_the_calculator_once_for_arithmetic() {
-        let agent = format!("{AGENT_PROMPT} before a meeting question is answered.");
+        let agent = format!(
+            "{AGENT_PROMPT} before a meeting question is answered.\n- calculator: math\n- web_search: web"
+        );
         assert_eq!(
             mock_answer(&req(
                 &agent,
@@ -157,6 +180,22 @@ mod tests {
         );
         assert_eq!(
             mock_answer(&req(&agent, "<question>What's the Pro limit?</question>")),
+            r#"{"done": true}"#
+        );
+        assert_eq!(
+            mock_answer(&req(
+                &agent,
+                "<question>What is the latest Fed rate?</question>"
+            )),
+            r#"{"tool": "web_search", "input": "What is the latest Fed rate?"}"#
+        );
+        // Only tools the Skill allows.
+        let calc_only = format!("{AGENT_PROMPT}.\n- calculator: math");
+        assert_eq!(
+            mock_answer(&req(
+                &calc_only,
+                "<question>What is the latest Fed rate?</question>"
+            )),
             r#"{"done": true}"#
         );
         // Other prompts still echo.

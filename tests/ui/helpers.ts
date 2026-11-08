@@ -69,6 +69,7 @@ interface SidekickTest {
       id: string,
     ): Promise<{ status: "ok"; data: { lines: { endMs: number }[] } } | { status: "error" }>;
     updateSettings(p: unknown): Promise<unknown>;
+    saveSkill(skill: Record<string, unknown>): Promise<{ status: string }>;
     createPack(name: string): Promise<{ status: "ok"; data: { id: string } }>;
     ingestPackDocument(packId: string, path: string): Promise<unknown>;
     saveSummary(

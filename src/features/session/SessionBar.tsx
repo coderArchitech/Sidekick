@@ -1,5 +1,11 @@
 import { useEffect, useId, useRef, useState } from "react";
-import { sessionEvents, type Retention } from "@/ipc";
+import {
+  commands,
+  sessionEvents,
+  type Retention,
+  type SessionOverrides,
+  type SessionProviderOptions,
+} from "@/ipc";
 import { useSkillsStore } from "@/orchestrator";
 import { ConsentDialog } from "./ConsentDialog";
 import { useSessionStore } from "./store";
@@ -24,6 +30,11 @@ export function SessionBar() {
   } = useSessionStore();
   const [title, setTitle] = useState("");
   const [asking, setAsking] = useState(false);
+  const [overrides, setOverrides] = useState<SessionOverrides>({
+    sttProvider: null,
+    llmProvider: null,
+  });
+  const [showOptions, setShowOptions] = useState(false);
   const inputId = useId();
 
   useEffect(() => {
@@ -36,27 +47,44 @@ export function SessionBar() {
     <div className="space-y-1.5 border-b border-line px-3 py-2 text-xs">
       {!session || session.status === "ended" ? (
         <form
-          className="flex items-center gap-2"
+          className="space-y-1.5"
           onSubmit={(e) => {
             e.preventDefault();
             if (session) reset();
-            void create(title).then(() => setTitle(""));
+            const picked = overrides.sttProvider || overrides.llmProvider ? overrides : null;
+            void create(title, picked).then(() => {
+              setTitle("");
+              setOverrides({ sttProvider: null, llmProvider: null });
+              setShowOptions(false);
+            });
           }}
         >
-          {session?.status === "ended" && <span className="text-fg-muted">Session ended.</span>}
-          <label htmlFor={inputId} className="sr-only">
-            Session name
-          </label>
-          <input
-            id={inputId}
-            value={title}
-            placeholder="New session name"
-            onChange={(e) => setTitle(e.target.value)}
-            className="field field-sm min-w-0 flex-1"
-          />
-          <button type="submit" className={button} disabled={busy || !title.trim()}>
-            New session
-          </button>
+          <div className="flex items-center gap-2">
+            {session?.status === "ended" && <span className="text-fg-muted">Session ended.</span>}
+            <label htmlFor={inputId} className="sr-only">
+              Session name
+            </label>
+            <input
+              id={inputId}
+              value={title}
+              placeholder="New session name"
+              onChange={(e) => setTitle(e.target.value)}
+              className="field field-sm min-w-0 flex-1"
+            />
+            <button
+              type="button"
+              aria-expanded={showOptions}
+              title="Providers for this session"
+              className="btn btn-ghost btn-sm"
+              onClick={() => setShowOptions((o) => !o)}
+            >
+              Options
+            </button>
+            <button type="submit" className={button} disabled={busy || !title.trim()}>
+              New session
+            </button>
+          </div>
+          {showOptions && <ProviderOverrides value={overrides} onChange={setOverrides} />}
         </form>
       ) : (
         <div className="flex items-center gap-2">
@@ -140,6 +168,69 @@ export function SessionBar() {
         />
       )}
     </div>
+  );
+}
+
+/**
+ * Providers for the next session only (PRD KEY-9): another speech-to-text or
+ * answer provider than the Settings defaults. Providers without a key are
+ * listed but can't be picked.
+ */
+function ProviderOverrides({
+  value,
+  onChange,
+}: {
+  value: SessionOverrides;
+  onChange: (v: SessionOverrides) => void;
+}) {
+  const [options, setOptions] = useState<SessionProviderOptions | null>(null);
+  useEffect(() => {
+    let live = true;
+    void commands.sessionProviderOptions().then((r) => {
+      if (live && r.status === "ok") setOptions(r.data);
+    });
+    return () => {
+      live = false;
+    };
+  }, []);
+  if (!options) return null;
+  const pick = (
+    label: string,
+    list: SessionProviderOptions["stt"],
+    def: string,
+    current: string | null,
+    set: (id: string | null) => void,
+  ) => (
+    <label className="flex items-center gap-2">
+      <span className="w-28 shrink-0 text-fg-muted">{label}</span>
+      <select
+        aria-label={`${label} for this session`}
+        className="field field-sm min-w-0 flex-1"
+        value={current ?? ""}
+        onChange={(e) => set(e.target.value || null)}
+      >
+        <option value="">Default ({list.find((p) => p.id === def)?.name ?? def})</option>
+        {list
+          .filter((p) => p.id !== def)
+          .map((p) => (
+            <option key={p.id} value={p.id} disabled={!p.ready}>
+              {p.name}
+              {p.ready ? "" : " (add its key in Settings)"}
+            </option>
+          ))}
+      </select>
+    </label>
+  );
+  return (
+    <fieldset className="space-y-1 rounded-md border border-line p-2">
+      <legend className="px-1 text-fg-muted">For this session only</legend>
+      {pick("Speech-to-text", options.stt, options.defaultStt, value.sttProvider, (id) =>
+        onChange({ ...value, sttProvider: id }),
+      )}
+      {pick("Answers", options.llm, options.defaultLlm, value.llmProvider, (id) =>
+        onChange({ ...value, llmProvider: id }),
+      )}
+    </fieldset>
   );
 }
 

@@ -12,6 +12,7 @@ pub mod notes;
 pub mod overlay;
 pub mod packs;
 pub mod retrieval;
+pub mod search;
 pub mod session;
 pub mod settings;
 pub mod skills;

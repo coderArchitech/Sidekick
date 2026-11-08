@@ -21,6 +21,8 @@ use sidekick_secrets::{KeyStatus, KeyStore, SecretString};
 
 pub use catalog::{ProviderInfo, ProviderKind};
 pub use providers::anthropic::{DEFAULT_ANSWER_MODEL, DEFAULT_CUE_MODEL};
+pub use providers::search::SearchResult;
+use providers::search::{SearchKind, WebSearch};
 use retry::{RetryPolicy, with_retries};
 use streams::{AnswerSink, StreamManager};
 
@@ -53,6 +55,8 @@ pub struct Gateway {
     local: Vec<&'static str>,
     keys: Arc<dyn KeyStore>,
     openai_base_url: Option<String>,
+    /// Web search endpoints by provider id (tests point these at a mock server).
+    search_urls: HashMap<&'static str, String>,
     policy: RetryPolicy,
     streams: StreamManager,
     mock: bool,
@@ -85,12 +89,18 @@ impl Gateway {
                 Arc::new(providers::ollama::OllamaProvider::default()),
             );
         }
+        let mut verifiers: HashMap<&'static str, Arc<dyn KeyVerifier>> = HashMap::new();
+        if !mock {
+            verifiers.insert("tavily", Arc::new(WebSearch::new(SearchKind::Tavily)));
+            verifiers.insert("brave", Arc::new(WebSearch::new(SearchKind::Brave)));
+        }
         Self {
             llms,
-            verifiers: HashMap::new(),
+            verifiers,
             local: Vec::new(),
             keys,
             openai_base_url: None,
+            search_urls: HashMap::new(),
             policy: RetryPolicy::default(),
             streams: StreamManager::default(),
             mock,
@@ -248,6 +258,36 @@ impl Gateway {
                 ),
             )),
         }
+    }
+
+    /// Searches the web with `provider` (`tavily` or `brave`; PRD KEY-8).
+    /// Mock mode returns one deterministic result.
+    pub async fn web_search(
+        &self,
+        provider: &str,
+        query: &str,
+    ) -> SidekickResult<Vec<SearchResult>> {
+        let kind = SearchKind::from_id(provider).ok_or_else(|| {
+            SidekickError::internal(format!("Sidekick can't search the web with {provider}."))
+        })?;
+        if self.mock {
+            return Ok(providers::search::mock_results(query));
+        }
+        let key = self
+            .key_for(provider)?
+            .ok_or_else(|| key_missing(provider))?;
+        let client = match self.search_urls.get(provider) {
+            Some(url) => WebSearch::with_base_url(kind, url),
+            None => WebSearch::new(kind),
+        };
+        with_retries(&self.policy, || client.search(query, &key)).await
+    }
+
+    /// Points a web search provider at another URL (tests).
+    #[must_use]
+    pub fn with_search_base_url(mut self, provider: &'static str, url: impl Into<String>) -> Self {
+        self.search_urls.insert(provider, url.into());
+        self
     }
 
     /// Points OpenAI calls at another URL (tests).

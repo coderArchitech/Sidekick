@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 import type {
   ContextOptions,
   ContextPack,
@@ -39,7 +39,10 @@ const PACK: ContextPack = {
 const ok = <T>(data: T): Result<T, SidekickError> => ({ status: "ok", data });
 const tick = () => new Promise((r) => setTimeout(r, 0));
 
-function harness(pack: ContextPack = PACK, opts: { streamFails?: boolean } = {}) {
+function harness(
+  pack: ContextPack = PACK,
+  opts: { streamFails?: boolean; webSearch?: AnswerDeps["webSearch"] } = {},
+) {
   const streams: { id: string; provider: string; req: LlmRequest }[] = [];
   const cancelled: string[] = [];
   const saved: NewAnswer[] = [];
@@ -82,6 +85,7 @@ function harness(pack: ContextPack = PACK, opts: { streamFails?: boolean } = {})
     },
     events: mockAnswerBus.events,
     now: () => clock,
+    webSearch: opts.webSearch,
   };
   const views = new Map<string, AnswerView>();
   const router = new AnswerRouter(deps, (v) => views.set(v.id, v));
@@ -320,5 +324,34 @@ describe("AnswerRouter", () => {
     const h = harness();
     await h.router.ask({ ...input(), skill: { name: "Plain", instructions: "Be plain." } });
     expect(h.streams.some((s) => s.id.startsWith("agent:"))).toBe(false);
+  });
+
+  it("an agent's web search uses the router's web search (KEY-8)", async () => {
+    const webSearch = vi.fn(() =>
+      Promise.resolve({
+        status: "ok" as const,
+        data: [{ title: "Rates", url: "https://x.test", snippet: "4.5%" }],
+      }),
+    );
+    const h = harness(PACK, { webSearch });
+    const v = h.router.ask({
+      ...input("What's the Fed rate today?"),
+      skill: { name: "Analyst", instructions: "Be current.", tools: ["web_search"] },
+    });
+    await tick();
+    const step = h.streams.find((s) => s.id.startsWith("agent:"));
+    token(step?.id ?? "", '{"tool": "web_search", "input": "fed rate today"}');
+    done(step?.id ?? "");
+    await tick();
+    await tick();
+    const step2 = h.streams.filter((s) => s.id.startsWith("agent:"))[1];
+    token(step2?.id ?? "", '{"done": true}');
+    done(step2?.id ?? "");
+    const view = await v;
+    expect(webSearch).toHaveBeenCalledWith("fed rate today");
+    const full = h.streams.find((s) => s.id === `${view.id}:full`);
+    expect(full?.req.messages.at(-1)?.content).toContain(
+      "web_search(fed rate today) → Rates (https://x.test): 4.5%",
+    );
   });
 });

@@ -120,9 +120,34 @@ export const commands = {
   async recordLatency(stage: Stage, ms: number): Promise<void> {
     await TAURI_INVOKE("record_latency", { stage, ms });
   },
-  async createSession(title: string): Promise<Result<Session, SidekickError>> {
+  async createSession(
+    title: string,
+    overrides: SessionOverrides | null,
+  ): Promise<Result<Session, SidekickError>> {
     try {
-      return { status: "ok", data: await TAURI_INVOKE("create_session", { title }) };
+      return { status: "ok", data: await TAURI_INVOKE("create_session", { title, overrides }) };
+    } catch (e) {
+      if (e instanceof Error) throw e;
+      else return { status: "error", error: e as any };
+    }
+  },
+  /**
+   * Searches the web with the Settings provider; an error when web search is off.
+   */
+  async webSearch(query: string): Promise<Result<SearchResult[], SidekickError>> {
+    try {
+      return { status: "ok", data: await TAURI_INVOKE("web_search", { query }) };
+    } catch (e) {
+      if (e instanceof Error) throw e;
+      else return { status: "error", error: e as any };
+    }
+  },
+  /**
+   * Speech-to-text and answer providers the overlay can offer when creating a session.
+   */
+  async sessionProviderOptions(): Promise<Result<SessionProviderOptions, SidekickError>> {
+    try {
+      return { status: "ok", data: await TAURI_INVOKE("session_provider_options") };
     } catch (e) {
       if (e instanceof Error) throw e;
       else return { status: "error", error: e as any };
@@ -1280,6 +1305,11 @@ export type ProviderEntry = {
 } & { key: KeyStatus };
 export type ProviderKind = "stt" | "llm" | "embed" | "search";
 /**
+ * A provider the overlay may offer for a session; `ready` means its key is
+ * saved or it needs none. Key details never leave the Settings window.
+ */
+export type ProviderOption = { id: string; name: string; ready: boolean };
+/**
  * Where a question came from (`questions.source`).
  */
 export type QuestionSource = "detected" | "chat" | "screenshot";
@@ -1346,6 +1376,10 @@ export type Screenshot = {
  */
 export type ScreenshotCaptured = { screenshot: Screenshot };
 /**
+ * One web result.
+ */
+export type SearchResult = { title: string; url: string; snippet: string };
+/**
  * A session as the UI sees it.
  */
 export type Session = {
@@ -1372,6 +1406,12 @@ export type Session = {
    */
   extraSkillIds: string[];
   /**
+   * Speech-to-text and answer providers for this session: the Settings
+   * defaults, or the ones picked when it was created (PRD KEY-9).
+   */
+  sttProvider: string;
+  llmProvider: string;
+  /**
    * How long its data is kept after it ends (tech doc 4.4).
    */
   retention: Retention;
@@ -1381,6 +1421,10 @@ export type Session = {
  */
 export type SessionChanged = { session: Session };
 /**
+ * Providers picked for one session instead of the Settings defaults (PRD KEY-9).
+ */
+export type SessionOverrides = { sttProvider: string | null; llmProvider: string | null };
+/**
  * One page of sessions, newest first.
  */
 export type SessionPage = {
@@ -1389,6 +1433,15 @@ export type SessionPage = {
    * Pass back to get the next page; `None` on the last page.
    */
   nextCursor: string | null;
+};
+export type SessionProviderOptions = {
+  stt: ProviderOption[];
+  llm: ProviderOption[];
+  /**
+   * The Settings defaults.
+   */
+  defaultStt: string;
+  defaultLlm: string;
 };
 /**
  * Result of starting a session: the session plus non-fatal warnings to show.

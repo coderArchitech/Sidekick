@@ -154,10 +154,23 @@ function arithmetic(text: string): string | null {
   return best;
 }
 
-/** Like the Rust mock: the agent step calls the calculator once for arithmetic, else done. */
-function mockAgentReply(content: string): string {
-  const expr = content.includes("<tool_results>") ? null : arithmetic(content);
-  return expr ? JSON.stringify({ tool: "calculator", input: expr }) : '{"done": true}';
+/**
+ * Like the Rust mock, once per question: the calculator for arithmetic, web
+ * search for "today", "latest", "current" or "now" (when the Skill allows
+ * them); otherwise done.
+ */
+function mockAgentReply(system: string, content: string): string {
+  if (content.includes("<tool_results>")) return '{"done": true}';
+  const question = /<question>([\s\S]*?)<\/question>/.exec(content)?.[1]?.trim() ?? content;
+  const expr = system.includes("- calculator:") ? arithmetic(question) : null;
+  if (expr) return JSON.stringify({ tool: "calculator", input: expr });
+  const current = question
+    .toLowerCase()
+    .split(/[^\p{L}\p{N}]+/u)
+    .some((w) => ["today", "latest", "current", "now"].includes(w));
+  if (system.includes("- web_search:") && current)
+    return JSON.stringify({ tool: "web_search", input: question.replace(/"/g, "'") });
+  return '{"done": true}';
 }
 
 /** Simulates ingest like the Rust pipeline: queued → parsing → embedding → ready (or failed). */
@@ -487,9 +500,9 @@ export const mockCommands: Commands = {
     // Like the Rust mock: full answers (answer-sized budgets) cite source [1].
     const cite = request.maxTokens > 100 ? " [1]" : "";
     const agent = request.system?.startsWith("You decide whether tools are needed");
-    const words = (agent ? mockAgentReply(question) : `${prefix} ${question}${cite}`).split(
-      /(?<= )/,
-    );
+    const words = (
+      agent ? mockAgentReply(request.system ?? "", question) : `${prefix} ${question}${cite}`
+    ).split(/(?<= )/);
     const handle = { cancelled: false };
     activeStreams.set(requestId, handle);
     void (async () => {
@@ -518,10 +531,17 @@ export const mockCommands: Commands = {
     latencySamples.set(stage, [...(latencySamples.get(stage) ?? []), ms]);
     return Promise.resolve();
   },
-  createSession: (title) => {
+  createSession: (title, overrides) => {
     const t = title.trim();
     if (!t || t.length > 200)
       return Promise.resolve(err("INTERNAL", "Give the session a name (up to 200 characters)."));
+    // Like Rust: an override must be a known provider of that kind.
+    for (const [id, kind] of [
+      [overrides?.sttProvider, "stt"],
+      [overrides?.llmProvider, "llm"],
+    ] as const)
+      if (id && !CATALOG.some(([cid, ck]) => cid === id && ck === kind))
+        return Promise.resolve(err("INTERNAL", `Sidekick doesn't know the provider ${id}.`));
     const session: Session = {
       id: `mock-session-${nextId++}`,
       title: t,
@@ -533,6 +553,8 @@ export const mockCommands: Commands = {
       consent: null,
       skillId: null,
       extraSkillIds: [],
+      sttProvider: overrides?.sttProvider ?? settings.stt.provider,
+      llmProvider: overrides?.llmProvider ?? settings.llm.provider,
       retention: settings.retention,
     };
     return Promise.resolve(save(session));
@@ -1050,6 +1072,38 @@ export const mockCommands: Commands = {
     const b = { contentMd, createdAt: Date.now() };
     briefs.set(sessionId, b);
     return Promise.resolve({ status: "ok", data: structuredClone(b) });
+  },
+  sessionProviderOptions: () => {
+    // Like Rust in mock mode: every provider is ready.
+    const of = (kind: ProviderKind) =>
+      CATALOG.filter(([, k]) => k === kind).map(([id, , name]) => ({ id, name, ready: true }));
+    return Promise.resolve({
+      status: "ok",
+      data: {
+        stt: of("stt"),
+        llm: of("llm"),
+        defaultStt: settings.stt.provider,
+        defaultLlm: settings.llm.provider,
+      },
+    });
+  },
+  webSearch: (query) => {
+    if (!settings.search)
+      return Promise.resolve(
+        err("INTERNAL", "Web search is off. Choose Tavily or Brave under Web search in Settings."),
+      );
+    const q = query.trim().replace(/\s+/g, " ");
+    // Like the Rust mock gateway.
+    return Promise.resolve({
+      status: "ok",
+      data: [
+        {
+          title: `Mock result for ${q}`,
+          url: "https://example.com/mock-search",
+          snippet: `Mock web snippet about ${q}.`,
+        },
+      ],
+    });
   },
   listDocuments: (sessionId) =>
     Promise.resolve({ status: "ok", data: structuredClone(documents.get(sessionId) ?? []) }),
