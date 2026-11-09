@@ -1,4 +1,5 @@
-import { act, render, screen, within } from "@testing-library/react";
+import { act, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
+import axe from "axe-core";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { useSessionStore } from "@/features/session";
 import type { LlmRequest, Session } from "@/ipc";
@@ -168,5 +169,118 @@ describe("Notes tab and rolling notes job", () => {
     await advance(NOTES_INTERVAL_MS);
     expect(screen.getByRole("alert")).toHaveTextContent("Disk is full.");
     expect(screen.getByText("Notes v1")).toBeInTheDocument();
+  });
+});
+
+describe("Agenda, recap and action items (PRD MEM-2, MEM-3, MEM-4)", () => {
+  beforeEach(() => {
+    resetMocks();
+    useSessionStore.setState({ session: null, warnings: [], error: null, busy: false });
+    useNotesStore.setState({ sessionId: null, notes: null, activity: "idle", error: null });
+  });
+  afterEach(() => vi.restoreAllMocks());
+
+  it("adds, edits and sets agenda items by hand", async () => {
+    const s = await liveSession();
+    render(<Harness />);
+    const agenda = await screen.findByRole("region", { name: "Agenda" });
+    fireEvent.click(within(agenda).getByRole("button", { name: "Add agenda" }));
+    fireEvent.change(within(agenda).getByLabelText("Agenda items, one per line"), {
+      target: { value: "Pricing\n\nRoadmap" },
+    });
+    fireEvent.click(within(agenda).getByRole("button", { name: "Save agenda" }));
+    const list = await within(agenda).findByRole("list", { name: "Agenda items" });
+    expect(
+      within(list)
+        .getAllByRole("listitem")
+        .map((l) => l.textContent),
+    ).toEqual([expect.stringContaining("Pricing"), expect.stringContaining("Roadmap")]);
+    expect(agenda).toHaveTextContent("0/2 covered");
+
+    fireEvent.change(within(agenda).getByLabelText("Status of Pricing"), {
+      target: { value: "covered" },
+    });
+    await waitFor(() => expect(agenda).toHaveTextContent("1/2 covered"));
+    const saved = await mockCommands.getNotes(s.id);
+    expect(saved.status === "ok" && saved.data.agenda[0]?.status).toBe("covered");
+
+    fireEvent.click(within(agenda).getByRole("button", { name: "Edit agenda" }));
+    expect(within(agenda).getByLabelText("Agenda items, one per line")).toHaveValue(
+      "Pricing\nRoadmap",
+    );
+  });
+
+  it("shows an error when the agenda is too long", async () => {
+    await liveSession();
+    render(<Harness />);
+    const agenda = await screen.findByRole("region", { name: "Agenda" });
+    fireEvent.click(within(agenda).getByRole("button", { name: "Add agenda" }));
+    fireEvent.change(within(agenda).getByLabelText("Agenda items, one per line"), {
+      target: { value: "x".repeat(201) },
+    });
+    fireEvent.click(within(agenda).getByRole("button", { name: "Save agenda" }));
+    expect(await within(agenda).findByRole("alert")).toHaveTextContent("up to 30 items");
+  });
+
+  it("'What did I miss?' recaps only the chosen minutes", async () => {
+    const calls: LlmRequest[] = [];
+    vi.spyOn(mockCommands, "llmStream").mockImplementation((requestId, _p, req) => {
+      calls.push(req);
+      queueMicrotask(() => {
+        mockAnswerBus.emitToken({ requestId, delta: "- Priya asked **you** for the quote" });
+        mockAnswerBus.emitDone({
+          requestId,
+          usage: { inputTokens: 1, outputTokens: 1 },
+          finishReason: "end_turn",
+        });
+      });
+      return Promise.resolve({ status: "ok", data: null });
+    });
+    const s = await liveSession();
+    say(s.id, "Ancient history from the start.", 60_000);
+    say(s.id, "Can you send the quote?", 700_000);
+    render(<Harness />);
+    fireEvent.change(await screen.findByLabelText("Recap period"), { target: { value: "2" } });
+    fireEvent.click(screen.getByRole("button", { name: "What did I miss?" }));
+    const card = await screen.findByRole("region", { name: "What you missed" });
+    expect(card).toHaveTextContent("Last 2 minutes");
+    expect(card).toHaveTextContent("Priya asked you for the quote");
+    expect(calls[0]?.messages[0]?.content).toContain("Can you send the quote?");
+    expect(calls[0]?.messages[0]?.content).not.toContain("Ancient history");
+    fireEvent.click(within(card).getByRole("button", { name: "Dismiss" }));
+    expect(screen.queryByRole("region", { name: "What you missed" })).toBeNull();
+  });
+
+  it("the recap button waits for the session to start", async () => {
+    const s = await mockCommands.createSession("Draft");
+    if (s.status !== "ok") throw new Error("create");
+    useSessionStore.setState({ session: s.data });
+    render(<Harness />);
+    await screen.findByRole("region", { name: "Agenda" });
+    expect(screen.queryByRole("button", { name: "What did I miss?" })).toBeNull();
+  });
+
+  it("action items can be ticked off", async () => {
+    const s = await liveSession();
+    await mockCommands.saveSummary(s.id, "Recap", [
+      { text: "Send the quote", owner: "Priya", due: "Monday" },
+    ]);
+    render(<Harness />);
+    const box = await screen.findByRole("checkbox", { name: /Send the quote/ });
+    expect(box).not.toBeChecked();
+    fireEvent.click(box);
+    await waitFor(() => expect(box).toBeChecked());
+    const saved = await mockCommands.getNotes(s.id);
+    expect(saved.status === "ok" && saved.data.actionItems[0]?.done).toBe(true);
+  });
+
+  it("has no accessibility violations (axe)", async () => {
+    const s = await liveSession();
+    await mockCommands.setAgenda(s.id, ["Pricing", "Roadmap"]);
+    await mockCommands.saveSummary(s.id, "Recap", [{ text: "Send it", owner: null, due: null }]);
+    const { container } = render(<Harness />);
+    await screen.findByRole("list", { name: "Agenda items" });
+    const results = await axe.run(container, { rules: { "color-contrast": { enabled: false } } });
+    expect(results.violations.map((v) => `${v.id}: ${v.help}`)).toEqual([]);
   });
 });

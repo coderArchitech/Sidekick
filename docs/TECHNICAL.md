@@ -225,7 +225,7 @@ Each module below is its own crate at `crates/<module>/`, named `sidekick-<modul
 | `answers` | Live Answers tab, newest first: cue line (Stop while streaming), expandable full answer (open by default when the question used your name), numbered sources, thumbs up/down (`rate_answer`, click again to clear). Markdown via `react-markdown` with raw HTML skipped and links shown as text, never opened. Fenced code uses Shiki, loaded lazily on first code block with 13 languages and the JavaScript regex engine (no WASM); unknown languages fall back to plain text. Copy writes only the code, only on click. Follow-up chips are not built yet |
 | `chat` | Chat tab: **Screenshot** menu (Full screen, A window…, An area… with a drag-to-select preview) for capture-and-ask: the capture shows as an attached thumbnail and the next question is asked with `source = screenshot`, so both cue and full answer see the image. Typed questions answered through the same `AnswerRouter` with `source = chat` and the session context (transcript, notes, documents), plus the last 3 finished exchanges as history so follow-ups make sense. Enter sends, Shift+Enter adds a line, Stop cancels. History is per session: saved chat and screenshot answers reload with `list_answers`. The Ask hotkey shows and focuses the overlay, switches to Chat and focuses the input. A chat question shares the 2-in-flight limit, so it can stop the oldest detected answer. Voice input arrives later |
 | `transcript` | Transcript tab: loads saved lines, applies live `transcript-partial` / `transcript-segment` events batched every 50 ms (`lib/batcher`), shows partial text until the final line arrives, rename/merge speakers, bookmarks, listening indicator |
-| `notes` | Notes tab: rolling notes (Topics, Decisions, Open questions) rendered as Markdown and updated live from `useNotesStore`; after the session ends, the Summary with decisions and action items (owner, due). Shows "Updating notes…" / "Writing the summary…" and a notice when an update fails (old notes stay) |
+| `notes` | Notes tab: **What did I miss?** (once the session has started) recaps the last 2, 5 or 10 minutes with the fast model, counted back from the newest line; the **Agenda** (one item per line, up to 30, each Not yet / In progress / Covered with a count, editable by hand); rolling notes (Topics, Decisions, Open questions, Action items) rendered as Markdown and updated live from `useNotesStore`; after the session ends, the Summary with decisions and action items (owner, due) that can be ticked off. Opening the tab reloads the saved notes. Shows "Updating notes…" / "Writing the summary…" and a notice when an update fails (old notes stay) |
 | `library` | Collapsible Documents panel under the session bar: add files (native picker via `tauri-plugin-dialog`, or drop onto the window), add links, live indexing progress, failure reason with Retry, remove. Screenshot strip arrives with T-043 |
 | `settings` | Settings window: provider and model dropdowns per kind (STT, LLM, embeddings, web search), masked key field with show/hide, paste, Save and test, Test connection, Remove; Auto-answer and retention. Opened with `open_settings`; Close hides the window |
 | `skills` | Settings → Skills: list with on/off, Edit, Export (save dialog), Delete; **New Skill** or start from a template in a no-code builder (name, description, instructions, where it applies, tools with what each one does, cue-then-full or full-only); field-level problems from `check_skill`; **Import…** shows the Skill's requested tools and saves only on "Allow and import". The overlay's session bar has a Skill picker (enabled Skills), and the Switch Skill shortcut cycles them, then none |
@@ -264,7 +264,7 @@ Steps 3 to 8 must finish within the NFR-2 budget. The cue in step 9 comes from a
 | --- | --- |
 | Document upload | `library` → `ingest_document` → `ingest` parses and chunks → `gateway` embeds with the active `EmbeddingProvider` → `store` writes chunks and vectors → `ingest.progress` events |
 | Screenshot | Hotkey → `capture` → `store` saves image → `screenshot.captured` event → capture-and-ask continues at step 3 above |
-| Rolling notes | Every 45 s while live (not while paused), and only when there are new transcript lines since the last update, `orchestrator` (`NotesJob`, `useNotes`) sends just those lines plus the current notes to the fast model at low effort, fenced as untrusted data, and saves with `save_notes(version)`. On `VERSION_CONFLICT` it merges the same lines into the latest notes once more; on any other failure the lines are kept for the next run. When a session the overlay watched ends, it catches up once, then asks the main model for a JSON recap (summary, decisions, action items; transcript capped to the last 60k characters, the notes cover the start) → `save_summary`. If the reply isn't JSON, the raw text becomes the summary |
+| Rolling notes | Every 45 s while live (not while paused), and only when there are new transcript lines since the last update, `orchestrator` (`NotesJob`, `useNotes`) sends just those lines plus the current notes to the fast model at low effort, fenced as untrusted data, and saves with `save_notes(version)`. On `VERSION_CONFLICT` it merges the same lines into the latest notes once more; on any other failure the lines are kept for the next run. When a session the overlay watched ends, it catches up once, then asks the main model for a JSON recap (summary, decisions, action items; transcript capped to the last 60k characters, the notes cover the start) → `save_summary`. If the reply isn't JSON, the raw text becomes the summary. **Agenda (MEM-2):** when the session has an agenda, each notes update also asks the fast model for item statuses as JSON (`AGENDA_SYSTEM`); if the reply can't be read, a keyword match on the new lines decides (an item is mentioned when half its keywords are said; the last one mentioned is in progress, earlier ones covered). Statuses only move forward, starting an item covers the one before, and ending the session covers the item still in progress → `update_agenda`. A failed agenda update never fails the notes. **Recap (MEM-3):** "What did I miss?" sends only the chosen window to the fast model; nothing said → no call. **Action items (MEM-4):** rolling notes keep an Action items section ("Owner: task (due …)"); the end summary stores them as rows with owner and due |
 | Session start | `start_session` → `consent` checks confirmation → `audio` and `stt` start → `session.state` event |
 
 ### 3.4 Technology stack with versions
@@ -469,6 +469,13 @@ CREATE TABLE action_items (
   text TEXT NOT NULL, owner TEXT, due TEXT, done INTEGER NOT NULL DEFAULT 0
 );
 
+CREATE TABLE agenda_items (                      -- PRD MEM-2 (0004)
+  id TEXT PRIMARY KEY,
+  session_id TEXT NOT NULL REFERENCES sessions(id) ON DELETE CASCADE,
+  position INTEGER NOT NULL, text TEXT NOT NULL,
+  status TEXT NOT NULL DEFAULT 'not_started'     -- not_started | in_progress | covered
+);
+
 CREATE TABLE bookmarks (
   id TEXT PRIMARY KEY,
   session_id TEXT NOT NULL REFERENCES sessions(id) ON DELETE CASCADE,
@@ -615,9 +622,12 @@ Commands are request/response calls from the frontend to Rust (`invoke`). All re
 | `save_answer` | `NewAnswer` (session, question, source, directed, segment, cue, body, sources, provider, model, latency, tokens) | `String` (answer id) | Persist a question and its answer in one transaction |
 | `rate_answer` | `answer_id, rating` (1, -1, or 0 to clear) | `()` | Thumbs up/down |
 | `list_answers` | `session_id, source?` (`detected`, `chat`, `screenshot`) | `SavedAnswer[]` (question, cue, body, sources, rating, `createdAt`), oldest first | Chat history per session |
-| `get_notes` | `session_id` | `Notes` (`contentMd`, `version` (0 before the first save), `updatedAt`, `summaryMd`, `actionItems`) | Notes, summary and action items |
+| `get_notes` | `session_id` | `Notes` (`contentMd`, `version` (0 before the first save), `updatedAt`, `summaryMd`, `actionItems`, `agenda`) | Notes, summary and action items |
 | `save_notes` | `session_id, content_md, version` | `Notes` | Update rolling notes if `version` is current; `VERSION_CONFLICT` otherwise |
 | `save_summary` | `session_id, summary_md, action_items` (`text, owner?, due?`) | `Notes` | Save the end-of-session summary and replace its action items |
+| `set_agenda` | `session_id, items` (strings) | `Notes` | Replace the agenda (blank lines dropped, up to 30 items of 200 characters); an item already on it keeps its id and status |
+| `update_agenda` | `session_id, updates` (`id, status`) | `Notes` | Set agenda item statuses (notes job or user); unknown ids are ignored |
+| `set_action_item_done` | `session_id, item_id, done` | `Notes` | Tick an action item off or back on |
 | `list_providers` | `kind: stt / llm / embed / search` | `ProviderInfo[]` | Dropdown options, with key status |
 | `set_api_key` | `provider, key` | `KeyStatus` | Test and store a key (key never returned) |
 | `test_api_key` | `provider` | `KeyStatus` | Re-test a stored key |
@@ -1417,7 +1427,8 @@ This is not legal advice; confirm requirements with legal counsel before any pub
 2. Optional: choose a Skill (e.g. Interview Coach for mock interview practice).
 3. Click **Start**. Confirm that participants are aware of transcription, or choose **Transcribe me only**.
 4. Sidekick listens. Answers appear in **Live Answers**: a one-line cue first, then the full answer and sources.
-5. Click **End** when the meeting finishes. The **Notes** tab, which kept running notes during the meeting, then shows a summary, decisions and action items.
+5. Optional: in the **Notes** tab, **Add agenda** (one item per line). Items are marked In progress and Covered as the meeting gets to them. Looked away? **What did I miss?** recaps the last 2, 5 or 10 minutes.
+6. Click **End** when the meeting finishes. The **Notes** tab, which kept running notes during the meeting, then shows a summary, decisions and action items you can tick off.
 
 **Auto-answer:** on by default, so every detected question gets an answer. Turn it off with the **Auto** button in the overlay header (or `Ctrl/Cmd+Shift+A`) to answer only questions that use your name.
 

@@ -67,7 +67,7 @@ export function useNotes(session: Session | null, intervalMs = NOTES_INTERVAL_MS
       useNotesStore.setState({ activity: "summarizing" });
       // Catch up on the last lines first, then recap.
       void j
-        .tick()
+        .catchUp()
         .catch(() => null)
         .then(() => j.summarize())
         .catch((e: unknown) =>

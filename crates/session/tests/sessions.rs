@@ -627,6 +627,96 @@ fn summary_saves_with_action_items_and_keeps_notes() {
 }
 
 #[test]
+fn agenda_keeps_statuses_across_edits_and_goes_with_the_session() {
+    use sidekick_session::notes::{self, AgendaStatus, AgendaUpdate};
+    let mut db = db();
+    let s = repo::create(&db, &new("Agenda")).unwrap();
+    let items = |v: &[&str]| v.iter().map(|s| (*s).to_owned()).collect::<Vec<_>>();
+
+    assert!(notes::get(&db, &s.id).unwrap().agenda.is_empty());
+    let n = notes::set_agenda(&mut db, &s.id, &items(&["Pricing", "  ", "Roadmap"])).unwrap();
+    let texts: Vec<_> = n.agenda.iter().map(|a| a.text.as_str()).collect();
+    assert_eq!(texts, ["Pricing", "Roadmap"], "blank lines dropped");
+    assert!(
+        n.agenda
+            .iter()
+            .all(|a| a.status == AgendaStatus::NotStarted)
+    );
+
+    let pricing = n.agenda[0].id.clone();
+    let n = notes::update_agenda(
+        &mut db,
+        &s.id,
+        &[
+            AgendaUpdate {
+                id: pricing.clone(),
+                status: AgendaStatus::Covered,
+            },
+            AgendaUpdate {
+                id: "not-ours".into(),
+                status: AgendaStatus::Covered,
+            },
+        ],
+    )
+    .unwrap();
+    assert_eq!(n.agenda[0].status, AgendaStatus::Covered);
+    assert_eq!(n.agenda[1].status, AgendaStatus::NotStarted);
+
+    // Reordering and adding keeps what was already there, by text.
+    let n = notes::set_agenda(&mut db, &s.id, &items(&["Hiring", "Pricing"])).unwrap();
+    assert_eq!(n.agenda[1].id, pricing);
+    assert_eq!(n.agenda[1].status, AgendaStatus::Covered);
+    assert_eq!(n.agenda[0].status, AgendaStatus::NotStarted);
+    assert_eq!(n.agenda.len(), 2, "Roadmap removed");
+
+    let too_many: Vec<String> = (0..=notes::MAX_AGENDA_ITEMS)
+        .map(|i| format!("Item {i}"))
+        .collect();
+    assert!(notes::set_agenda(&mut db, &s.id, &too_many).is_err());
+    assert!(notes::set_agenda(&mut db, &s.id, &["x".repeat(201)]).is_err());
+    assert!(notes::set_agenda(&mut db, "missing", &items(&["A"])).is_err());
+
+    repo::delete(&db, &s.id).unwrap();
+    let left: i64 = db
+        .conn()
+        .query_row("SELECT count(*) FROM agenda_items", [], |r| r.get(0))
+        .unwrap();
+    assert_eq!(left, 0, "agenda goes with the session");
+}
+
+#[test]
+fn action_items_can_be_ticked_off() {
+    use sidekick_session::notes::{self, NewActionItem};
+    let mut db = db();
+    let s = repo::create(&db, &new("Done")).unwrap();
+    let n = notes::save_summary(
+        &mut db,
+        &s.id,
+        "Recap",
+        &[NewActionItem {
+            text: "Send the quote".into(),
+            owner: Some("Priya".into()),
+            due: Some("Friday".into()),
+        }],
+    )
+    .unwrap();
+    let id = n.action_items[0].id.clone();
+    assert!(
+        notes::set_action_item_done(&db, &s.id, &id, true)
+            .unwrap()
+            .action_items[0]
+            .done
+    );
+    assert!(
+        !notes::set_action_item_done(&db, &s.id, &id, false)
+            .unwrap()
+            .action_items[0]
+            .done
+    );
+    assert!(notes::set_action_item_done(&db, &s.id, "missing", true).is_err());
+}
+
+#[test]
 fn a_session_can_use_a_skill() {
     let db = db();
     let s = repo::create(&db, &new("With Skill")).unwrap();

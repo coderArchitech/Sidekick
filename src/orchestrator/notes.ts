@@ -1,4 +1,6 @@
 import type {
+  AgendaItem,
+  AgendaUpdate,
   NewActionItem,
   Notes,
   Result,
@@ -6,6 +8,14 @@ import type {
   Transcript,
   TranscriptLine,
 } from "@/ipc";
+import {
+  agendaPrompt,
+  agendaUpdates,
+  AGENDA_SYSTEM,
+  closeAgenda,
+  matchAgenda,
+  parseAgendaReply,
+} from "./agenda";
 import { complete, type CompleteDeps } from "./complete";
 import type { ModelPlan } from "./models";
 
@@ -27,6 +37,7 @@ export interface NotesDeps extends CompleteDeps {
     summaryMd: string,
     actionItems: NewActionItem[],
   ): Promise<Result<Notes, SidekickError>>;
+  updateAgenda(sessionId: string, updates: AgendaUpdate[]): Promise<Result<Notes, SidekickError>>;
 }
 
 const clock = (ms: number) => {
@@ -34,7 +45,7 @@ const clock = (ms: number) => {
   return `${Math.floor(s / 60)}:${String(s % 60).padStart(2, "0")}`;
 };
 
-const lineText = (l: TranscriptLine) =>
+export const lineText = (l: TranscriptLine) =>
   `${clock(l.startMs)} ${l.isUser ? "Me" : l.speakerLabel}: ${l.text}`;
 
 const UNTRUSTED =
@@ -46,7 +57,8 @@ Update the current notes with the new transcript and return the complete notes i
 ## Topics
 ## Decisions
 ## Open questions
-Use short bullets. Keep earlier points unless the new transcript changes them. Only write what was said; never invent. Leave a section with "- None yet" if empty. Return only the notes.`;
+## Action items
+Use short bullets. An action item is something someone agreed to do: write "- Owner: task (due …)", leaving out the owner or due date when nobody said them. Keep earlier points unless the new transcript changes them. Only write what was said; never invent. Leave a section with "- None yet" if empty. Return only the notes.`;
 
 export const SUMMARY_SYSTEM = `You write the recap of a meeting that just ended. ${UNTRUSTED}
 
@@ -101,7 +113,8 @@ export function parseSummary(raw: string): ParsedSummary {
 export class NotesJob {
   /** End of the last transcript line already in the notes. */
   private cursorMs = -1;
-  private running = false;
+  /** The update in progress, if any. */
+  private running: Promise<Notes | null> | null = null;
 
   constructor(
     private readonly deps: NotesDeps,
@@ -113,31 +126,83 @@ export class NotesJob {
   /** Returns the saved notes, or null when there was nothing new (or a run is in progress). */
   async tick(): Promise<Notes | null> {
     if (this.running) return null;
-    this.running = true;
+    this.running = this.run();
     try {
-      const t = await this.deps.getTranscript(this.sessionId);
-      if (t.status === "error") throw new Error(t.error.message);
-      const fresh = t.data.lines.filter((l) => l.endMs > this.cursorMs);
-      if (fresh.length === 0) return null;
-      const newCursor = Math.max(...fresh.map((l) => l.endMs));
-      let current = await this.deps.getNotes(this.sessionId);
-      for (let attempt = 0; attempt < 2; attempt++) {
-        if (current.status === "error") throw new Error(current.error.message);
-        const merged = await this.merge(current.data.contentMd, fresh);
-        const saved = await this.deps.saveNotes(this.sessionId, merged, current.data.version);
-        if (saved.status === "ok") {
-          this.cursorMs = newCursor;
-          this.onNotes(saved.data);
-          return saved.data;
-        }
-        if (saved.error.code !== "VERSION_CONFLICT") throw new Error(saved.error.message);
-        // Someone saved first: merge the same new lines into their notes.
-        current = await this.deps.getNotes(this.sessionId);
-      }
-      throw new Error("The notes kept changing; will try again next time.");
+      return await this.running;
     } finally {
-      this.running = false;
+      this.running = null;
     }
+  }
+
+  /**
+   * The last update, once any update in progress has finished. When the
+   * session ends this catches up after a scheduled update that was still
+   * running, instead of skipping (and closing the agenda too early).
+   */
+  async catchUp(): Promise<Notes | null> {
+    await this.running?.catch(() => null);
+    return this.tick();
+  }
+
+  private async run(): Promise<Notes | null> {
+    const t = await this.deps.getTranscript(this.sessionId);
+    if (t.status === "error") throw new Error(t.error.message);
+    const fresh = t.data.lines.filter((l) => l.endMs > this.cursorMs);
+    if (fresh.length === 0) return null;
+    const newCursor = Math.max(...fresh.map((l) => l.endMs));
+    let current = await this.deps.getNotes(this.sessionId);
+    for (let attempt = 0; attempt < 2; attempt++) {
+      if (current.status === "error") throw new Error(current.error.message);
+      const merged = await this.merge(current.data.contentMd, fresh);
+      const saved = await this.deps.saveNotes(this.sessionId, merged, current.data.version);
+      if (saved.status === "ok") {
+        this.cursorMs = newCursor;
+        this.onNotes(saved.data);
+        return (await this.trackAgenda(saved.data.agenda, fresh)) ?? saved.data;
+      }
+      if (saved.error.code !== "VERSION_CONFLICT") throw new Error(saved.error.message);
+      // Someone saved first: merge the same new lines into their notes.
+      current = await this.deps.getNotes(this.sessionId);
+    }
+    throw new Error("The notes kept changing; will try again next time.");
+  }
+
+  /**
+   * Moves the agenda on from the new lines (PRD MEM-2). A failure here never
+   * fails the notes update: the agenda just stays as it was.
+   */
+  private async trackAgenda(agenda: AgendaItem[], lines: TranscriptLine[]): Promise<Notes | null> {
+    if (agenda.length === 0) return null;
+    let proposed = null;
+    try {
+      const plan = this.models();
+      const raw = await complete(
+        this.deps,
+        plan.provider,
+        {
+          model: plan.cue,
+          system: AGENDA_SYSTEM,
+          messages: [
+            { role: "user", content: agendaPrompt(agenda, lines.map(lineText).join("\n")) },
+          ],
+          maxTokens: 300,
+          effort: "low",
+        },
+        "agenda",
+      );
+      proposed = parseAgendaReply(raw, agenda);
+    } catch {
+      // Fall back to keywords below.
+    }
+    return this.applyAgenda(agendaUpdates(agenda, proposed ?? matchAgenda(agenda, lines)));
+  }
+
+  private async applyAgenda(updates: AgendaUpdate[]): Promise<Notes | null> {
+    if (updates.length === 0) return null;
+    const r = await this.deps.updateAgenda(this.sessionId, updates);
+    if (r.status === "error") return null;
+    this.onNotes(r.data);
+    return r.data;
   }
 
   private merge(notes: string, lines: TranscriptLine[]): Promise<string> {
@@ -168,6 +233,7 @@ export class NotesJob {
     ]);
     if (t.status === "error") throw new Error(t.error.message);
     if (n.status === "error") throw new Error(n.error.message);
+    await this.applyAgenda(closeAgenda(n.data.agenda));
     let transcript = t.data.lines.map(lineText).join("\n");
     if (transcript.length > SUMMARY_TRANSCRIPT_CHARS)
       // The notes cover the start; keep the end of the transcript.

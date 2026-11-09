@@ -32,7 +32,12 @@ export const config: WebdriverIO.Config = {
   runner: "local",
   specs: llmFails
     ? ["./specs/llm-failure.e2e.ts"]
-    : ["./specs/session.e2e.ts", "./specs/screenshot.e2e.ts", "./specs/settings.e2e.ts"],
+    : [
+        "./specs/session.e2e.ts",
+        "./specs/meeting-memory.e2e.ts",
+        "./specs/screenshot.e2e.ts",
+        "./specs/settings.e2e.ts",
+      ],
   maxInstances: 1,
   // Typed loosely: the service reads these keys, its published types lag behind.
   capabilities: [

@@ -1,6 +1,6 @@
-//! SQL for `notes` and `action_items` (tech doc 4.2; PRD MEM-1, MEM-3):
-//! rolling notes with an optimistic version check, and the end-of-session
-//! summary with its action items.
+//! SQL for `notes`, `action_items` and `agenda_items` (tech doc 4.2; PRD
+//! MEM-1 to MEM-4): rolling notes with an optimistic version check, the
+//! end-of-session summary with its action items, and the session's agenda.
 
 use rusqlite::{OptionalExtension, params};
 use serde::{Deserialize, Serialize};
@@ -21,7 +21,60 @@ pub struct Notes {
     /// Summary and decisions, written when the session ends.
     pub summary_md: Option<String>,
     pub action_items: Vec<ActionItem>,
+    /// The agenda, in order (PRD MEM-2).
+    pub agenda: Vec<AgendaItem>,
 }
+
+/// Where the meeting is with an agenda item (PRD MEM-2).
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[cfg_attr(feature = "specta", derive(specta::Type))]
+#[serde(rename_all = "snake_case")]
+pub enum AgendaStatus {
+    NotStarted,
+    InProgress,
+    Covered,
+}
+
+impl AgendaStatus {
+    fn as_str(self) -> &'static str {
+        match self {
+            Self::NotStarted => "not_started",
+            Self::InProgress => "in_progress",
+            Self::Covered => "covered",
+        }
+    }
+
+    fn parse(s: &str) -> Self {
+        match s {
+            "in_progress" => Self::InProgress,
+            "covered" => Self::Covered,
+            _ => Self::NotStarted,
+        }
+    }
+}
+
+/// One agenda item.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[cfg_attr(feature = "specta", derive(specta::Type))]
+#[serde(rename_all = "camelCase")]
+pub struct AgendaItem {
+    pub id: String,
+    pub text: String,
+    pub status: AgendaStatus,
+}
+
+/// A status change for one agenda item.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[cfg_attr(feature = "specta", derive(specta::Type))]
+#[serde(rename_all = "camelCase")]
+pub struct AgendaUpdate {
+    pub id: String,
+    pub status: AgendaStatus,
+}
+
+/// Most agenda items a session can have, and the longest item.
+pub const MAX_AGENDA_ITEMS: usize = 30;
+pub const MAX_AGENDA_TEXT: usize = 200;
 
 /// One action item from the summary (PRD MEM-3).
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -98,13 +151,114 @@ pub fn get(db: &Database, session_id: &str) -> SidekickResult<Notes> {
         .map_err(|e| db_err("reading action items", &e))?
         .collect::<Result<Vec<_>, _>>()
         .map_err(|e| db_err("reading action items", &e))?;
+    let mut stmt = db
+        .conn()
+        .prepare(
+            "SELECT id, text, status FROM agenda_items WHERE session_id = ?1 ORDER BY position",
+        )
+        .map_err(|e| db_err("reading the agenda", &e))?;
+    let agenda = stmt
+        .query_map([session_id], |r| {
+            Ok(AgendaItem {
+                id: r.get(0)?,
+                text: r.get(1)?,
+                status: AgendaStatus::parse(&r.get::<_, String>(2)?),
+            })
+        })
+        .map_err(|e| db_err("reading the agenda", &e))?
+        .collect::<Result<Vec<_>, _>>()
+        .map_err(|e| db_err("reading the agenda", &e))?;
     Ok(Notes {
         content_md,
         version,
         updated_at,
         summary_md,
         action_items,
+        agenda,
     })
+}
+
+/// Replaces the agenda with `items` (blank lines dropped). An item whose text
+/// was already on the agenda keeps its id and status.
+pub fn set_agenda(db: &mut Database, session_id: &str, items: &[String]) -> SidekickResult<Notes> {
+    session_exists(db, session_id)?;
+    let items: Vec<&str> = items
+        .iter()
+        .map(|i| i.trim())
+        .filter(|i| !i.is_empty())
+        .collect();
+    if items.len() > MAX_AGENDA_ITEMS || items.iter().any(|i| i.chars().count() > MAX_AGENDA_TEXT) {
+        return Err(SidekickError::internal(format!(
+            "An agenda can have up to {MAX_AGENDA_ITEMS} items of up to {MAX_AGENDA_TEXT} characters."
+        )));
+    }
+    let existing = get(db, session_id)?.agenda;
+    let tx = db
+        .conn_mut()
+        .transaction()
+        .map_err(|e| db_err("saving the agenda", &e))?;
+    tx.execute(
+        "DELETE FROM agenda_items WHERE session_id = ?1",
+        [session_id],
+    )
+    .map_err(|e| db_err("saving the agenda", &e))?;
+    for (position, text) in items.iter().enumerate() {
+        let kept = existing.iter().find(|a| a.text == *text);
+        let id = kept.map_or_else(|| uuid::Uuid::now_v7().to_string(), |a| a.id.clone());
+        let status = kept.map_or(AgendaStatus::NotStarted, |a| a.status);
+        tx.execute(
+            "INSERT INTO agenda_items (id, session_id, position, text, status) VALUES (?1, ?2, ?3, ?4, ?5)",
+            params![id, session_id, i64::try_from(position).unwrap_or(i64::MAX), text, status.as_str()],
+        )
+        .map_err(|e| db_err("saving the agenda", &e))?;
+    }
+    tx.commit().map_err(|e| db_err("saving the agenda", &e))?;
+    get(db, session_id)
+}
+
+/// Sets the status of agenda items; ids not on this session's agenda are ignored.
+pub fn update_agenda(
+    db: &mut Database,
+    session_id: &str,
+    updates: &[AgendaUpdate],
+) -> SidekickResult<Notes> {
+    session_exists(db, session_id)?;
+    let tx = db
+        .conn_mut()
+        .transaction()
+        .map_err(|e| db_err("updating the agenda", &e))?;
+    for u in updates {
+        tx.execute(
+            "UPDATE agenda_items SET status = ?3 WHERE session_id = ?1 AND id = ?2",
+            params![session_id, u.id, u.status.as_str()],
+        )
+        .map_err(|e| db_err("updating the agenda", &e))?;
+    }
+    tx.commit().map_err(|e| db_err("updating the agenda", &e))?;
+    get(db, session_id)
+}
+
+/// Ticks an action item off (or back on).
+pub fn set_action_item_done(
+    db: &Database,
+    session_id: &str,
+    item_id: &str,
+    done: bool,
+) -> SidekickResult<Notes> {
+    session_exists(db, session_id)?;
+    let changed = db
+        .conn()
+        .execute(
+            "UPDATE action_items SET done = ?3 WHERE session_id = ?1 AND id = ?2",
+            params![session_id, item_id, done],
+        )
+        .map_err(|e| db_err("updating the action item", &e))?;
+    if changed == 0 {
+        return Err(SidekickError::internal(
+            "That action item no longer exists.",
+        ));
+    }
+    get(db, session_id)
 }
 
 /// Saves rolling notes if `version` is still the current one (0 for the

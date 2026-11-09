@@ -1,5 +1,12 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import type { LlmRequest, NewActionItem, Notes, TranscriptLine } from "@/ipc";
+import type {
+  AgendaItem,
+  AgendaUpdate,
+  LlmRequest,
+  NewActionItem,
+  Notes,
+  TranscriptLine,
+} from "@/ipc";
 import { mockAnswerBus } from "@/ipc/testing";
 import { NotesJob, parseSummary, type NotesDeps } from "./notes";
 
@@ -11,7 +18,14 @@ function line(id: number, text: string, endMs: number): TranscriptLine {
 
 function fakeDeps(reply: (req: LlmRequest) => string) {
   const lines: TranscriptLine[] = [];
-  let notes: Notes = { contentMd: "", version: 0, updatedAt: 0, summaryMd: null, actionItems: [] };
+  let notes: Notes = {
+    contentMd: "",
+    version: 0,
+    updatedAt: 0,
+    summaryMd: null,
+    actionItems: [],
+    agenda: [],
+  };
   const requests: LlmRequest[] = [];
   const deps: NotesDeps = {
     events: mockAnswerBus.events,
@@ -49,6 +63,16 @@ function fakeDeps(reply: (req: LlmRequest) => string) {
         ...notes,
         summaryMd,
         actionItems: items.map((i, n) => ({ ...i, id: `i${n}`, done: false })),
+      };
+      return Promise.resolve({ status: "ok" as const, data: { ...notes } });
+    }),
+    updateAgenda: vi.fn((_s: string, updates: AgendaUpdate[]) => {
+      notes = {
+        ...notes,
+        agenda: notes.agenda.map((a) => {
+          const u = updates.find((x) => x.id === a.id);
+          return u ? { ...a, status: u.status } : a;
+        }),
       };
       return Promise.resolve({ status: "ok" as const, data: { ...notes } });
     }),
@@ -181,5 +205,114 @@ describe("parseSummary", () => {
 
   it("falls back to the raw text", () => {
     expect(parseSummary("Just prose.")).toEqual({ summaryMd: "Just prose.", actionItems: [] });
+  });
+});
+
+describe("NotesJob agenda (PRD MEM-2)", () => {
+  beforeEach(() => vi.restoreAllMocks());
+  const first: AgendaItem = { id: "a1", text: "Pro tier pricing", status: "not_started" };
+  const second: AgendaItem = { id: "a2", text: "Dashboard", status: "not_started" };
+  const agenda = [first, second, { id: "a3", text: "Hiring", status: "not_started" as const }];
+
+  it("uses the model's statuses when its reply is valid", async () => {
+    const f = fakeDeps((req) =>
+      req.system?.includes("agenda")
+        ? '{"agenda": [{"n": 1, "status": "covered"}, {"n": 3, "status": "in_progress"}]}'
+        : "## Topics\n- x",
+    );
+    f.setNotes({ agenda });
+    f.lines.push(line(1, "Anything at all", 1000));
+    const n = await new NotesJob(f.deps, "s1", plan, () => {}).tick();
+    expect(n?.agenda.map((a) => a.status)).toEqual(["covered", "not_started", "in_progress"]);
+    const agendaReq = f.requests.find((r) => r.system?.includes("agenda"));
+    expect(agendaReq?.messages[0]?.content).toContain("1. [not_started] Pro tier pricing");
+    expect(agendaReq?.model).toBe("small");
+  });
+
+  it("falls back to keywords when the reply can't be read", async () => {
+    const f = fakeDeps(() => "not json");
+    f.setNotes({ agenda });
+    f.lines.push(line(1, "What's the rate limit for the Pro tier?", 1000));
+    const job = new NotesJob(f.deps, "s1", plan, () => {});
+    let n = await job.tick();
+    expect(n?.agenda.map((a) => a.status)).toEqual(["in_progress", "not_started", "not_started"]);
+    f.lines.push(line(2, "Let's also look at the dashboard.", 2000));
+    n = await job.tick();
+    expect(n?.agenda.map((a) => a.status)).toEqual(["covered", "in_progress", "not_started"]);
+  });
+
+  it("skips the agenda call without an agenda, and a failing agenda never fails the notes", async () => {
+    const f = fakeDeps(() => "## Topics\n- x");
+    f.lines.push(line(1, "Hello", 1000));
+    await new NotesJob(f.deps, "s1", plan, () => {}).tick();
+    expect(f.requests).toHaveLength(1);
+    expect(f.deps.updateAgenda).not.toHaveBeenCalled();
+
+    const g = fakeDeps(() => "## Topics\n- y");
+    g.setNotes({ agenda });
+    vi.mocked(g.deps.updateAgenda).mockResolvedValue({
+      status: "error",
+      error: { code: "DB_ERROR", message: "boom", retryable: false },
+    });
+    g.lines.push(line(1, "The dashboard is slow", 1000));
+    const n = await new NotesJob(g.deps, "s1", plan, () => {}).tick();
+    expect(n?.contentMd).toBe("## Topics\n- y");
+  });
+
+  it("covers the item in progress when the meeting ends", async () => {
+    const f = fakeDeps(() => '{"summary": "Done.", "decisions": [], "actionItems": []}');
+    f.setNotes({ agenda: [{ ...first, status: "in_progress" }, second] });
+    f.lines.push(line(1, "Bye", 1000));
+    const n = await new NotesJob(f.deps, "s1", plan, () => {}).summarize();
+    expect(n.agenda.map((a) => a.status)).toEqual(["covered", "not_started"]);
+  });
+
+  it("asks for live action items with owner and due date (PRD MEM-4)", async () => {
+    const f = fakeDeps(() => "## Topics\n- x");
+    f.lines.push(line(1, "Priya will send the quote by Friday", 1000));
+    await new NotesJob(f.deps, "s1", plan, () => {}).tick();
+    expect(f.requests[0]?.system).toContain("## Action items");
+    expect(f.requests[0]?.system).toContain("Owner: task (due");
+  });
+});
+
+describe("NotesJob catch-up when the meeting ends", () => {
+  beforeEach(() => vi.restoreAllMocks());
+
+  it("waits for an update in progress, then closes the agenda it set", async () => {
+    // Slow model: the scheduled update is still running when the meeting ends.
+    let release!: () => void;
+    const gate = new Promise<void>((r) => (release = r));
+    const f = fakeDeps((req) =>
+      req.system?.includes("recap")
+        ? '{"summary": "Done.", "decisions": [], "actionItems": []}'
+        : "## Topics\n- x",
+    );
+    const slowNotes = f.deps.getNotes;
+    let first = true;
+    f.deps.getNotes = vi.fn(async (id: string) => {
+      if (first) {
+        first = false;
+        await gate;
+      }
+      return slowNotes(id);
+    });
+    f.setNotes({
+      agenda: [
+        { id: "a1", text: "Pro tier pricing", status: "not_started" },
+        { id: "a2", text: "Dashboard", status: "not_started" },
+      ],
+    });
+    f.lines.push(line(1, "What's the rate limit for the Pro tier?", 1000));
+    f.lines.push(line(2, "Let's also look at the dashboard.", 2000));
+    const job = new NotesJob(f.deps, "s1", plan, () => {});
+
+    const scheduled = job.tick(); // in progress
+    expect(await job.tick()).toBeNull(); // a plain tick still skips
+    const ending = job.catchUp().then(() => job.summarize());
+    release();
+    await scheduled;
+    const n = await ending;
+    expect(n.agenda.map((a) => a.status)).toEqual(["covered", "covered"]);
   });
 });

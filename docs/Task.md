@@ -90,7 +90,7 @@ All Phase 0 code and automated tests are done and green on Linux, Windows and ma
 
 | ID | Task | Status | Notes |
 | --- | --- | --- | --- |
-| T-041 | Meeting memory extras: agenda, recap, action items | ⬜ To do | |
+| T-041 | Meeting memory extras: agenda, recap, action items | 🟡 In progress: testing | 🖥️ Built with unit, Playwright and E2E tests. Needs a real-model check of agenda and recap quality (T-039) |
 | T-042 | Answer follow-up chips | ⬜ To do | |
 | T-043 | Screenshot quick actions and strip | ⬜ To do | |
 | T-044 | Pre-meeting brief and Knowledge Packs | ⬜ To do | |
@@ -617,6 +617,22 @@ Each P1 task gets full scope and tests when it moves to In progress.
 | T-046 | KEY-8, KEY-9; T-003 (P2) | Unit: Tavily and Brave adapters; Integration: per-session override |
 | T-047 | LIS-5 | Unit: vocabulary passed to each STT provider |
 | T-048 | UI-5, UI-8 | Manual: click-through on both OSes; axe: each theme passes contrast |
+
+### T-041 Meeting memory extras: agenda, recap, action items
+
+**Refs:** PRD MEM-2, MEM-3, MEM-4; TECHNICAL.md 3.3, 4.2, 6.5
+**Scope**
+- [x] Agenda per session (`agenda_items`, migration 0004): add or edit one item per line in the Notes tab; each item Not yet / In progress / Covered, settable by hand; "n/m covered".
+- [x] The notes job moves the agenda on after each update: fast-model JSON statuses, keyword fallback when the reply can't be read; statuses only move forward; ending the session covers the item in progress.
+- [x] "What did I miss?": recap of the last 2, 5 or 10 minutes (counted back from the newest line) with the fast model; no call when nothing was said.
+- [x] Action items: live in the rolling notes ("Owner: task (due …)"); stored with owner and due in the summary; can be ticked off (`set_action_item_done`).
+**Tests**
+- [x] Rust: agenda keeps id and status across edits, limits, unknown ids ignored, deleted with the session; action items tick off.
+- [x] Unit (Vitest): keyword matching, model reply parsing, forward-only updates, end-of-meeting close, recap window and prompt, live action items in the notes prompt.
+- [x] Component: agenda add/edit/status/error, recap window and dismiss, action item checkbox, axe.
+- [x] Playwright (`tests/ui/meeting-memory.spec.ts`): agenda moves and closes when the session ends, recap, action items, axe.
+- [x] E2E (`tests/e2e/specs/meeting-memory.e2e.ts`): agenda stored, moved by the notes job and closed on End in the real app; recap of the fixture transcript.
+- [ ] Manual 🖥️: agenda and recap quality with a real model (T-039).
 
 ### T-049 Glass overlay: translucent background, crisp text
 

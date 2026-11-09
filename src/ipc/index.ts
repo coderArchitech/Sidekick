@@ -52,6 +52,9 @@ export type { SessionEvents } from "./sessionEvents";
 import type { Unlisten } from "./answerEvents";
 export type {
   ActionItem,
+  AgendaItem,
+  AgendaStatus,
+  AgendaUpdate,
   AnswerFormat,
   FieldError,
   ImportPreview,

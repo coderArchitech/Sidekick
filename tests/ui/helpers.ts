@@ -69,6 +69,11 @@ interface SidekickTest {
       id: string,
     ): Promise<{ status: "ok"; data: { lines: { endMs: number }[] } } | { status: "error" }>;
     updateSettings(p: unknown): Promise<unknown>;
+    saveSummary(
+      id: string,
+      summaryMd: string,
+      items: { text: string; owner: string | null; due: string | null }[],
+    ): Promise<unknown>;
   };
   transcriptLine(
     id: string,
