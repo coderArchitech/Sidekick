@@ -72,6 +72,18 @@ pub fn builder() -> Builder<tauri::Wry> {
             commands::documents::ingest_url,
             commands::documents::list_documents,
             commands::documents::delete_document,
+            commands::packs::create_pack,
+            commands::packs::rename_pack,
+            commands::packs::delete_pack,
+            commands::packs::list_packs,
+            commands::packs::list_pack_documents,
+            commands::packs::ingest_pack_document,
+            commands::packs::ingest_pack_url,
+            commands::packs::list_session_packs,
+            commands::packs::set_session_packs,
+            commands::packs::brief_material,
+            commands::packs::get_brief,
+            commands::packs::save_brief,
             commands::retrieval::retrieve_context,
         ])
         .events(collect_events![

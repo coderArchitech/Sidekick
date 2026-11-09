@@ -1,4 +1,5 @@
-//! Vector and keyword search over one session's chunks.
+//! Vector and keyword search over one session's chunks and the Knowledge
+//! Packs attached to it (PRD CTX-5).
 
 use rusqlite::params;
 use sidekick_core::{ErrorCode, SidekickError, SidekickResult};
@@ -19,9 +20,25 @@ fn db_err(context: &str, e: &rusqlite::Error) -> SidekickError {
     )
 }
 
-/// Closest chunks by cosine distance among the session's ready documents.
-/// The vector index is partitioned by owner, so only this session's vectors
-/// are scanned and other sessions can never leak in.
+/// The vector partitions a session may read: its own and its attached packs'.
+fn owners(db: &Database, session_id: &str) -> SidekickResult<Vec<String>> {
+    let mut stmt = db
+        .conn()
+        .prepare_cached("SELECT pack_id FROM session_packs WHERE session_id = ?1")
+        .map_err(|e| db_err("reading session packs", &e))?;
+    let packs: Vec<String> = stmt
+        .query_map([session_id], |r| r.get(0))
+        .map_err(|e| db_err("reading session packs", &e))?
+        .collect::<Result<_, _>>()
+        .map_err(|e| db_err("reading session packs", &e))?;
+    Ok(std::iter::once(vectors::session_owner(session_id))
+        .chain(packs.iter().map(|p| vectors::pack_owner(p)))
+        .collect())
+}
+
+/// Closest chunks by cosine distance among the session's ready documents and
+/// those of its attached packs. The vector index is partitioned by owner, so
+/// only those partitions are scanned and other sessions can never leak in.
 pub fn vector(
     db: &Database,
     session_id: &str,
@@ -31,7 +48,12 @@ pub fn vector(
     if !vectors::exists(db)? {
         return Ok(Vec::new());
     }
-    let hits = vectors::nearest(db, &vectors::session_owner(session_id), query, k)?;
+    let mut hits = Vec::new();
+    for owner in owners(db, session_id)? {
+        hits.extend(vectors::nearest(db, &owner, query, k)?);
+    }
+    hits.sort_by(|a, b| a.1.total_cmp(&b.1));
+    hits.truncate(k);
     // Drop chunks of documents that are still embedding or failed.
     let mut ready = db
         .conn()
@@ -75,7 +97,8 @@ pub fn fts_query(text: &str) -> Option<String> {
     }
 }
 
-/// Best keyword matches (BM25) among ready documents of the session.
+/// Best keyword matches (BM25) among ready documents of the session and its
+/// attached packs.
 pub fn keyword(db: &Database, session_id: &str, text: &str, k: usize) -> SidekickResult<Vec<Hit>> {
     let Some(q) = fts_query(text) else {
         return Ok(Vec::new());
@@ -87,7 +110,9 @@ pub fn keyword(db: &Database, session_id: &str, text: &str, k: usize) -> Sidekic
              FROM chunks_fts
              JOIN chunks c ON c.id = chunks_fts.rowid
              JOIN documents doc ON doc.id = c.document_id
-             WHERE chunks_fts MATCH ?1 AND doc.session_id = ?2 AND doc.status = 'ready'
+             WHERE chunks_fts MATCH ?1 AND doc.status = 'ready'
+               AND (doc.session_id = ?2
+                    OR doc.pack_id IN (SELECT pack_id FROM session_packs WHERE session_id = ?2))
              ORDER BY s DESC LIMIT ?3",
         )
         .map_err(|e| db_err("searching documents", &e))?;

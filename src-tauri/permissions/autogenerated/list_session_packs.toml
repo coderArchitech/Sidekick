@@ -1,0 +1,11 @@
+# Automatically generated - DO NOT EDIT!
+
+[[permission]]
+identifier = "allow-list-session-packs"
+description = "Enables the list_session_packs command without any pre-configured scope."
+commands.allow = ["list_session_packs"]
+
+[[permission]]
+identifier = "deny-list-session-packs"
+description = "Denies the list_session_packs command without any pre-configured scope."
+commands.deny = ["list_session_packs"]

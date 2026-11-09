@@ -25,5 +25,6 @@ export { NOTES_INTERVAL_MS, NotesJob, parseSummary, type NotesDeps } from "./not
 export { useNotesStore, type NotesActivity } from "./notesStore";
 export { useNotes } from "./useNotes";
 export { agendaUpdates, keywords, matchAgenda, mentions, parseAgendaReply } from "./agenda";
+export { BRIEF_SYSTEM, NO_MATERIAL, briefPrompt, writeBrief, type BriefDeps } from "./brief";
 export { RECAP_MINUTES, recap, recapWindow, type RecapMinutes } from "./recap";
 export { nextSkillId, skillFor, useSkillsStore } from "./skills";

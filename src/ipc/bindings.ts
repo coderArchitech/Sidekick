@@ -660,6 +660,144 @@ export const commands = {
       else return { status: "error", error: e as any };
     }
   },
+  /**
+   * Creates an empty pack.
+   */
+  async createPack(name: string): Promise<Result<PackInfo, SidekickError>> {
+    try {
+      return { status: "ok", data: await TAURI_INVOKE("create_pack", { name }) };
+    } catch (e) {
+      if (e instanceof Error) throw e;
+      else return { status: "error", error: e as any };
+    }
+  },
+  /**
+   * Renames a pack.
+   */
+  async renamePack(packId: string, name: string): Promise<Result<PackInfo, SidekickError>> {
+    try {
+      return { status: "ok", data: await TAURI_INVOKE("rename_pack", { packId, name }) };
+    } catch (e) {
+      if (e instanceof Error) throw e;
+      else return { status: "error", error: e as any };
+    }
+  },
+  /**
+   * Deletes a pack with its documents; sessions that used it no longer do.
+   */
+  async deletePack(packId: string): Promise<Result<null, SidekickError>> {
+    try {
+      return { status: "ok", data: await TAURI_INVOKE("delete_pack", { packId }) };
+    } catch (e) {
+      if (e instanceof Error) throw e;
+      else return { status: "error", error: e as any };
+    }
+  },
+  /**
+   * All packs, by name, with document counts.
+   */
+  async listPacks(): Promise<Result<PackInfo[], SidekickError>> {
+    try {
+      return { status: "ok", data: await TAURI_INVOKE("list_packs") };
+    } catch (e) {
+      if (e instanceof Error) throw e;
+      else return { status: "error", error: e as any };
+    }
+  },
+  /**
+   * A pack's documents.
+   */
+  async listPackDocuments(packId: string): Promise<Result<DocumentInfo[], SidekickError>> {
+    try {
+      return { status: "ok", data: await TAURI_INVOKE("list_pack_documents", { packId }) };
+    } catch (e) {
+      if (e instanceof Error) throw e;
+      else return { status: "error", error: e as any };
+    }
+  },
+  /**
+   * Queues a file for a pack.
+   */
+  async ingestPackDocument(packId: string, path: string): Promise<Result<null, SidekickError>> {
+    try {
+      return { status: "ok", data: await TAURI_INVOKE("ingest_pack_document", { packId, path }) };
+    } catch (e) {
+      if (e instanceof Error) throw e;
+      else return { status: "error", error: e as any };
+    }
+  },
+  /**
+   * Queues a web page for a pack.
+   */
+  async ingestPackUrl(packId: string, url: string): Promise<Result<null, SidekickError>> {
+    try {
+      return { status: "ok", data: await TAURI_INVOKE("ingest_pack_url", { packId, url }) };
+    } catch (e) {
+      if (e instanceof Error) throw e;
+      else return { status: "error", error: e as any };
+    }
+  },
+  /**
+   * The packs attached to a session.
+   */
+  async listSessionPacks(sessionId: string): Promise<Result<string[], SidekickError>> {
+    try {
+      return { status: "ok", data: await TAURI_INVOKE("list_session_packs", { sessionId }) };
+    } catch (e) {
+      if (e instanceof Error) throw e;
+      else return { status: "error", error: e as any };
+    }
+  },
+  /**
+   * Replaces the packs attached to a session; answers then search them too.
+   */
+  async setSessionPacks(
+    sessionId: string,
+    packIds: string[],
+  ): Promise<Result<string[], SidekickError>> {
+    try {
+      return {
+        status: "ok",
+        data: await TAURI_INVOKE("set_session_packs", { sessionId, packIds }),
+      };
+    } catch (e) {
+      if (e instanceof Error) throw e;
+      else return { status: "error", error: e as any };
+    }
+  },
+  /**
+   * The start of every ready document of the session and its packs, for the brief.
+   */
+  async briefMaterial(sessionId: string): Promise<Result<BriefSource[], SidekickError>> {
+    try {
+      return { status: "ok", data: await TAURI_INVOKE("brief_material", { sessionId }) };
+    } catch (e) {
+      if (e instanceof Error) throw e;
+      else return { status: "error", error: e as any };
+    }
+  },
+  /**
+   * The session's saved brief, if any.
+   */
+  async getBrief(sessionId: string): Promise<Result<Brief | null, SidekickError>> {
+    try {
+      return { status: "ok", data: await TAURI_INVOKE("get_brief", { sessionId }) };
+    } catch (e) {
+      if (e instanceof Error) throw e;
+      else return { status: "error", error: e as any };
+    }
+  },
+  /**
+   * Saves the session's brief (written by the overlay).
+   */
+  async saveBrief(sessionId: string, contentMd: string): Promise<Result<Brief, SidekickError>> {
+    try {
+      return { status: "ok", data: await TAURI_INVOKE("save_brief", { sessionId, contentMd }) };
+    } catch (e) {
+      if (e instanceof Error) throw e;
+      else return { status: "error", error: e as any };
+    }
+  },
   async retrieveContext(
     sessionId: string,
     query: string,
@@ -752,6 +890,21 @@ export type Binding = { action: Action; keys: string };
  * A moment the user marked (PRD 5 "Bookmarks").
  */
 export type Bookmark = { id: string; atMs: number; label: string | null };
+/**
+ * A saved brief.
+ */
+export type Brief = { contentMd: string; createdAt: number };
+/**
+ * One document's excerpt.
+ */
+export type BriefSource = {
+  documentName: string;
+  /**
+   * The Knowledge Pack it comes from, if any.
+   */
+  packName: string | null;
+  text: string;
+};
 /**
  * What to capture.
  */
@@ -1045,6 +1198,16 @@ export type OverlayPrefs = {
    * One per monitor, most recent first (managed by the app shell).
    */
   positions: SavedPosition[];
+};
+/**
+ * A pack with its document counts.
+ */
+export type PackInfo = {
+  id: string;
+  name: string;
+  createdAt: number;
+  documents: number;
+  ready: number;
 };
 /**
  * Who the user is, for directed questions and STT boosts (PRD QA-2, LIS-5a).

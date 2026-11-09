@@ -1,0 +1,11 @@
+# Automatically generated - DO NOT EDIT!
+
+[[permission]]
+identifier = "allow-save-brief"
+description = "Enables the save_brief command without any pre-configured scope."
+commands.allow = ["save_brief"]
+
+[[permission]]
+identifier = "deny-save-brief"
+description = "Denies the save_brief command without any pre-configured scope."
+commands.deny = ["save_brief"]

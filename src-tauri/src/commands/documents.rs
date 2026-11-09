@@ -11,10 +11,10 @@ use tauri_specta::Event;
 use crate::events::IngestProgress;
 use crate::state::AppState;
 
-fn start(
+pub(crate) fn start(
     app: AppHandle,
     state: &AppState,
-    session_id: String,
+    owner: Owner,
     source: Source,
 ) -> SidekickResult<()> {
     // Resolve the embedder now so a missing key is reported immediately.
@@ -31,16 +31,7 @@ fn start(
     });
     tauri::async_runtime::spawn(async move {
         let _permit = slots.acquire_owned().await;
-        if let Err(e) = sidekick_ingest::ingest(
-            db,
-            Owner::Session(session_id),
-            source,
-            embedder,
-            key,
-            progress,
-        )
-        .await
-        {
+        if let Err(e) = sidekick_ingest::ingest(db, owner, source, embedder, key, progress).await {
             tracing::warn!(code = ?e.code, "document ingest failed");
         }
         drop(app);
@@ -57,7 +48,12 @@ pub fn ingest_document(
     session_id: String,
     path: String,
 ) -> SidekickResult<()> {
-    start(app, &state, session_id, Source::File(path.into()))
+    start(
+        app,
+        &state,
+        Owner::Session(session_id),
+        Source::File(path.into()),
+    )
 }
 
 /// Queues a web page (http/https) for ingest.
@@ -69,7 +65,7 @@ pub fn ingest_url(
     session_id: String,
     url: String,
 ) -> SidekickResult<()> {
-    start(app, &state, session_id, Source::Url(url))
+    start(app, &state, Owner::Session(session_id), Source::Url(url))
 }
 
 #[tauri::command]

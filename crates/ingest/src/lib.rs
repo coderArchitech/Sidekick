@@ -7,9 +7,11 @@
 
 pub mod chunk;
 pub mod html;
+pub mod packs;
 pub mod parse;
 pub mod pipeline;
 pub mod repo;
 
+pub use packs::PackInfo;
 pub use pipeline::{Owner, Progress, Source, ingest};
 pub use repo::{DocStatus, DocumentInfo};

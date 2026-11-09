@@ -10,6 +10,7 @@ import { DataSection } from "./DataSection";
 import { DiagnosticsPanel } from "./DiagnosticsPanel";
 import { ProfileSection } from "./ProfileSection";
 import { ProviderSection } from "./ProviderSection";
+import { PacksSection } from "@/features/packs";
 import { SkillsSection } from "@/features/skills";
 import { ShortcutsSection } from "./ShortcutsSection";
 
@@ -137,6 +138,7 @@ export function SettingsWindow() {
               </select>
             </section>
             <SkillsSection />
+            <PacksSection />
             <DataSection />
             <ShortcutsSection
               shortcuts={settings.shortcuts}

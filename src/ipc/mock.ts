@@ -5,7 +5,9 @@ import type {
   commands as tauriCommands,
   Bookmark,
   ConsentOption,
+  Brief,
   DocumentInfo,
+  PackInfo,
   NewAnswer,
   Session,
   TranscriptLine,
@@ -92,6 +94,32 @@ export const MOCK_IMAGE_URL = `data:image/svg+xml;base64,${btoa(
   '<svg xmlns="http://www.w3.org/2000/svg" width="1600" height="900"><defs><linearGradient id="g" x2="1" y2="1"><stop offset="0" stop-color="#1e293b"/><stop offset="1" stop-color="#0f766e"/></linearGradient></defs><rect width="1600" height="900" fill="url(#g)"/><rect x="120" y="120" width="900" height="560" rx="16" fill="#f8fafc"/><text x="160" y="220" font-size="56" font-family="monospace" fill="#b91c1c">TypeError: x is undefined</text></svg>',
 )}`;
 const documents = new Map<string, DocumentInfo[]>();
+/** Knowledge Packs; their documents live in `documents` under `pack:<id>`. */
+const packs = new Map<string, { id: string; name: string; createdAt: number }>();
+const sessionPacks = new Map<string, string[]>();
+const briefs = new Map<string, Brief>();
+let packSeq = 0;
+const packKey = (id: string) => `pack:${id}`;
+
+function packInfo(id: string): PackInfo | null {
+  const p = packs.get(id);
+  if (!p) return null;
+  const docs = documents.get(packKey(id)) ?? [];
+  return { ...p, documents: docs.length, ready: docs.filter((d) => d.status === "ready").length };
+}
+
+/** Ready documents a session can read: its own, then its attached packs' (like Rust). */
+function readableDocs(sessionId: string): (DocumentInfo & { packName: string | null })[] {
+  return [
+    ...(documents.get(sessionId) ?? []).map((d) => ({ ...d, packName: null })),
+    ...(sessionPacks.get(sessionId) ?? []).flatMap((id) =>
+      (documents.get(packKey(id)) ?? []).map((d) => ({
+        ...d,
+        packName: packs.get(id)?.name ?? null,
+      })),
+    ),
+  ].filter((d) => d.status === "ready");
+}
 /** Answers saved through `saveAnswer`, for assertions. */
 export const savedAnswers: {
   id: string;
@@ -321,6 +349,9 @@ export function resetMocks(): void {
   mockFiles.saveAs = [];
   bookmarks.clear();
   notesBySession.clear();
+  packs.clear();
+  sessionPacks.clear();
+  briefs.clear();
   mockSkills.reset();
   downloadedModels.clear();
   screenshots.length = 0;
@@ -870,8 +901,7 @@ export const mockCommands: Commands = {
       .toLowerCase()
       .split(/\W+/)
       .filter((w) => w.length > 2);
-    const chunks = (documents.get(sessionId) ?? [])
-      .filter((d) => d.status === "ready")
+    const chunks = readableDocs(sessionId)
       .map((d, i) => ({
         chunkId: i + 1,
         documentId: d.id,
@@ -895,6 +925,92 @@ export const mockCommands: Commands = {
           ) ?? null,
       },
     });
+  },
+  createPack: (name) => {
+    const n = name.trim();
+    if (!n || n.length > 100)
+      return Promise.resolve(err("INTERNAL", "Give the pack a name (up to 100 characters)."));
+    const id = `mock-pack-${++packSeq}`;
+    packs.set(id, { id, name: n, createdAt: Date.now() });
+    return Promise.resolve({ status: "ok", data: packInfo(id) as PackInfo });
+  },
+  renamePack: (packId, name) => {
+    const p = packs.get(packId);
+    const n = name.trim();
+    if (!p) return Promise.resolve(err("INTERNAL", "That Knowledge Pack no longer exists."));
+    if (!n || n.length > 100)
+      return Promise.resolve(err("INTERNAL", "Give the pack a name (up to 100 characters)."));
+    p.name = n;
+    return Promise.resolve({ status: "ok", data: packInfo(packId) as PackInfo });
+  },
+  deletePack: (packId) => {
+    packs.delete(packId);
+    documents.delete(packKey(packId));
+    for (const [s, ids] of sessionPacks)
+      sessionPacks.set(
+        s,
+        ids.filter((i) => i !== packId),
+      );
+    return Promise.resolve({ status: "ok", data: null });
+  },
+  listPacks: () =>
+    Promise.resolve({
+      status: "ok",
+      data: [...packs.keys()]
+        .map((id) => packInfo(id) as PackInfo)
+        .sort((a, b) => a.name.localeCompare(b.name, undefined, { sensitivity: "base" })),
+    }),
+  listPackDocuments: (packId) =>
+    Promise.resolve(
+      packs.has(packId)
+        ? { status: "ok", data: structuredClone(documents.get(packKey(packId)) ?? []) }
+        : err("INTERNAL", "That Knowledge Pack no longer exists."),
+    ),
+  ingestPackDocument: (packId, path) => {
+    if (!packs.has(packId))
+      return Promise.resolve(err("INTERNAL", "That Knowledge Pack no longer exists."));
+    const name = path.split(/[\\/]/).pop() ?? path;
+    return Promise.resolve(mockIngest(packKey(packId), name, 1000));
+  },
+  ingestPackUrl: (packId, url) => {
+    if (!packs.has(packId))
+      return Promise.resolve(err("INTERNAL", "That Knowledge Pack no longer exists."));
+    return Promise.resolve(
+      /^https?:\/\//.test(url)
+        ? mockIngest(packKey(packId), url, 1000)
+        : err("UNSUPPORTED_FILE", "Only http and https links can be added."),
+    );
+  },
+  listSessionPacks: (sessionId) =>
+    Promise.resolve({ status: "ok", data: [...(sessionPacks.get(sessionId) ?? [])] }),
+  setSessionPacks: (sessionId, packIds) => {
+    if (packIds.some((id) => !packs.has(id)))
+      return Promise.resolve(err("INTERNAL", "That Knowledge Pack no longer exists."));
+    if (!sessions.has(sessionId))
+      return Promise.resolve(err("INTERNAL", "That session no longer exists."));
+    const ids = [...new Set(packIds)].sort((a, b) =>
+      (packs.get(a)?.name ?? "").localeCompare(packs.get(b)?.name ?? ""),
+    );
+    sessionPacks.set(sessionId, ids);
+    return Promise.resolve({ status: "ok", data: [...ids] });
+  },
+  briefMaterial: (sessionId) =>
+    Promise.resolve({
+      status: "ok",
+      data: readableDocs(sessionId).map((d) => ({
+        documentName: d.name,
+        packName: d.packName,
+        text: `Mock content of ${d.name}.`,
+      })),
+    }),
+  getBrief: (sessionId) =>
+    Promise.resolve({ status: "ok", data: structuredClone(briefs.get(sessionId) ?? null) }),
+  saveBrief: (sessionId, contentMd) => {
+    if (!sessions.has(sessionId))
+      return Promise.resolve(err("INTERNAL", "That session no longer exists."));
+    const b = { contentMd, createdAt: Date.now() };
+    briefs.set(sessionId, b);
+    return Promise.resolve({ status: "ok", data: structuredClone(b) });
   },
   listDocuments: (sessionId) =>
     Promise.resolve({ status: "ok", data: structuredClone(documents.get(sessionId) ?? []) }),

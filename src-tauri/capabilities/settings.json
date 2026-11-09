@@ -1,7 +1,7 @@
 {
   "$schema": "../gen/schemas/desktop-schema.json",
   "identifier": "settings",
-  "description": "Settings window: providers, keys, models, settings, skills, usage, diagnostics, backup (tech doc 5.8). The only window that can touch API keys.",
+  "description": "Settings window: providers, keys, models, settings, skills, Knowledge Packs, usage, diagnostics, backup (tech doc 5.8). The only window that can touch API keys.",
   "windows": ["settings"],
   "permissions": [
     "core:default",
@@ -25,6 +25,14 @@
     "allow-import-skill",
     "allow-export-skill",
     "allow-delete-all-data",
+    "allow-create-pack",
+    "allow-rename-pack",
+    "allow-delete-pack",
+    "allow-list-packs",
+    "allow-list-pack-documents",
+    "allow-ingest-pack-document",
+    "allow-ingest-pack-url",
+    "allow-delete-document",
     "allow-log",
     "allow-export-logs",
     "dialog:allow-open",

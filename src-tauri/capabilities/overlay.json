@@ -49,6 +49,12 @@
     "allow-ingest-url",
     "allow-list-documents",
     "allow-delete-document",
+    "allow-list-packs",
+    "allow-list-session-packs",
+    "allow-set-session-packs",
+    "allow-brief-material",
+    "allow-get-brief",
+    "allow-save-brief",
     "allow-retrieve-context",
     "core:window:allow-start-dragging",
     "core:window:allow-set-always-on-top"

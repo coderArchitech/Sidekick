@@ -1,0 +1,11 @@
+# Automatically generated - DO NOT EDIT!
+
+[[permission]]
+identifier = "allow-ingest-pack-document"
+description = "Enables the ingest_pack_document command without any pre-configured scope."
+commands.allow = ["ingest_pack_document"]
+
+[[permission]]
+identifier = "deny-ingest-pack-document"
+description = "Denies the ingest_pack_document command without any pre-configured scope."
+commands.deny = ["ingest_pack_document"]

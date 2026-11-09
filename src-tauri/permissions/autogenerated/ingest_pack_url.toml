@@ -1,0 +1,11 @@
+# Automatically generated - DO NOT EDIT!
+
+[[permission]]
+identifier = "allow-ingest-pack-url"
+description = "Enables the ingest_pack_url command without any pre-configured scope."
+commands.allow = ["ingest_pack_url"]
+
+[[permission]]
+identifier = "deny-ingest-pack-url"
+description = "Denies the ingest_pack_url command without any pre-configured scope."
+commands.deny = ["ingest_pack_url"]
