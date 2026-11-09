@@ -26,6 +26,8 @@ pub fn builder() -> Builder<tauri::Wry> {
             commands::diagnostics::get_diagnostics,
             commands::diagnostics::record_latency,
             commands::session::create_session,
+            commands::search::web_search,
+            commands::session::session_provider_options,
             commands::session::confirm_consent,
             commands::session::start_session,
             commands::session::pause_session,

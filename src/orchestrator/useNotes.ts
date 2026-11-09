@@ -1,6 +1,6 @@
 import { useEffect, useRef } from "react";
 import { answerEvents, commands, type Session } from "@/ipc";
-import { modelPlan, type ModelPlan } from "./models";
+import { modelPlan, sessionPlan, type ModelPlan } from "./models";
 import { NOTES_INTERVAL_MS, NotesJob } from "./notes";
 import { useNotesStore } from "./notesStore";
 
@@ -13,6 +13,8 @@ import { useNotesStore } from "./notesStore";
 export function useNotes(session: Session | null, intervalMs = NOTES_INTERVAL_MS) {
   const sessionId = session?.id ?? null;
   const status = session?.status ?? null;
+  // The session's own answer provider (PRD KEY-9).
+  const llmProvider = session?.llmProvider ?? null;
   const job = useRef<NotesJob | null>(null);
   const sawActive = useRef(false);
 
@@ -21,9 +23,10 @@ export function useNotes(session: Session | null, intervalMs = NOTES_INTERVAL_MS
     job.current = null;
     sawActive.current = false;
     if (!sessionId) return;
-    let models: ModelPlan = modelPlan({ provider: "anthropic", model: null });
+    const own = llmProvider ? { llmProvider } : null;
+    let models: ModelPlan = modelPlan({ provider: llmProvider ?? "anthropic", model: null });
     void commands.getSettings().then((r) => {
-      if (r.status === "ok") models = modelPlan(r.data.llm);
+      if (r.status === "ok") models = sessionPlan(r.data.llm, own);
     });
     const current = (id: string) => useNotesStore.getState().sessionId === id;
     job.current = new NotesJob(
@@ -41,7 +44,7 @@ export function useNotes(session: Session | null, intervalMs = NOTES_INTERVAL_MS
     return () => {
       job.current = null;
     };
-  }, [sessionId]);
+  }, [sessionId, llmProvider]);
 
   useEffect(() => {
     const j = job.current;

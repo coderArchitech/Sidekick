@@ -14,7 +14,7 @@ function Harness() {
 const tick = (ms = 20) => act(() => new Promise((r) => setTimeout(r, ms)));
 
 async function liveSession() {
-  const s = await mockCommands.createSession("Hotkeys");
+  const s = await mockCommands.createSession("Hotkeys", null);
   if (s.status !== "ok") throw new Error("create");
   await mockCommands.confirmConsent(s.data.id, "me_only");
   const started = await mockCommands.startSession(s.data.id);

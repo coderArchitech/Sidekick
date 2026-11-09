@@ -9,8 +9,8 @@ describe("Settings → Your data", () => {
 
   it("deletes every session only after typing DELETE", async () => {
     const user = userEvent.setup();
-    await mockCommands.createSession("One");
-    await mockCommands.createSession("Two");
+    await mockCommands.createSession("One", null);
+    await mockCommands.createSession("Two", null);
     render(<DataSection />);
     await user.click(screen.getByRole("button", { name: "Delete everything…" }));
     const go = screen.getByRole("button", { name: "Delete all meeting data" });
@@ -27,7 +27,7 @@ describe("Settings → Your data", () => {
 
   it("cancel deletes nothing", async () => {
     const user = userEvent.setup();
-    await mockCommands.createSession("Keep me");
+    await mockCommands.createSession("Keep me", null);
     render(<DataSection />);
     await user.click(screen.getByRole("button", { name: "Delete everything…" }));
     await user.click(screen.getByRole("button", { name: "Cancel" }));

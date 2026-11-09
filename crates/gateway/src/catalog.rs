@@ -149,7 +149,7 @@ pub const PROVIDERS: &[ProviderInfo] = &[
         Search,
         "Tavily",
         true,
-        false,
+        true,
         "https://docs.tavily.com",
     ),
     p(
@@ -157,7 +157,7 @@ pub const PROVIDERS: &[ProviderInfo] = &[
         Search,
         "Brave Search",
         true,
-        false,
+        true,
         "https://brave.com/search/api",
     ),
 ];

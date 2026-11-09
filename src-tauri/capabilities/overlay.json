@@ -14,6 +14,8 @@
     "allow-cancel-stream",
     "allow-record-latency",
     "allow-create-session",
+    "allow-web-search",
+    "allow-session-provider-options",
     "allow-confirm-consent",
     "allow-start-session",
     "allow-pause-session",

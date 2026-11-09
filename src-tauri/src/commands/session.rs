@@ -4,7 +4,7 @@
 
 use std::sync::Arc;
 
-use serde::Serialize;
+use serde::{Deserialize, Serialize};
 use sidekick_audio::{Pacing, StreamKind};
 use sidekick_core::{ErrorCode, SidekickError, SidekickResult};
 use sidekick_session::model::{Action, transition};
@@ -37,26 +37,135 @@ pub(crate) fn changed(app: &AppHandle, session: &Session) {
     .emit(app);
 }
 
+/// Providers picked for one session instead of the Settings defaults (PRD KEY-9).
+#[derive(Debug, Clone, Default, Deserialize, specta::Type)]
+#[serde(rename_all = "camelCase")]
+pub struct SessionOverrides {
+    pub stt_provider: Option<String>,
+    pub llm_provider: Option<String>,
+}
+
+/// A provider the overlay may offer for a session; `ready` means its key is
+/// saved or it needs none. Key details never leave the Settings window.
+#[derive(Debug, Clone, Serialize, specta::Type)]
+#[serde(rename_all = "camelCase")]
+pub struct ProviderOption {
+    pub id: String,
+    pub name: String,
+    pub ready: bool,
+}
+
+#[derive(Debug, Clone, Serialize, specta::Type)]
+#[serde(rename_all = "camelCase")]
+pub struct SessionProviderOptions {
+    pub stt: Vec<ProviderOption>,
+    pub llm: Vec<ProviderOption>,
+    /// The Settings defaults.
+    pub default_stt: String,
+    pub default_llm: String,
+}
+
+/// Speech-to-text and answer providers the overlay can offer when creating a session.
+#[tauri::command]
+#[specta::specta]
+pub fn session_provider_options(
+    state: State<'_, AppState>,
+) -> SidekickResult<SessionProviderOptions> {
+    let settings = sidekick_settings::load(&state.db())?;
+    let options = |kind| -> SidekickResult<Vec<ProviderOption>> {
+        Ok(state
+            .gateway
+            .providers(kind)?
+            .into_iter()
+            .map(|p| ProviderOption {
+                id: p.info.id.to_owned(),
+                name: p.info.display_name.to_owned(),
+                ready: p.info.implemented && (state.mock || !p.info.key_required || p.key.saved),
+            })
+            .collect())
+    };
+    Ok(SessionProviderOptions {
+        stt: options(sidekick_gateway::ProviderKind::Stt)?,
+        llm: options(sidekick_gateway::ProviderKind::Llm)?,
+        default_stt: settings.stt.provider,
+        default_llm: settings.llm.provider,
+    })
+}
+
+/// Checks a per-session provider: known for that kind and ready to use.
+fn check_override(
+    state: &AppState,
+    kind: sidekick_gateway::ProviderKind,
+    id: &str,
+) -> SidekickResult<()> {
+    let p = state
+        .gateway
+        .providers(kind)?
+        .into_iter()
+        .find(|p| p.info.id == id)
+        .ok_or_else(|| {
+            SidekickError::internal(format!("Sidekick doesn't know the provider {id}."))
+        })?;
+    if !p.info.implemented {
+        return Err(SidekickError::internal(format!(
+            "{} isn't available in this version yet.",
+            p.info.display_name
+        )));
+    }
+    if !state.mock && p.info.key_required && !p.key.saved {
+        return Err(SidekickError::new(
+            ErrorCode::KeyMissing,
+            format!(
+                "Add your {} API key in Settings first.",
+                p.info.display_name
+            ),
+        ));
+    }
+    Ok(())
+}
+
 #[tauri::command]
 #[specta::specta]
 pub fn create_session(
     app: AppHandle,
     state: State<'_, AppState>,
     title: String,
+    overrides: Option<SessionOverrides>,
 ) -> SidekickResult<Session> {
+    let overrides = overrides.unwrap_or_default();
+    if let Some(id) = &overrides.stt_provider {
+        check_override(&state, sidekick_gateway::ProviderKind::Stt, id)?;
+    }
+    if let Some(id) = &overrides.llm_provider {
+        check_override(&state, sidekick_gateway::ProviderKind::Llm, id)?;
+    }
     let db = state.db();
     let settings = sidekick_settings::load(&db)?;
+    let stt_provider = overrides
+        .stt_provider
+        .as_deref()
+        .unwrap_or(&settings.stt.provider);
+    let llm_provider = overrides
+        .llm_provider
+        .as_deref()
+        .unwrap_or(&settings.llm.provider);
+    // Another provider than the default uses its own default model.
+    let llm_model = if llm_provider == settings.llm.provider {
+        settings
+            .llm
+            .model
+            .as_deref()
+            .unwrap_or(sidekick_gateway::DEFAULT_ANSWER_MODEL)
+    } else {
+        ""
+    };
     let session = repo::create(
         &db,
         &NewSession {
             title: &title,
-            stt_provider: &settings.stt.provider,
-            llm_provider: &settings.llm.provider,
-            llm_model: settings
-                .llm
-                .model
-                .as_deref()
-                .unwrap_or(sidekick_gateway::DEFAULT_ANSWER_MODEL),
+            stt_provider,
+            llm_provider,
+            llm_model,
             auto_answer: settings.auto_answer,
             retention: settings.retention,
         },
@@ -115,7 +224,17 @@ pub async fn start_session(
         }
         None => Box::new(DeviceAudio),
     };
-    let mut plan = stt_plan(&state, &settings.stt)?;
+    // The session's speech-to-text provider (PRD KEY-9); the Settings model
+    // choice applies when it is the default provider.
+    let choice = if session.stt_provider == settings.stt.provider {
+        settings.stt.clone()
+    } else {
+        ProviderChoice {
+            provider: session.stt_provider.clone(),
+            model: None,
+        }
+    };
+    let mut plan = stt_plan(&state, &choice)?;
     // Boost the user's name and nicknames so directed questions are heard (PRD LIS-5a).
     plan.keyterms = settings.profile.names();
     let sink = Arc::new(TauriSttSink::new(app.clone(), session_id.clone()));
@@ -363,4 +482,35 @@ pub fn list_answers(
     source: Option<sidekick_session::answers::QuestionSource>,
 ) -> SidekickResult<Vec<sidekick_session::answers::SavedAnswer>> {
     sidekick_session::answers::list(&state.db(), &session_id, source)
+}
+
+#[cfg(test)]
+mod tests {
+    use std::sync::Arc;
+
+    use sidekick_gateway::ProviderKind;
+    use sidekick_secrets::{KeyStore, MemoryStore, SecretString};
+
+    use super::*;
+
+    #[test]
+    fn a_session_override_must_be_known_and_have_its_key() {
+        let dir = tempfile::tempdir().unwrap();
+        let keys: Arc<dyn KeyStore> = Arc::new(MemoryStore::default());
+        let state =
+            AppState::init_with(Arc::clone(&keys), dir.path().to_path_buf(), false).unwrap();
+
+        let err = check_override(&state, ProviderKind::Llm, "bing").unwrap_err();
+        assert!(err.message.contains("doesn't know"), "{}", err.message);
+        // A speech-to-text id isn't an answer provider.
+        assert!(check_override(&state, ProviderKind::Llm, "deepgram").is_err());
+
+        let err = check_override(&state, ProviderKind::Llm, "openai").unwrap_err();
+        assert_eq!(err.code, ErrorCode::KeyMissing);
+        keys.set("openai", &SecretString::from("sk-test-1234".to_owned()))
+            .unwrap();
+        check_override(&state, ProviderKind::Llm, "openai").unwrap();
+        // Keyless local providers need nothing.
+        check_override(&state, ProviderKind::Llm, "ollama").unwrap();
+    }
 }

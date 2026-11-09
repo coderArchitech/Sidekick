@@ -95,7 +95,7 @@ All Phase 0 code and automated tests are done and green on Linux, Windows and ma
 | T-043 | Screenshot quick actions and strip | 🟡 In progress: testing | 🖥️ Built with unit, Playwright and E2E tests. Needs a real-model check of each action on real screenshots (T-039) |
 | T-044 | Pre-meeting brief and Knowledge Packs | 🟡 In progress: testing | 🖥️ Built with Rust, unit, Playwright and E2E tests. Needs a real-model check of brief quality (T-039) |
 | T-045 | Agents (tools) and multiple active Skills | 🟡 In progress: testing | 🖥️ Built with Rust, unit, Playwright and E2E tests. Web search tool arrives with T-046; needs a real-model check of tool choice (T-039) |
-| T-046 | Web search provider and per-session overrides | ⬜ To do | |
+| T-046 | Web search provider and per-session overrides | 🟡 In progress: testing | 🖥️ Built with Rust (mock HTTP), unit, Playwright and E2E tests. Needs a live check with real Tavily and Brave keys |
 | T-047 | Custom vocabulary | ⬜ To do | |
 | T-048 | Click-through mode and themes | ⬜ To do | |
 | T-049 | Glass overlay: translucent background, crisp text | 🟡 In progress: testing | 🖥️ Built and tested (Vitest, Playwright over a busy backdrop). Needs a manual look over a live call on Windows and macOS |
@@ -695,6 +695,22 @@ Each P1 task gets full scope and tests when it moves to In progress.
 - [x] Playwright (`tests/ui/agents.spec.ts`): Negotiation Coach uses the calculator; two Skills at once; axe.
 - [x] E2E (`tests/e2e/specs/agents.e2e.ts`): calculator step through the real gateway; extra Skill saved.
 - [ ] Manual 🖥️: with a real model, tools are used when they help and not otherwise (T-039); web search after T-046.
+
+### T-046 Web search provider and per-session overrides
+
+**Refs:** PRD KEY-8, KEY-9; T-003 (P2); TECHNICAL.md 6.5 (`web_search`, `create_session`, `session_provider_options`), 7.1 (`gateway`)
+**Scope**
+- [x] Web search adapters for Tavily and Brave in the gateway, used by the Settings key check and by `web_search` (the provider chosen under Web search in Settings; off → clear error). At most 5 results, http(s) links only, short plain snippets.
+- [x] Agent Skills' `web_search` tool uses it (T-045 hook).
+- [x] Per-session providers: **Options** next to **New session** picks another speech-to-text or answer provider for that session only; ready providers only (key saved or none needed), others shown but disabled.
+- [x] The session keeps its providers: start uses its speech-to-text provider; answers, notes, "What did I miss?" and the brief use its answer provider (Settings model when it's the Settings provider, else that provider's defaults).
+**Tests**
+- [x] Rust: Tavily and Brave over a mock HTTP server (keys, query, parsing), error mapping, missing key, unknown provider, empty query, mock mode; result parsing limits; an override must be known, implemented and have its key; a session keeps its providers; mock model's web search step.
+- [x] Unit: `sessionPlan`; answers use the session's provider; an agent's web search goes through the router.
+- [x] Component: Options picker with defaults, creating a session with overrides, defaults without options.
+- [x] Playwright (`tests/ui/web-search-overrides.spec.ts`): session with its own providers, agent web search shown under Tools used, axe.
+- [x] E2E (`tests/e2e/specs/web-search-overrides.e2e.ts`): providers stored by Rust; web search through the real gateway (mock mode).
+- [ ] Manual 🖥️: real Tavily and Brave keys (key check and results); a session on OpenAI while Settings says Anthropic. Speech-to-text overrides offer only providers marked implemented in the catalog (Deepgram in this build; AssemblyAI and Soniox once T-021's live checks pass).
 
 ### T-049 Glass overlay: translucent background, crisp text
 

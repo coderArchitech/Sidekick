@@ -1,7 +1,8 @@
 import { useEffect, useState } from "react";
 import { Markdown } from "@/features/answers";
+import { useSessionStore } from "@/features/session";
 import { answerEvents, commands, type Brief } from "@/ipc";
-import { modelPlan, writeBrief } from "@/orchestrator";
+import { modelPlan, sessionPlan, writeBrief } from "@/orchestrator";
 
 /**
  * Pre-meeting brief (PRD CTX-4): a summary of the session's documents and
@@ -29,9 +30,10 @@ export function BriefPanel({ sessionId }: { sessionId: string }) {
     setError(null);
     try {
       const s = await commands.getSettings();
-      const plan = modelPlan(
-        s.status === "ok" ? s.data.llm : { provider: "anthropic", model: null },
-      );
+      const plan =
+        s.status === "ok"
+          ? sessionPlan(s.data.llm, useSessionStore.getState().session)
+          : modelPlan({ provider: "anthropic", model: null });
       setBrief(await writeBrief({ ...commands, events: answerEvents }, sessionId, plan));
       setOpen(true);
     } catch (e) {

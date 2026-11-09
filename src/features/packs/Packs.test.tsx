@@ -69,7 +69,7 @@ describe("Overlay pack picker (PRD CTX-5)", () => {
   beforeEach(resetMocks);
 
   async function session() {
-    const s = await mockCommands.createSession("Call");
+    const s = await mockCommands.createSession("Call", null);
     if (s.status !== "ok") throw new Error("create");
     return s.data.id;
   }

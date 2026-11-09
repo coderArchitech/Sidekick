@@ -26,6 +26,40 @@ describe("SessionBar", () => {
     expect(screen.getByRole("button", { name: "Start" })).toBeInTheDocument();
   });
 
+  it("can pick other providers for one session (KEY-9)", async () => {
+    const user = userEvent.setup();
+    render(<SessionBar />);
+    await user.click(screen.getByRole("button", { name: "Options" }));
+    const stt = await screen.findByRole("combobox", { name: "Speech-to-text for this session" });
+    const llm = screen.getByRole("combobox", { name: "Answers for this session" });
+    expect(stt).toHaveValue("");
+    expect(within(stt).getByRole("option", { name: "Default (Deepgram)" })).toBeInTheDocument();
+    expect(
+      within(llm).getByRole("option", { name: "Default (Anthropic (Claude))" }),
+    ).toBeInTheDocument();
+    await user.selectOptions(stt, "assemblyai");
+    await user.selectOptions(llm, "openai");
+    await user.type(screen.getByLabelText("Session name"), "Vendor call");
+    await user.click(screen.getByRole("button", { name: "New session" }));
+    await waitFor(() =>
+      expect(useSessionStore.getState().session).toMatchObject({
+        title: "Vendor call",
+        sttProvider: "assemblyai",
+        llmProvider: "openai",
+      }),
+    );
+  });
+
+  it("a session without options uses the Settings providers", async () => {
+    const user = userEvent.setup();
+    render(<SessionBar />);
+    await createSession(user);
+    expect(useSessionStore.getState().session).toMatchObject({
+      sttProvider: "deepgram",
+      llmProvider: "anthropic",
+    });
+  });
+
   it("asks for consent before listening and needs a choice", async () => {
     const user = userEvent.setup();
     render(<SessionBar />);
@@ -94,7 +128,7 @@ describe("SessionBar", () => {
     render(<SessionBar />);
     await user.type(screen.getByLabelText("Session name"), "Second meeting");
     // Another session already live: starting is refused.
-    const other = await mockCommands.createSession("Other");
+    const other = await mockCommands.createSession("Other", null);
     if (other.status === "ok") {
       await mockCommands.confirmConsent(other.data.id, "me_only");
       await mockCommands.startSession(other.data.id);
@@ -121,7 +155,7 @@ describe("mock start without consent", () => {
   beforeEach(resetMocks);
 
   it("returns CONSENT_REQUIRED", async () => {
-    const s = await mockCommands.createSession("No consent");
+    const s = await mockCommands.createSession("No consent", null);
     if (s.status !== "ok") throw new Error("create failed");
     const started = await mockCommands.startSession(s.data.id);
     expect(started.status === "error" && started.error.code).toBe("CONSENT_REQUIRED");

@@ -17,6 +17,8 @@ const COMMANDS: &[&str] = &[
     "get_diagnostics",
     "record_latency",
     "create_session",
+    "web_search",
+    "session_provider_options",
     "confirm_consent",
     "start_session",
     "pause_session",

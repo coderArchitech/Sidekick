@@ -90,6 +90,10 @@ pub struct Session {
     pub skill_id: Option<String>,
     /// Skills also in use alongside the main one, in order (PRD SKL-5).
     pub extra_skill_ids: Vec<String>,
+    /// Speech-to-text and answer providers for this session: the Settings
+    /// defaults, or the ones picked when it was created (PRD KEY-9).
+    pub stt_provider: String,
+    pub llm_provider: String,
     /// How long its data is kept after it ends (tech doc 4.4).
     pub retention: sidekick_core::retention::Retention,
 }

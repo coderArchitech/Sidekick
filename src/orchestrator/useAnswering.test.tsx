@@ -23,7 +23,7 @@ describe("detect → answer → save", () => {
   });
 
   it("answers a detected question end to end with the mocks", async () => {
-    const s = await mockCommands.createSession("E2E");
+    const s = await mockCommands.createSession("E2E", null);
     if (s.status !== "ok") throw new Error("create");
     await mockCommands.confirmConsent(s.data.id, "participants_agreed");
     const started = await mockCommands.startSession(s.data.id);
@@ -51,7 +51,7 @@ describe("detect → answer → save", () => {
 
   it("uses the session's active Skill in the prompt", async () => {
     const stream = vi.spyOn(mockCommands, "llmStream");
-    const s = await mockCommands.createSession("Skilled");
+    const s = await mockCommands.createSession("Skilled", null);
     if (s.status !== "ok") throw new Error("create");
     await mockCommands.confirmConsent(s.data.id, "participants_agreed");
     await mockCommands.startSession(s.data.id);
@@ -74,6 +74,34 @@ describe("detect → answer → save", () => {
     const systems = all.filter((sys) => !agent.includes(sys));
     expect(systems).toHaveLength(2);
     for (const sys of systems) expect(sys).toContain("Active Skill: Teacher");
+    stream.mockRestore();
+  });
+
+  it("answers with the session's own provider (KEY-9)", async () => {
+    const stream = vi.spyOn(mockCommands, "llmStream");
+    const s = await mockCommands.createSession("Override", {
+      sttProvider: null,
+      llmProvider: "openai",
+    });
+    if (s.status !== "ok") throw new Error("create");
+    await mockCommands.confirmConsent(s.data.id, "participants_agreed");
+    const started = await mockCommands.startSession(s.data.id);
+    if (started.status !== "ok") throw new Error("start");
+    render(<Harness session={started.data.session} />);
+    await wait(20);
+    mockTranscriptLine(s.data.id, {
+      speakerLabel: "speaker_1",
+      isUser: false,
+      text: "What's the rate limit for the Pro tier?",
+      startMs: 0,
+      endMs: 1200,
+    });
+    await wait(900);
+    const calls = stream.mock.calls.map((c) => [c[1], (c[2] as LlmRequest).model]);
+    expect(calls).toEqual([
+      ["openai", "gpt-5-mini"],
+      ["openai", "gpt-5"],
+    ]);
     stream.mockRestore();
   });
 });

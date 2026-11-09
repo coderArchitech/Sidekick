@@ -8,7 +8,7 @@ import { BriefPanel } from "./BriefPanel";
 const wait = (ms: number) => act(() => new Promise((r) => setTimeout(r, ms)));
 
 async function session() {
-  const s = await mockCommands.createSession("Call");
+  const s = await mockCommands.createSession("Call", null);
   if (s.status !== "ok") throw new Error("create");
   return s.data.id;
 }

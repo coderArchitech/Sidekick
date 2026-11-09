@@ -38,7 +38,7 @@ function fakeModel() {
 }
 
 async function liveSession(): Promise<Session> {
-  const s = await mockCommands.createSession("Notes");
+  const s = await mockCommands.createSession("Notes", null);
   if (s.status !== "ok") throw new Error("create");
   await mockCommands.confirmConsent(s.data.id, "participants_agreed");
   const started = await mockCommands.startSession(s.data.id);
@@ -252,7 +252,7 @@ describe("Agenda, recap and action items (PRD MEM-2, MEM-3, MEM-4)", () => {
   });
 
   it("the recap button waits for the session to start", async () => {
-    const s = await mockCommands.createSession("Draft");
+    const s = await mockCommands.createSession("Draft", null);
     if (s.status !== "ok") throw new Error("create");
     useSessionStore.setState({ session: s.data });
     render(<Harness />);

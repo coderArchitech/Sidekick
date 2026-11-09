@@ -1,0 +1,11 @@
+# Automatically generated - DO NOT EDIT!
+
+[[permission]]
+identifier = "allow-session-provider-options"
+description = "Enables the session_provider_options command without any pre-configured scope."
+commands.allow = ["session_provider_options"]
+
+[[permission]]
+identifier = "deny-session-provider-options"
+description = "Denies the session_provider_options command without any pre-configured scope."
+commands.deny = ["session_provider_options"]

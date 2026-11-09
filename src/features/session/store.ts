@@ -4,6 +4,7 @@ import {
   type ConsentOption,
   type Retention,
   type Session,
+  type SessionOverrides,
   type SidekickError,
 } from "@/ipc";
 
@@ -12,7 +13,8 @@ interface SessionState {
   warnings: string[];
   error: string | null;
   busy: boolean;
-  create: (title: string) => Promise<void>;
+  /** Creates a draft session; `overrides` picks other providers for it (PRD KEY-9). */
+  create: (title: string, overrides?: SessionOverrides | null) => Promise<void>;
   /** Records consent, then starts listening (PRD 8). */
   confirmAndStart: (option: ConsentOption) => Promise<void>;
   pause: () => Promise<void>;
@@ -56,8 +58,8 @@ export const useSessionStore = create<SessionState>((set, get) => {
     error: null,
     busy: false,
 
-    create: async (title) => {
-      const session = await run(() => commands.createSession(title));
+    create: async (title, overrides) => {
+      const session = await run(() => commands.createSession(title, overrides ?? null));
       if (session) set({ session, warnings: [] });
     },
 

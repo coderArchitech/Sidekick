@@ -14,7 +14,7 @@ const wait = (ms: number) => act(() => new Promise((r) => setTimeout(r, ms)));
 
 async function live(autoAnswer: boolean): Promise<Session> {
   await mockCommands.updateSettings({ profile: { name: "Nitesh", nicknames: ["Nitu"] } });
-  const s = await mockCommands.createSession("Detect");
+  const s = await mockCommands.createSession("Detect", null);
   if (s.status !== "ok") throw new Error("create");
   await mockCommands.confirmConsent(s.data.id, "participants_agreed");
   await mockCommands.startSession(s.data.id);
