@@ -1,0 +1,94 @@
+# Builds unsigned Sidekick installers on demand: Actions → Build installers →
+# Run workflow, then pick the branch and the platforms. The installers are kept
+# as downloadable artifacts on the run's page. Signing comes with T-037.
+name: Build installers
+
+on:
+  workflow_dispatch:
+    inputs:
+      platform:
+        description: Which installers to build
+        type: choice
+        options: [all, windows, macos]
+        default: all
+  # GitHub only offers "Run workflow" once this file is on main. Until then,
+  # pushing a change to this file builds everything from that branch.
+  push:
+    paths:
+      - .github/workflows/build-installers.yml
+
+concurrency:
+  group: build-installers-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  CARGO_TERM_COLOR: always
+
+jobs:
+  windows:
+    name: Windows (.msi and setup .exe)
+    if: github.event_name != 'workflow_dispatch' || inputs.platform != 'macos'
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      # rustup reads rust-toolchain.toml and installs the pinned version on first use.
+      - run: rustup show
+      - uses: Swatinem/rust-cache@v2
+        with:
+          key: installer-windows
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - name: Build the app and both installers
+        run: pnpm tauri build --bundles msi,nsis
+      - name: Upload the installers
+        uses: actions/upload-artifact@v4
+        with:
+          name: sidekick-windows
+          path: |
+            target/release/bundle/msi/*.msi
+            target/release/bundle/nsis/*.exe
+          if-no-files-found: error
+          retention-days: 30
+
+  macos:
+    name: macOS ${{ matrix.label }} (.dmg)
+    if: github.event_name != 'workflow_dispatch' || inputs.platform != 'windows'
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - label: Apple Silicon
+            target: aarch64-apple-darwin
+            artifact: sidekick-macos-apple-silicon
+          - label: Intel
+            target: x86_64-apple-darwin
+            artifact: sidekick-macos-intel
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+      - run: rustup show
+      - run: rustup target add ${{ matrix.target }}
+      - uses: Swatinem/rust-cache@v2
+        with:
+          key: installer-${{ matrix.target }}
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - name: Build the app and the disk image
+        run: pnpm tauri build --target ${{ matrix.target }} --bundles dmg
+      # Only the .dmg is uploaded: artifacts drop file permissions, which would
+      # break a bare .app, while the disk image keeps them.
+      - name: Upload the disk image
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ matrix.artifact }}
+          path: target/${{ matrix.target }}/release/bundle/dmg/*.dmg
+          if-no-files-found: error
+          retention-days: 30

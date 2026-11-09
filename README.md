@@ -114,6 +114,8 @@ Build an installer (unsigned):
 pnpm tauri build
 ```
 
+Or build installers for both platforms on GitHub: **Actions → Build installers → Run workflow**, pick the branch and `all`, `windows` or `macos`. When it finishes, download them from the run page: `sidekick-windows` (`.msi` and setup `.exe`), `sidekick-macos-apple-silicon` and `sidekick-macos-intel` (`.dmg`). They're unsigned, so Windows SmartScreen and macOS Gatekeeper warn on first open. The button appears once the workflow is on `main`.
+
 Build with local Whisper speech-to-text (needs CMake and Clang):
 
 ```bash
