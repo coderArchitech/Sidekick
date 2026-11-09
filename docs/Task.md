@@ -841,6 +841,8 @@ pnpm build:e2e
 pnpm test:e2e
 ```
 
+**Installer for testing:** the [Windows installer workflow](../.github/workflows/windows-installer.yml) builds an unsigned `.msi` and setup `.exe` on a Windows runner (Actions → Windows installer → artifact `sidekick-windows-installers`). Windows SmartScreen warns about unsigned installers: choose More info → Run anyway. Signing comes with T-037.
+
 - [ ] Windows 10: `pnpm verify` and `pnpm test:e2e` green.
 - [ ] Windows 11: `pnpm verify` and `pnpm test:e2e` green.
 
