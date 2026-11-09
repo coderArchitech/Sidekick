@@ -1,6 +1,6 @@
 import { useEffect, useState, type CSSProperties } from "react";
 import { LiveAnswers } from "@/features/answers";
-import { ChatView } from "@/features/chat";
+import { ChatView, LiveScreenshot } from "@/features/chat";
 import { Library } from "@/features/library";
 import { NotesView } from "@/features/notes";
 import { SessionBar, useSessionStore } from "@/features/session";
@@ -152,7 +152,10 @@ export function Overlay() {
         {tab === "transcript" ? (
           <TranscriptView />
         ) : tab === "answers" ? (
-          <LiveAnswers />
+          <>
+            <LiveScreenshot />
+            <LiveAnswers />
+          </>
         ) : tab === "chat" ? (
           <ChatView />
         ) : (

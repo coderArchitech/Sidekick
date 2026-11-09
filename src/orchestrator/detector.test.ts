@@ -81,3 +81,41 @@ describe("QuestionDetector", () => {
     expect(found).toHaveLength(1);
   });
 });
+
+describe("the other person's interview prompts (bug: tasks weren't answered)", () => {
+  it("a task from the other speaker is a question; room lines count as the other person", () => {
+    vi.useFakeTimers();
+    const found: string[] = [];
+    const d = new QuestionDetector({ names: [], onQuestion: (q) => found.push(q.text) });
+    d.push({ id: 1, speakerLabel: "speaker_1", isUser: false, text: "Okay so", endMs: 1000 });
+    d.push({
+      id: 2,
+      speakerLabel: "speaker_1",
+      isUser: false,
+      text: "design a URL shortener like bitly",
+      endMs: 2000,
+    });
+    vi.advanceTimersByTime(700);
+    d.push({
+      id: 3,
+      speakerLabel: "room",
+      isUser: false,
+      text: "Implement debounce in JavaScript.",
+      endMs: 5000,
+    });
+    vi.advanceTimersByTime(700);
+    d.push({
+      id: 4,
+      speakerLabel: "me",
+      isUser: true,
+      text: "Design a URL shortener",
+      endMs: 6000,
+    });
+    vi.advanceTimersByTime(700);
+    expect(found).toEqual([
+      "Okay so design a URL shortener like bitly",
+      "Implement debounce in JavaScript.",
+    ]);
+    vi.useRealTimers();
+  });
+});

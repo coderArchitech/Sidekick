@@ -5,6 +5,7 @@ import { useSessionStore } from "@/features/session";
 import type { LlmRequest, Session } from "@/ipc";
 import { mockAnswerBus, mockCommands, mockTranscriptLine, resetMocks } from "@/ipc/testing";
 import { NOTES_INTERVAL_MS, useNotes, useNotesStore } from "@/orchestrator";
+import { pick } from "@/test/select";
 import { NotesView } from "./NotesView";
 
 function Harness() {
@@ -197,9 +198,7 @@ describe("Agenda, recap and action items (PRD MEM-2, MEM-3, MEM-4)", () => {
     ).toEqual([expect.stringContaining("Pricing"), expect.stringContaining("Roadmap")]);
     expect(agenda).toHaveTextContent("0/2 covered");
 
-    fireEvent.change(within(agenda).getByLabelText("Status of Pricing"), {
-      target: { value: "covered" },
-    });
+    pick(within(agenda).getByRole("combobox", { name: "Status of Pricing" }), "covered");
     await waitFor(() => expect(agenda).toHaveTextContent("1/2 covered"));
     const saved = await mockCommands.getNotes(s.id);
     expect(saved.status === "ok" && saved.data.agenda[0]?.status).toBe("covered");
@@ -240,7 +239,7 @@ describe("Agenda, recap and action items (PRD MEM-2, MEM-3, MEM-4)", () => {
     say(s.id, "Ancient history from the start.", 60_000);
     say(s.id, "Can you send the quote?", 700_000);
     render(<Harness />);
-    fireEvent.change(await screen.findByLabelText("Recap period"), { target: { value: "2" } });
+    pick(await screen.findByRole("combobox", { name: "Recap period" }), "2");
     fireEvent.click(screen.getByRole("button", { name: "What did I miss?" }));
     const card = await screen.findByRole("region", { name: "What you missed" });
     expect(card).toHaveTextContent("Last 2 minutes");

@@ -13,7 +13,7 @@ const theme = () => browser.execute(() => document.documentElement.dataset.theme
 async function pickTheme(value: string) {
   await $("button=Settings").click();
   await browser.tauri.switchWindow("settings");
-  await selectValue("select#theme", value);
+  await selectValue("theme", value);
   await browser.tauri.switchWindow("overlay");
 }
 

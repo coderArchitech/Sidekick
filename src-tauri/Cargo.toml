@@ -55,5 +55,9 @@ tauri-specta.workspace = true
 tempfile.workspace = true
 rusqlite.workspace = true
 
+[target.'cfg(target_os = "macos")'.dependencies]
+# Overlay window level and Spaces behaviour (src/topmost.rs).
+objc2-app-kit = { version = "0.3", default-features = false, features = ["std", "NSResponder", "NSWindow"] }
+
 [lints]
 workspace = true

@@ -1,5 +1,11 @@
-import { expect } from "@wdio/globals";
-import { createAndStart, openTab, selectValue, waitForLine, waitForText } from "../helpers";
+import {
+  createAndStart,
+  openTab,
+  selectValue,
+  selectedValue,
+  waitForLine,
+  waitForText,
+} from "../helpers";
 
 // Looked up afresh each time: the Notes tab remounts when the test switches
 // tabs, and `aria/Agenda` could also match the section's "Agenda" heading.
@@ -35,7 +41,7 @@ describe("meeting memory (PRD MEM-2, MEM-3)", () => {
     // The fixture script mentions the Pro tier, then the dashboard.
     await waitForLine("Let's also look at the dashboard.");
     await openTab("Notes");
-    await selectValue('select[aria-label="Recap period"]', "10");
+    await selectValue("Recap period", "10");
     await $("button=What did I miss?").click();
     const card = await $("aria/What you missed");
     await card.waitForDisplayed({ timeout: 20_000 });
@@ -44,7 +50,9 @@ describe("meeting memory (PRD MEM-2, MEM-3)", () => {
 
     await $("button=End").click();
     await waitForAgenda("2/3 covered", 30_000);
-    await expect($('select[aria-label="Status of Pro tier pricing"]')).toHaveValue("covered");
-    await expect($('select[aria-label="Status of Hiring"]')).toHaveValue("not_started");
+    if ((await selectedValue("Status of Pro tier pricing")) !== "covered")
+      throw new Error("Pro tier pricing should be covered");
+    if ((await selectedValue("Status of Hiring")) !== "not_started")
+      throw new Error("Hiring should not be started");
   });
 });

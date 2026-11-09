@@ -3,6 +3,7 @@ import userEvent from "@testing-library/user-event";
 import axe from "axe-core";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { mockCommands, mockWindowCalls, resetMocks } from "@/ipc/testing";
+import { choose, optionsOf } from "@/test/select";
 import { SettingsWindow } from "./SettingsWindow";
 
 function section(name: RegExp) {
@@ -12,8 +13,17 @@ function section(name: RegExp) {
 async function renderSettings() {
   render(<SettingsWindow />);
   await screen.findByRole("region", { name: /speech-to-text/i });
-  // Wait for every provider list to load.
-  await waitFor(() => expect(screen.getAllByRole("option", { name: /deepgram/i })).toHaveLength(1));
+  // Wait for every provider list to load (the dropdown shows the chosen one's name).
+  await waitFor(() => {
+    for (const [re, name] of [
+      [/speech-to-text/i, "Deepgram"],
+      [/answers/i, "Anthropic (Claude)"],
+      [/embeddings/i, "OpenAI"],
+    ] as const)
+      expect(within(section(re)).getByRole("combobox", { name: "Provider" })).toHaveTextContent(
+        name,
+      );
+  });
 }
 
 describe("SettingsWindow", () => {
@@ -24,29 +34,33 @@ describe("SettingsWindow", () => {
   it("shows a section per provider kind with the defaults selected", async () => {
     await renderSettings();
     const provider = (re: RegExp) =>
-      within(section(re)).getByRole("combobox", { name: "Provider" }) as HTMLSelectElement;
-    expect(provider(/speech-to-text/i).value).toBe("deepgram");
-    expect(provider(/answers/i).value).toBe("anthropic");
-    expect(provider(/embeddings/i).value).toBe("openai");
-    expect(provider(/web search/i).value).toBe("__off__");
-    expect(
-      within(section(/answers/i))
-        .getAllByRole("option")
-        .map((o) => o.textContent),
-    ).toEqual(["Anthropic (Claude)", "OpenAI", "Google Gemini", "Ollama (local)"]);
+      within(section(re)).getByRole("combobox", { name: "Provider" }).getAttribute("data-value");
+    expect(provider(/speech-to-text/i)).toBe("deepgram");
+    expect(provider(/answers/i)).toBe("anthropic");
+    expect(provider(/embeddings/i)).toBe("openai");
+    expect(provider(/web search/i)).toBe("__off__");
+    const user = userEvent.setup();
+    const answers = within(section(/answers/i)).getByRole("combobox", { name: "Provider" });
+    expect((await optionsOf(user, answers)).map((o) => o.label)).toEqual([
+      "Anthropic (Claude)",
+      "OpenAI",
+      "Google Gemini",
+      "Ollama (local)",
+    ]);
   });
 
   it("picks a theme for both windows (UI-8)", async () => {
     const user = userEvent.setup();
     await renderSettings();
     const theme = screen.getByRole("combobox", { name: "Theme" });
-    expect(theme).toHaveValue("dark");
-    expect(
-      within(theme)
-        .getAllByRole("option")
-        .map((o) => o.textContent),
-    ).toEqual(["Dark", "Light", "High contrast", "Same as the system"]);
-    await user.selectOptions(theme, "high_contrast");
+    expect(theme).toHaveAttribute("data-value", "dark");
+    expect((await optionsOf(user, theme)).map((o) => o.label)).toEqual([
+      "Dark",
+      "Light",
+      "High contrast",
+      "Same as the system",
+    ]);
+    await choose(user, theme, "high_contrast");
     await waitFor(async () => {
       const s = await mockCommands.getSettings();
       expect(s.status === "ok" && s.data.theme).toBe("high_contrast");
@@ -123,7 +137,7 @@ describe("SettingsWindow", () => {
     await renderSettings();
     const llm = section(/answers/i);
     const model = await within(llm).findByRole("combobox", { name: "Model" });
-    await user.selectOptions(model, "mock-large");
+    await choose(user, model, "mock-large");
     await waitFor(async () => {
       const s = await mockCommands.getSettings();
       expect(s.status === "ok" && s.data.llm).toEqual({
@@ -139,9 +153,9 @@ describe("SettingsWindow", () => {
     await renderSettings();
     const llm = section(/answers/i);
     const provider = within(llm).getByRole("combobox", { name: "Provider" });
-    await user.selectOptions(provider, "ollama");
+    await choose(user, provider, "ollama");
     expect(await within(llm).findByText(/no key needed/i)).toBeInTheDocument();
-    await user.selectOptions(provider, "anthropic");
+    await choose(user, provider, "anthropic");
     expect(await within(llm).findByText("••••5678")).toBeInTheDocument();
     const s = await mockCommands.getSettings();
     expect(s.status === "ok" && s.data.llm.provider).toBe("anthropic");
@@ -151,12 +165,12 @@ describe("SettingsWindow", () => {
     const user = userEvent.setup();
     await renderSettings();
     const search = within(section(/web search/i)).getByRole("combobox", { name: "Provider" });
-    await user.selectOptions(search, "tavily");
+    await choose(user, search, "tavily");
     await waitFor(async () => {
       const s = await mockCommands.getSettings();
       expect(s.status === "ok" && s.data.search?.provider).toBe("tavily");
     });
-    await user.selectOptions(search, "__off__");
+    await choose(user, search, "__off__");
     await waitFor(async () => {
       const s = await mockCommands.getSettings();
       expect(s.status === "ok" && s.data.search).toBeNull();
@@ -167,7 +181,7 @@ describe("SettingsWindow", () => {
     const user = userEvent.setup();
     await renderSettings();
     await user.click(screen.getByRole("checkbox", { name: /auto-answer/i }));
-    await user.selectOptions(screen.getByRole("combobox", { name: "Keep session data" }), "7d");
+    await choose(user, screen.getByRole("combobox", { name: "Keep session data" }), "7d");
     await waitFor(async () => {
       const s = await mockCommands.getSettings();
       expect(s.status === "ok" && [s.data.autoAnswer, s.data.retention]).toEqual([false, "7d"]);

@@ -1,5 +1,6 @@
 import { render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
+import { choose } from "@/test/select";
 import { beforeEach, describe, expect, it } from "vitest";
 import { mockCommands, mockFiles, mockSkills, resetMocks } from "@/ipc/testing";
 import { SkillsSection } from "./SkillsSection";
@@ -8,7 +9,7 @@ async function renderSection() {
   const user = userEvent.setup();
   render(<SkillsSection />);
   const list = await screen.findByRole("list", { name: "Your Skills" });
-  await waitFor(() => expect(within(list).getAllByRole("listitem")).toHaveLength(5));
+  await waitFor(() => expect(within(list).getAllByRole("listitem")).toHaveLength(6));
   return { user, list };
 }
 
@@ -26,6 +27,7 @@ describe("Skills in Settings", () => {
       "Interview Coach",
       "Negotiation Coach",
       "Sales Discovery",
+      "Staff Engineer Interview (JS)",
       "Teacher",
       "Technical Architect",
     ]);
@@ -33,10 +35,7 @@ describe("Skills in Settings", () => {
 
   it("builder creates a Skill from a template and saves it", async () => {
     const { user, list } = await renderSection();
-    await user.selectOptions(
-      screen.getByRole("combobox", { name: "Start from a template" }),
-      "teacher",
-    );
+    await choose(user, screen.getByRole("combobox", { name: "Start from a template" }), "teacher");
     const form = screen.getByRole("form", { name: "New Skill" });
     const name = within(form).getByLabelText("Name");
     expect(name).toHaveValue("Teacher (copy)");
@@ -70,7 +69,7 @@ describe("Skills in Settings", () => {
     expect(
       within(form).getByText("Write the instructions below the front matter."),
     ).toBeInTheDocument();
-    expect(mockSkills.list()).toHaveLength(5);
+    expect(mockSkills.list()).toHaveLength(6);
   });
 
   it("edits a Skill in place", async () => {

@@ -63,6 +63,30 @@ const IMPLICIT = [
   /^how about\b/,
 ];
 
+/**
+ * Tasks: interviewers and colleagues often ask for work, not information
+ * ("Design a URL shortener", "Implement debounce", "Given an array…").
+ * Checked after leading fillers ("okay so", "now") are removed.
+ */
+const TASK_VERBS =
+  "design|implement|write|build|code|create|develop|architect|model|sketch|draw|solve|optimi[sz]e|refactor|debug|reverse|sort|find|merge|validate|parse|flatten|traverse|compute|calculate|convert|detect|count|make|extend|modify|improve|handle";
+const TASKS = [
+  // "Reverse a linked list", "Find the longest…", "Now make it work…"
+  new RegExp(
+    `^(please )?(${TASK_VERBS}) (a|an|the|me|us|this|that|it|two|three|your|some|all|each|every|our|one|n)\\b`,
+  ),
+  // Design-type verbs take any object: "Design Twitter's timeline".
+  /^(please )?(design|architect|implement|build) \S/,
+  /^let'?s (design|code|implement|build|write|create|architect|model|solve|tackle|work on)\b/,
+  /^given (a|an|the|two|three|n|some|\d+)\b/,
+  /^(your|the) (task|problem|challenge|question|exercise|goal) (is|here is)\b/,
+  /^i('d| would) like you to\b/,
+  /^(i want|we want|i need|we need) you to\b/,
+];
+
+/** Leading fillers that don't change what is asked. */
+const FILLER = /^((okay|ok|so|alright|all right|right|now|next|great|cool|good|well|and)[,]?\s+)+/;
+
 /** Meeting mechanics: questions nobody needs help answering. */
 const CHIT_CHAT = [
   /^(hello|hi|hey)\b.*\?$/,
@@ -113,6 +137,8 @@ export function isQuestion(text: string, names: string[] = []): boolean {
   if (!t || CHIT_CHAT.some((r) => r.test(t))) return false;
   if (NOT_A_QUESTION_OPENER.some((r) => r.test(t))) return false;
   if (IMPLICIT.some((r) => r.test(t))) return true;
+  const task = t.replace(FILLER, "");
+  if (TASKS.some((r) => r.test(task)) || IMPLICIT.some((r) => r.test(task))) return true;
   // Addressed to someone and phrased as a request: "Priya, the numbers please."
   if (addressed && /\bplease[.!]?$/.test(t)) return true;
   if (/\?\s*$/.test(t))

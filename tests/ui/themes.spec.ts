@@ -1,5 +1,5 @@
 import { expect, test, type Page } from "@playwright/test";
-import { expectAccessible, open, say, startSession, type SidekickTest } from "./helpers";
+import { expectAccessible, open, say, startSession, type SidekickTest, choose } from "./helpers";
 
 /** T-048: themes pass axe with contrast (PRD UI-8); click-through (UI-5). */
 const THEMES = [
@@ -32,7 +32,7 @@ for (const [theme, attr] of THEMES) {
 
   test(`Settings in ${theme} passes axe`, async ({ page }) => {
     await open(page, "settings");
-    await page.getByRole("combobox", { name: "Theme" }).selectOption(theme);
+    await choose(page.getByRole("combobox", { name: "Theme" }), theme);
     await expect(page.locator("html")).toHaveAttribute("data-theme", attr);
     await expectAccessible(page);
   });

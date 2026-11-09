@@ -33,14 +33,17 @@ describe("web search and per-session providers (PRD KEY-8, KEY-9)", () => {
     await browser.tauri.switchWindow("overlay");
 
     await $("button=Options").click();
-    await selectValue('select[aria-label="Answers for this session"]', "openai");
+    await selectValue("Answers for this session", "openai");
     // Providers that aren't available (or have no key) are listed but can't be picked.
+    const stt = await $('[role="combobox"][aria-label="Speech-to-text for this session"]');
+    await stt.click();
     const soniox = await $(
-      'select[aria-label="Speech-to-text for this session"] option[value="soniox"]',
+      `[id="${await stt.getAttribute("aria-controls")}"] [role="option"][data-value="soniox"]`,
     );
     await soniox.waitForExist();
-    if ((await soniox.getProperty("disabled")) !== true)
+    if ((await soniox.getAttribute("aria-disabled")) !== "true")
       throw new Error("Soniox should not be selectable in this build");
+    await browser.keys("Escape");
     await $('input[placeholder="New session name"]').setValue("Market call");
     await $("button=New session").click();
     await $("button=Start").click();
@@ -59,7 +62,7 @@ describe("web search and per-session providers (PRD KEY-8, KEY-9)", () => {
     if (stored.sttProvider !== "deepgram" || stored.llmProvider !== "openai")
       throw new Error(`session providers not kept: ${JSON.stringify(stored)}`);
 
-    await selectValue('select[aria-label="Skill"]', "market-watch");
+    await selectValue("Skill", "market-watch");
     await openTab("Chat");
     await $("aria/Ask a question").setValue("What is the latest Fed rate?");
     await browser.keys("Enter");

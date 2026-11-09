@@ -139,6 +139,7 @@ describe("transcript helpers", () => {
   it("names speakers", () => {
     expect(displayName("me")).toBe("Me");
     expect(displayName("speaker_3")).toBe("Speaker 3");
+    expect(displayName("room")).toBe("Room");
     expect(displayName("Priya")).toBe("Priya");
   });
 

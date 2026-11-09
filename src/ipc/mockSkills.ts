@@ -5,6 +5,7 @@
 import interviewCoach from "../../skills/templates/interview-coach.md?raw";
 import negotiationCoach from "../../skills/templates/negotiation-coach.md?raw";
 import salesDiscovery from "../../skills/templates/sales-discovery.md?raw";
+import staffEngineerInterview from "../../skills/templates/staff-engineer-interview.md?raw";
 import teacher from "../../skills/templates/teacher.md?raw";
 import technicalArchitect from "../../skills/templates/technical-architect.md?raw";
 import type {
@@ -23,6 +24,7 @@ const TEMPLATE_TEXT = [
   technicalArchitect,
   teacher,
   negotiationCoach,
+  staffEngineerInterview,
 ];
 export const TOOLS: Tool[] = ["doc_search", "web_search", "calculator"];
 export const TRIGGERS: Trigger[] = ["question_detected", "chat", "screenshot"];

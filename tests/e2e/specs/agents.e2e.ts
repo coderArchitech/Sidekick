@@ -9,7 +9,7 @@ describe("agent Skills and several Skills (PRD SKL-4, SKL-5)", () => {
   it("calculator step, then extra Skills", async () => {
     await createAndStart("Deal review", "Transcribe me only");
     // The Skills list loads after the session starts; selectValue waits for it.
-    await selectValue('select[aria-label="Skill"]', "negotiation-coach");
+    await selectValue("Skill", "negotiation-coach");
 
     await openTab("Chat");
     await $("aria/Ask a question").setValue("What is 2400 * 15% of the deal?");

@@ -26,7 +26,7 @@
 | Context   | Your documents (PDF, Word, PowerPoint, spreadsheets, text, web pages) searched with hybrid vector + keyword search; the meeting so far; screenshots of a window, an area or the whole screen                                         |
 | Chat      | Ask your own questions with the whole session as context, with follow-ups and capture-and-ask ("What does this error mean?")                                                                                                         |
 | Notes     | Rolling notes every 45 seconds; a summary, decisions and action items when the meeting ends                                                                                                                                          |
-| Skills    | Tell Sidekick how to behave for a kind of meeting (Interview Coach, Sales Discovery, Technical Architect, Teacher, Negotiation Coach, or your own)                                                                                   |
+| Skills    | Tell Sidekick how to behave for a kind of meeting (Interview Coach, Staff Engineer Interview (JS), Sales Discovery, Technical Architect, Teacher, Negotiation Coach, or your own)                                                    |
 | Models    | Anthropic (Claude), OpenAI, Google Gemini, or local Ollama, with your own keys in the OS keychain                                                                                                                                    |
 | Privacy   | Overlay excluded from screen sharing where the OS supports it, with a visible status; everything stored encrypted on your computer; retention per session; delete everything at any time; consent before listening to anyone but you |
 

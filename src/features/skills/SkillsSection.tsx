@@ -1,4 +1,5 @@
 import { useEffect, useId, useState } from "react";
+import { Select } from "@/lib/Select";
 import {
   chooseSkillExportPath,
   commands,
@@ -205,29 +206,26 @@ export function SkillsSection() {
             >
               New Skill
             </button>
-            <label className="flex items-center gap-1 text-fg-2">
+            <div className="flex items-center gap-1 text-fg-2">
               From template
-              <select
+              <Select
                 aria-label="Start from a template"
-                className="field"
+                className="w-56"
                 value=""
-                onChange={(e) => {
-                  const t = templates.find((x) => x.id === e.target.value);
+                onChange={(v) => {
+                  const t = templates.find((x) => x.id === v);
                   if (t)
                     setEditing({
                       skill: { ...t, id: "", name: `${t.name} (copy)` },
                       existing: false,
                     });
                 }}
-              >
-                <option value="">Choose…</option>
-                {templates.map((t) => (
-                  <option key={t.id} value={t.id}>
-                    {t.name}
-                  </option>
-                ))}
-              </select>
-            </label>
+                options={[
+                  { value: "", label: "Choose…" },
+                  ...templates.map((t) => ({ value: t.id, label: t.name })),
+                ]}
+              />
+            </div>
             <button type="button" className="btn btn-secondary" onClick={() => void startImport()}>
               Import…
             </button>

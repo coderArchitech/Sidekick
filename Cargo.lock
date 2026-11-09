@@ -5244,6 +5244,7 @@ checksum = "f8fadd59c855ef2080decdef8ff161eb6661b86933c9d82e5ba29dc602a55aba"
 name = "sidekick-app"
 version = "0.1.0"
 dependencies = [
+ "objc2-app-kit",
  "reqwest 0.12.28",
  "rusqlite",
  "serde",

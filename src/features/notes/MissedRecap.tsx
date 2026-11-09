@@ -2,6 +2,7 @@ import { useState } from "react";
 import { Markdown } from "@/features/answers";
 import { useSessionStore } from "@/features/session";
 import { answerEvents, commands } from "@/ipc";
+import { Select } from "@/lib/Select";
 import { modelPlan, recap, sessionPlan, RECAP_MINUTES, type RecapMinutes } from "@/orchestrator";
 
 type State =
@@ -41,21 +42,16 @@ export function MissedRecap({ sessionId }: { sessionId: string }) {
         >
           What did I miss?
         </button>
-        <label className="flex items-center gap-1 text-xs text-fg-muted">
+        <div className="flex items-center gap-1 text-xs text-fg-muted">
           <span>Last</span>
-          <select
+          <Select
             aria-label="Recap period"
-            className="field field-sm w-auto"
-            value={minutes}
-            onChange={(e) => setMinutes(Number(e.target.value) as RecapMinutes)}
-          >
-            {RECAP_MINUTES.map((m) => (
-              <option key={m} value={m}>
-                {m} min
-              </option>
-            ))}
-          </select>
-        </label>
+            small
+            value={String(minutes)}
+            onChange={(v) => setMinutes(Number(v) as RecapMinutes)}
+            options={RECAP_MINUTES.map((m) => ({ value: String(m), label: `${m} min` }))}
+          />
+        </div>
       </div>
       {state.kind === "loading" && (
         <p role="status" className="text-xs text-fg-muted">

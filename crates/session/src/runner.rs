@@ -10,6 +10,8 @@ use sidekick_audio::{
 use sidekick_core::{SidekickError, SidekickResult};
 use sidekick_secrets::SecretString;
 use sidekick_stt::{SttConfig, SttProvider, SttSink};
+
+use crate::sinks::{EchoFilter, RoomSink};
 use tokio::task::JoinHandle;
 use tokio_util::sync::CancellationToken;
 
@@ -73,6 +75,12 @@ impl LiveSession {
     /// Starts every stream in `kinds`. If system audio can't start but the
     /// microphone can, the session continues with the mic and records a warning
     /// (ADR-014: e.g. macOS before 14.6). Any other failure stops everything.
+    ///
+    /// System audio starts first, so the microphone knows whether it is the
+    /// only way to hear the other person: then its lines count as the room
+    /// ([`RoomSink`]), so their questions are answered. With both streams, mic
+    /// lines that only echo the other person (speakers, no headphones) are
+    /// dropped ([`EchoFilter`]).
     pub fn start(
         kinds: &[StreamKind],
         audio: &dyn AudioFactory,
@@ -80,9 +88,22 @@ impl LiveSession {
         sink: Arc<dyn SttSink>,
     ) -> SidekickResult<Self> {
         let cancel = CancellationToken::new();
-        let mut streams = Vec::new();
+        let mut streams: Vec<Stream> = Vec::new();
         let mut warnings = Vec::new();
-        for &kind in kinds {
+        let echo: Arc<dyn SttSink> = Arc::new(EchoFilter::new(Arc::clone(&sink)));
+        let mut order = kinds.to_vec();
+        order.sort_by_key(|k| u8::from(*k != StreamKind::System));
+        for kind in order {
+            let system_running = streams.iter().any(|s| s.kind == StreamKind::System);
+            let stream_sink: Arc<dyn SttSink> = match kind {
+                StreamKind::System => Arc::clone(&echo),
+                StreamKind::Mic if system_running => Arc::clone(&echo),
+                // Consent covers others, but system audio failed: hear the room.
+                StreamKind::Mic if kinds.contains(&StreamKind::System) => {
+                    Arc::new(RoomSink::new(Arc::clone(&sink)))
+                }
+                StreamKind::Mic => Arc::clone(&sink),
+            };
             let (tx, rx) = frame_channel();
             match audio.start(kind, tx) {
                 Ok(capture) => {
@@ -91,7 +112,7 @@ impl LiveSession {
                     cfg.keyterms.clone_from(&stt.keyterms);
                     let provider = Arc::clone(&stt.provider);
                     let key = stt.key.clone();
-                    let sink = Arc::clone(&sink);
+                    let sink = stream_sink;
                     let cancel = cancel.clone();
                     let task =
                         tokio::spawn(async move { provider.run(cfg, key, rx, sink, cancel).await });
@@ -104,7 +125,7 @@ impl LiveSession {
                 Err(e) if kind == StreamKind::System && kinds.contains(&StreamKind::Mic) => {
                     tracing::warn!(target: "session", code = ?e.code, "system audio unavailable; continuing with the microphone");
                     warnings.push(format!(
-                        "Only your microphone is being transcribed. {}",
+                        "System audio isn't available, so Sidekick listens through your microphone: it hears the room and answers questions from anyone, including you. Headphones won't work this way. {}",
                         e.message
                     ));
                 }

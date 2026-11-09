@@ -10,7 +10,8 @@ use sidekick_store::Database;
 
 use crate::format::{self, SCHEMA_VERSION, Skill, Tool};
 
-/// Built-in templates (PRD SKL-3), seeded into the Skills folder on first run.
+/// Built-in templates (PRD SKL-3). Each is copied into the Skills folder once
+/// per install: on first run, or on the first start after an update adds it.
 pub const TEMPLATES: &[(&str, &str)] = &[
     (
         "interview-coach",
@@ -32,7 +33,23 @@ pub const TEMPLATES: &[(&str, &str)] = &[
         "negotiation-coach",
         include_str!("../../../skills/templates/negotiation-coach.md"),
     ),
+    (
+        "staff-engineer-interview",
+        include_str!("../../../skills/templates/staff-engineer-interview.md"),
+    ),
 ];
+
+/// The templates of the first release, seeded before `SEEDED_KEY` existed.
+const FIRST_TEMPLATES: [&str; 5] = [
+    "interview-coach",
+    "sales-discovery",
+    "technical-architect",
+    "teacher",
+    "negotiation-coach",
+];
+
+/// Settings key listing the templates already offered on this install.
+const SEEDED_KEY: &str = "skills.seededTemplates";
 
 /// A saved Skill and whether it's enabled.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize)]
@@ -89,17 +106,40 @@ fn is_builtin(id: &str) -> bool {
 
 /// Copies the templates into `dir` when the index is empty (first run).
 pub fn seed(db: &Database, dir: &Path) -> SidekickResult<usize> {
-    let count: i64 = db
-        .conn()
-        .query_row("SELECT count(*) FROM skills", [], |r| r.get(0))
-        .map_err(|e| db_err("reading Skills", &e))?;
-    if count > 0 {
-        return Ok(0);
+    let mut seeded: Vec<String> = match sidekick_store::settings::get(db, SEEDED_KEY)? {
+        Some(v) => serde_json::from_value(v).unwrap_or_default(),
+        None => {
+            let count: i64 = db
+                .conn()
+                .query_row("SELECT count(*) FROM skills", [], |r| r.get(0))
+                .map_err(|e| db_err("reading Skills", &e))?;
+            // An install from before this list existed was seeded with the
+            // first templates; the user may have deleted some since.
+            if count > 0 {
+                FIRST_TEMPLATES.iter().map(|s| (*s).to_owned()).collect()
+            } else {
+                Vec::new()
+            }
+        }
+    };
+    let mut added = 0;
+    for (id, text) in TEMPLATES {
+        if seeded.iter().any(|s| s == id) {
+            continue;
+        }
+        // Each built-in is offered once: one the user deleted stays deleted.
+        if get(db, id).is_err() {
+            save(db, dir, &format::parse(text)?)?;
+            added += 1;
+        }
+        seeded.push((*id).to_owned());
     }
-    for (_, text) in TEMPLATES {
-        save(db, dir, &format::parse(text)?)?;
-    }
-    Ok(TEMPLATES.len())
+    sidekick_store::settings::set(
+        db,
+        SEEDED_KEY,
+        &serde_json::to_value(&seeded).unwrap_or_default(),
+    )?;
+    Ok(added)
 }
 
 /// Writes the file and updates the index. The id must be new or the same Skill.

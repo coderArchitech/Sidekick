@@ -1,0 +1,70 @@
+/**
+ * Interview speech (the interviewer's side), labelled like
+ * `questions.fixture.ts`: `true` = something the candidate should answer.
+ * Interviewers often give tasks, not questions ("Design a URL shortener"),
+ * and STT may drop the punctuation.
+ */
+export const INTERVIEW: [string, boolean][] = [
+  // Coding round
+  ["Implement a debounce function in JavaScript.", true],
+  ["Write a function that flattens a nested array", true],
+  ["Reverse a linked list in place.", true],
+  ["Find the longest substring without repeating characters", true],
+  [
+    "Given an array of integers, return the indices of the two numbers that add up to a target.",
+    true,
+  ],
+  ["Given a binary tree return its level order traversal", true],
+  ["Merge two sorted arrays without using extra space.", true],
+  ["Can you optimize that to linear time?", true],
+  ["What's the time complexity of your solution?", true],
+  ["Now make it work for a stream of numbers.", true],
+  ["Let's code a promise pool that limits concurrency to three.", true],
+  ["Your task is to build an LRU cache with get and put in constant time.", true],
+  ["Okay so the problem is to detect a cycle in a directed graph", true],
+  ["Explain the event loop and the difference between microtasks and macrotasks.", true],
+  ["How does this work in JavaScript", true],
+  ["Walk me through your approach before you code.", true],
+  // Low-level design
+  ["Design a parking lot system.", true],
+  ["Design the classes for an elevator controller", true],
+  ["Model a rate limiter that supports multiple strategies.", true],
+  ["Let's design a notification service with email and SMS channels.", true],
+  ["Build an autocomplete component in React.", true],
+  ["Create a reusable modal component and talk about accessibility.", true],
+  ["I'd like you to design the API for a data table component.", true],
+  // High-level design
+  ["Design a URL shortener like bitly.", true],
+  ["Design Twitter's home timeline", true],
+  ["How would you scale this to a hundred million users?", true],
+  ["How would you design the frontend for a collaborative document editor?", true],
+  ["Architect a real-time chat application for web and mobile.", true],
+  ["Let's say we need to handle ten thousand writes per second, what would you change?", true],
+  ["Suppose the cache goes down. What happens?", true],
+  [
+    "Imagine the service has to work across three regions. How do you keep the data consistent?",
+    true,
+  ],
+  ["Tell me about a time you disagreed with your manager.", true],
+  ["Tell me about yourself", true],
+  ["What trade-offs did you consider?", true],
+  // Interviewer statements: not questions
+  ["Great, that looks good.", false],
+  ["Okay, let's move on to the next part.", false],
+  ["I'll give you a minute to think about it.", false],
+  ["That's a reasonable approach.", false],
+  ["We have about twenty minutes left.", false],
+  ["Feel free to use any language you like.", false],
+  ["I can see your screen now.", false],
+  ["Thanks, that's all from my side.", false],
+  ["Let me share the problem statement in the chat.", false],
+  ["Sounds good.", false],
+  ["Take your time.", false],
+  ["Right, okay.", false],
+  ["That makes sense.", false],
+  ["Nice, I like that you handled the empty case.", false],
+  ["We'll wrap up with your questions for us.", false],
+  ["Let me write that down.", false],
+  ["I'll design the next question around that.", false],
+  ["Let's find a time for the next round.", false],
+];

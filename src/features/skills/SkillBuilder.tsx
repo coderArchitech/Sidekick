@@ -1,4 +1,5 @@
 import { useId, useState } from "react";
+import { Select } from "@/lib/Select";
 import {
   commands,
   type AnswerFormat,
@@ -157,15 +158,16 @@ export function SkillBuilder({ initial, editing, onSaved, onCancel }: Props) {
         <label htmlFor={`${base}-format`} className="block text-fg-2">
           Answers
         </label>
-        <select
+        <Select
           id={`${base}-format`}
+          className="mt-1"
           value={skill.answerFormat ?? "cue_then_full"}
-          onChange={(e) => set({ answerFormat: e.target.value as AnswerFormat })}
-          className="mt-1 field"
-        >
-          <option value="cue_then_full">One-line cue, then the full answer</option>
-          <option value="full_only">Full answer only</option>
-        </select>
+          onChange={(v) => set({ answerFormat: v as AnswerFormat })}
+          options={[
+            { value: "cue_then_full", label: "One-line cue, then the full answer" },
+            { value: "full_only", label: "Full answer only" },
+          ]}
+        />
       </div>
       {errorFor("").map((m) => (
         <p key={m} role="alert" className="text-danger">

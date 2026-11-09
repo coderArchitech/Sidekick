@@ -1,5 +1,6 @@
 import { render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
+import { choose, optionsOf } from "@/test/select";
 import axe from "axe-core";
 import { beforeEach, describe, expect, it } from "vitest";
 import { mockCalls, mockCommands, resetMocks } from "@/ipc/testing";
@@ -32,13 +33,11 @@ describe("SessionBar", () => {
     await user.click(screen.getByRole("button", { name: "Options" }));
     const stt = await screen.findByRole("combobox", { name: "Speech-to-text for this session" });
     const llm = screen.getByRole("combobox", { name: "Answers for this session" });
-    expect(stt).toHaveValue("");
-    expect(within(stt).getByRole("option", { name: "Default (Deepgram)" })).toBeInTheDocument();
-    expect(
-      within(llm).getByRole("option", { name: "Default (Anthropic (Claude))" }),
-    ).toBeInTheDocument();
-    await user.selectOptions(stt, "assemblyai");
-    await user.selectOptions(llm, "openai");
+    expect(stt).toHaveAttribute("data-value", "");
+    expect(stt).toHaveTextContent("Default (Deepgram)");
+    expect(llm).toHaveTextContent("Default (Anthropic (Claude))");
+    await choose(user, stt, "assemblyai");
+    await choose(user, llm, "openai");
     await user.type(screen.getByLabelText("Session name"), "Vendor call");
     await user.click(screen.getByRole("button", { name: "New session" }));
     await waitFor(() =>
@@ -191,13 +190,13 @@ describe("Auto-answer toggle", () => {
     render(<SessionBar />);
     await createSession(user);
     const picker = screen.getByRole("combobox", { name: "Skill" });
-    await waitFor(() => expect(within(picker).getAllByRole("option")).toHaveLength(5));
-    expect(within(picker).queryByRole("option", { name: "Teacher" })).toBeNull();
-    await user.selectOptions(picker, "sales-discovery");
+    await waitFor(async () => expect(await optionsOf(user, picker)).toHaveLength(6));
+    expect((await optionsOf(user, picker)).map((o) => o.label)).not.toContain("Teacher");
+    await choose(user, picker, "sales-discovery");
     await waitFor(() =>
       expect(useSessionStore.getState().session?.skillId).toBe("sales-discovery"),
     );
-    await user.selectOptions(picker, "");
+    await choose(user, picker, "");
     await waitFor(() => expect(useSessionStore.getState().session?.skillId).toBeNull());
   });
 
@@ -208,8 +207,8 @@ describe("Auto-answer toggle", () => {
     // No main Skill yet: nothing to add to.
     expect(screen.queryByRole("button", { name: /More Skills/ })).toBeNull();
     const picker = screen.getByRole("combobox", { name: "Skill" });
-    await waitFor(() => expect(within(picker).getAllByRole("option").length).toBeGreaterThan(2));
-    await user.selectOptions(picker, "teacher");
+    await waitFor(async () => expect((await optionsOf(user, picker)).length).toBeGreaterThan(2));
+    await choose(user, picker, "teacher");
 
     await user.click(await screen.findByRole("button", { name: /More Skills/ }));
     const dialog = screen.getByRole("dialog", { name: "Also use" });
@@ -228,7 +227,7 @@ describe("Auto-answer toggle", () => {
 
     // Switching the main Skill to an extra one moves it.
     await user.keyboard("{Escape}");
-    await user.selectOptions(picker, "sales-discovery");
+    await choose(user, picker, "sales-discovery");
     await waitFor(() =>
       expect(useSessionStore.getState().session?.extraSkillIds).toEqual(["interview-coach"]),
     );
@@ -247,8 +246,8 @@ describe("Auto-answer toggle", () => {
   it("after the session ends, chooses how long to keep it", async () => {
     const user = userEvent.setup();
     const keep = await endedSession(user);
-    expect(keep).toHaveValue("30d");
-    await user.selectOptions(keep, "forever");
+    expect(keep).toHaveAttribute("data-value", "30d");
+    await choose(user, keep, "forever");
     await waitFor(() => expect(useSessionStore.getState().session?.retention).toBe("forever"));
   });
 

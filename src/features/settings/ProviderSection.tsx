@@ -1,4 +1,5 @@
 import { useEffect, useId, useState } from "react";
+import { Select } from "@/lib/Select";
 import {
   commands,
   type ModelInfo,
@@ -80,23 +81,19 @@ export function ProviderSection({ kind, title, description, choice, allowOff, on
       <label htmlFor={providerSelectId} className="block text-sm text-fg-2">
         Provider
       </label>
-      <select
+      <Select
         id={providerSelectId}
-        className="field mt-1"
+        className="mt-1 max-w-sm"
         value={choice?.provider ?? OFF}
-        onChange={(e) =>
-          onChoose(e.target.value === OFF ? null : { provider: e.target.value, model: null })
-        }
-      >
-        {allowOff && <option value={OFF}>Off</option>}
-        {providers.map((p) => (
-          <option key={p.id} value={p.id}>
-            {p.displayName}
-            {p.key.saved ? " (key saved)" : ""}
-            {p.implemented ? "" : " (coming soon)"}
-          </option>
-        ))}
-      </select>
+        onChange={(v) => onChoose(v === OFF ? null : { provider: v, model: null })}
+        options={[
+          ...(allowOff ? [{ value: OFF, label: "Off" }] : []),
+          ...providers.map((p) => ({
+            value: p.id,
+            label: `${p.displayName}${p.key.saved ? " (key saved)" : ""}${p.implemented ? "" : " (coming soon)"}`,
+          })),
+        ]}
+      />
 
       {selected && !selected.keyRequired && (
         <p className="mt-3 text-sm text-fg-muted">Runs on this computer. No key needed.</p>
@@ -116,19 +113,16 @@ export function ProviderSection({ kind, title, description, choice, allowOff, on
           <label htmlFor={modelSelectId} className="block text-sm text-fg-2">
             Model
           </label>
-          <select
+          <Select
             id={modelSelectId}
-            className="field mt-1"
+            className="mt-1 max-w-sm"
             value={choice.model ?? DEFAULT_MODEL}
-            onChange={(e) => onChoose({ provider: choice.provider, model: e.target.value || null })}
-          >
-            <option value={DEFAULT_MODEL}>Sidekick default</option>
-            {models.map((m) => (
-              <option key={m.id} value={m.id}>
-                {m.displayName}
-              </option>
-            ))}
-          </select>
+            onChange={(v) => onChoose({ provider: choice.provider, model: v || null })}
+            options={[
+              { value: DEFAULT_MODEL, label: "Sidekick default" },
+              ...models.map((m) => ({ value: m.id, label: m.displayName })),
+            ]}
+          />
         </div>
       )}
       {selected?.id === "whisper-local" && choice && (

@@ -69,9 +69,13 @@ export const useTranscriptStore = create<TranscriptState>((set) => ({
     set((state) => ({ bookmarks: [...state.bookmarks, b].sort((x, y) => x.atMs - y.atMs) })),
 }));
 
-/** "me" → "Me", "speaker_2" → "Speaker 2"; names the user gave are kept as they are. */
+/**
+ * "me" → "Me", "speaker_2" → "Speaker 2", "room" (microphone only, no system
+ * audio) → "Room"; names the user gave are kept as they are.
+ */
 export function displayName(label: string): string {
   if (label === "me") return "Me";
+  if (label === "room") return "Room";
   const m = /^speaker_(\d+)$/.exec(label);
   return m ? `Speaker ${m[1]}` : label;
 }

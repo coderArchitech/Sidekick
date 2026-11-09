@@ -271,21 +271,21 @@ async fn participants_agreed_starts_both_streams() {
     let sink = Arc::new(Sink::default());
     let kinds = streams_for(Some(ConsentOption::ParticipantsAgreed)).unwrap();
     let live = LiveSession::start(&kinds, &audio, &plan(), sink.clone()).unwrap();
-    assert_eq!(live.kinds(), [StreamKind::Mic, StreamKind::System]);
+    // System audio starts first, so the mic knows whether it is needed for the room.
+    assert_eq!(live.kinds(), [StreamKind::System, StreamKind::Mic]);
+    assert_eq!(
+        *audio.started.lock().unwrap(),
+        [StreamKind::System, StreamKind::Mic]
+    );
     assert!(live.warnings.is_empty());
     tokio::time::sleep(Duration::from_millis(300)).await; // Let the fixture play.
     live.stop().await;
-    let labels: Vec<String> = sink
-        .segments
-        .lock()
-        .unwrap()
-        .iter()
-        .map(|s| s.speaker_label.clone())
-        .collect();
-    assert!(
-        labels.contains(&"me".to_owned()) && labels.contains(&"speaker_1".to_owned()),
-        "{labels:?}"
-    );
+    let segs = sink.segments.lock().unwrap();
+    let labels: Vec<&str> = segs.iter().map(|s| s.speaker_label.as_str()).collect();
+    assert!(labels.contains(&"speaker_1"), "{labels:?}");
+    // Both streams heard the same fixture: the mic copy is an echo of the
+    // other speaker (speakers, no headphones) and is dropped.
+    assert!(segs.iter().all(|s| !s.is_user), "{labels:?}");
 }
 
 #[tokio::test]
@@ -293,11 +293,25 @@ async fn missing_system_audio_falls_back_to_the_microphone_with_a_warning() {
     let dir = tempfile::tempdir().unwrap();
     let audio = recording(dir.path(), true);
     let kinds = streams_for(Some(ConsentOption::ParticipantsAgreed)).unwrap();
-    let live = LiveSession::start(&kinds, &audio, &plan(), Arc::new(Sink::default())).unwrap();
+    let sink = Arc::new(Sink::default());
+    let live = LiveSession::start(&kinds, &audio, &plan(), sink.clone()).unwrap();
     assert_eq!(live.kinds(), [StreamKind::Mic]);
     assert_eq!(live.warnings.len(), 1);
-    assert!(live.warnings[0].contains("Only your microphone"));
+    assert!(
+        live.warnings[0].contains("listens through your microphone"),
+        "{}",
+        live.warnings[0]
+    );
+    tokio::time::sleep(Duration::from_millis(300)).await; // Let the fixture play.
     live.stop().await;
+    // The mic is the only way to hear the other person: its lines are the room,
+    // so questions in them are detected and answered.
+    let segs = sink.segments.lock().unwrap();
+    assert_eq!(segs.len(), 2);
+    assert!(
+        segs.iter()
+            .all(|s| !s.is_user && s.speaker_label == sidekick_session::sinks::ROOM_LABEL)
+    );
 }
 
 struct Failing;
