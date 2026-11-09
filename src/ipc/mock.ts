@@ -45,7 +45,18 @@ export const DEFAULT_SETTINGS: Settings = {
   ],
   profile: { name: "", nicknames: [] },
   overlay: { opacity: 80, fontSize: 14, compact: false, positions: [] },
+  vocabulary: [],
 };
+
+/** Mirrors `clean_vocabulary` in crates/settings: trimmed, no blanks or duplicates. */
+export function cleanVocabulary(terms: string[]): string[] {
+  const out: string[] = [];
+  for (const raw of terms) {
+    const t = raw.trim().replace(/\s+/g, " ");
+    if (t && !out.some((o) => o.toLowerCase() === t.toLowerCase())) out.push(t);
+  }
+  return out;
+}
 
 type CatalogRow = [id: string, kind: ProviderKind, displayName: string, keyRequired: boolean];
 
@@ -347,6 +358,7 @@ export function applyPatch(current: Settings, patch: SettingsPatch): Settings {
       .filter((n) => n && !seen.has(n.toLowerCase()) && seen.add(n.toLowerCase()));
     next.profile = { name, nicknames };
   }
+  if (patch.vocabulary) next.vocabulary = cleanVocabulary(patch.vocabulary);
   return next;
 }
 
@@ -426,6 +438,13 @@ export const mockCommands: Commands = {
           err("INTERNAL", "Each shortcut needs at least one modifier (Ctrl, Cmd, Alt or Shift)."),
         );
       }
+    }
+    if (patch.vocabulary) {
+      const v = cleanVocabulary(patch.vocabulary);
+      if (v.length > 100 || v.some((t) => t.length > 50))
+        return Promise.resolve(
+          err("INTERNAL", "Custom vocabulary can have up to 100 terms of up to 50 characters."),
+        );
     }
     settings = applyPatch(settings, patch);
     return Promise.resolve({ status: "ok", data: structuredClone(settings) });

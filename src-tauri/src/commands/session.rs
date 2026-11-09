@@ -235,8 +235,8 @@ pub async fn start_session(
         }
     };
     let mut plan = stt_plan(&state, &choice)?;
-    // Boost the user's name and nicknames so directed questions are heard (PRD LIS-5a).
-    plan.keyterms = settings.profile.names();
+    // Boost the user's names (PRD LIS-5a) and the custom vocabulary (LIS-5).
+    plan.keyterms = settings.keyterms();
     let sink = Arc::new(TauriSttSink::new(app.clone(), session_id.clone()));
     let runner = LiveSession::start(&kinds, audio.as_ref(), &plan, sink)?;
     let warnings = runner.warnings.clone();

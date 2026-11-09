@@ -65,7 +65,7 @@ impl AssemblyAiProvider {
             if !cfg.keyterms.is_empty() {
                 q.append_pair(
                     "keyterms_prompt",
-                    &serde_json::to_string(&cfg.keyterms).unwrap_or_default(),
+                    &serde_json::to_string(crate::keyterms_for(cfg)).unwrap_or_default(),
                 );
             }
         }
@@ -238,6 +238,27 @@ impl KeyVerifier for AssemblyAiVerifier {
 #[allow(clippy::unwrap_used)]
 mod tests {
     use super::*;
+
+    fn vocabulary(n: usize) -> Vec<String> {
+        std::iter::once("Nitesh".to_owned())
+            .chain((1..n).map(|i| format!("Term{i}")))
+            .collect()
+    }
+
+    #[test]
+    fn sends_the_custom_vocabulary_up_to_the_limit() {
+        let mut cfg = SttConfig::new(StreamKind::Mic);
+        cfg.keyterms = vocabulary(150);
+        let url = url::Url::parse(&AssemblyAiProvider::default().listen_url(&cfg)).unwrap();
+        let prompt = url
+            .query_pairs()
+            .find(|(k, _)| k == "keyterms_prompt")
+            .map(|(_, v)| v.into_owned())
+            .unwrap();
+        let terms: Vec<String> = serde_json::from_str(&prompt).unwrap();
+        assert_eq!(terms.len(), crate::MAX_KEYTERMS);
+        assert_eq!(terms[0], "Nitesh");
+    }
     use sidekick_audio::StreamKind;
 
     #[test]

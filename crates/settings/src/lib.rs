@@ -115,6 +115,40 @@ pub struct Settings {
     pub shortcuts: Vec<Binding>,
     pub profile: Profile,
     pub overlay: OverlayPrefs,
+    /// Product names, acronyms and people to boost in speech-to-text (PRD LIS-5).
+    pub vocabulary: Vec<String>,
+}
+
+/// Most vocabulary terms, and the longest term.
+pub const MAX_VOCABULARY: usize = 100;
+pub const MAX_TERM: usize = 50;
+
+/// Vocabulary terms trimmed, without blanks or duplicates (case-insensitive).
+#[must_use]
+pub fn clean_vocabulary(terms: &[String]) -> Vec<String> {
+    let mut out: Vec<String> = Vec::new();
+    for t in terms {
+        let t = t.split_whitespace().collect::<Vec<_>>().join(" ");
+        if !t.is_empty() && !out.iter().any(|o| o.eq_ignore_ascii_case(&t)) {
+            out.push(t);
+        }
+    }
+    out
+}
+
+impl Settings {
+    /// Speech-to-text keyterms: the user's names first (PRD LIS-5a), then the
+    /// custom vocabulary (LIS-5), without duplicates.
+    #[must_use]
+    pub fn keyterms(&self) -> Vec<String> {
+        let mut out = self.profile.names();
+        for t in &self.vocabulary {
+            if !out.iter().any(|o| o.eq_ignore_ascii_case(t)) {
+                out.push(t.clone());
+            }
+        }
+        out
+    }
 }
 
 impl Default for Settings {
@@ -139,6 +173,7 @@ impl Default for Settings {
             shortcuts: sidekick_hotkeys::defaults(),
             profile: Profile::default(),
             overlay: OverlayPrefs::default(),
+            vocabulary: Vec::new(),
         }
     }
 }
@@ -170,6 +205,9 @@ pub struct SettingsPatch {
     pub profile: Option<Profile>,
     #[serde(default)]
     pub overlay: Option<OverlayPrefs>,
+    /// The full vocabulary list (PRD LIS-5).
+    #[serde(default)]
+    pub vocabulary: Option<Vec<String>>,
 }
 
 impl Settings {
@@ -210,6 +248,18 @@ impl Settings {
         if let Some(v) = patch.overlay {
             v.validate()?;
             self.overlay = v;
+        }
+        if let Some(v) = patch.vocabulary {
+            let v = clean_vocabulary(&v);
+            if v.len() > MAX_VOCABULARY || v.iter().any(|t| t.chars().count() > MAX_TERM) {
+                return Err(SidekickError::new(
+                    ErrorCode::Internal,
+                    format!(
+                        "Custom vocabulary can have up to {MAX_VOCABULARY} terms of up to {MAX_TERM} characters."
+                    ),
+                ));
+            }
+            self.vocabulary = v;
         }
         self.validate()?;
         Ok(self)
@@ -257,6 +307,7 @@ pub fn load(db: &Database) -> SidekickResult<Settings> {
         overlay: section::<OverlayPrefs>(db, "overlay")?
             .filter(|o| o.validate().is_ok())
             .unwrap_or(d.overlay),
+        vocabulary: section(db, "vocabulary")?.unwrap_or(d.vocabulary),
     })
 }
 
@@ -289,6 +340,9 @@ pub fn update(db: &Database, patch: SettingsPatch) -> SidekickResult<Settings> {
     }
     if patch.overlay.is_some() {
         raw::set(db, "overlay", &to_json(&updated.overlay)?)?;
+    }
+    if patch.vocabulary.is_some() {
+        raw::set(db, "vocabulary", &to_json(&updated.vocabulary)?)?;
     }
     Ok(updated)
 }
@@ -600,5 +654,39 @@ mod tests {
         )
         .unwrap();
         assert_eq!(load(&db).unwrap().overlay, OverlayPrefs::default());
+    }
+
+    #[test]
+    fn vocabulary_is_cleaned_limited_and_merged_after_the_names() {
+        let db = db();
+        let patch = |v: serde_json::Value| -> SettingsPatch { serde_json::from_value(v).unwrap() };
+        let s = update(
+            &db,
+            patch(serde_json::json!({ "vocabulary": ["  Kubernetes ", "SOC 2", "kubernetes", "", "Priya   Raman"] })),
+        )
+        .unwrap();
+        assert_eq!(s.vocabulary, ["Kubernetes", "SOC 2", "Priya Raman"]);
+        assert_eq!(load(&db).unwrap().vocabulary, s.vocabulary, "saved");
+
+        let too_many: Vec<String> = (0..=MAX_VOCABULARY).map(|i| format!("term {i}")).collect();
+        assert!(update(&db, patch(serde_json::json!({ "vocabulary": too_many }))).is_err());
+        assert!(
+            update(
+                &db,
+                patch(serde_json::json!({ "vocabulary": ["x".repeat(51)] }))
+            )
+            .is_err()
+        );
+
+        let s = update(
+            &db,
+            patch(serde_json::json!({ "profile": { "name": "Priya Raman", "nicknames": ["PR"] } })),
+        )
+        .unwrap();
+        assert_eq!(
+            s.keyterms(),
+            ["Priya Raman", "PR", "Kubernetes", "SOC 2"],
+            "names first, no duplicates"
+        );
     }
 }

@@ -13,6 +13,7 @@ import { ProviderSection } from "./ProviderSection";
 import { PacksSection } from "@/features/packs";
 import { SkillsSection } from "@/features/skills";
 import { ShortcutsSection } from "./ShortcutsSection";
+import { VocabularySection } from "./VocabularySection";
 
 const RETENTION_LABELS: Record<Retention, string> = {
   session: "Until the session ends",
@@ -76,6 +77,17 @@ export function SettingsWindow() {
                 if (result.status === "ok") {
                   setSettings(result.data);
                   return { saved: result.data.profile };
+                }
+                return { error: result.error.message };
+              }}
+            />
+            <VocabularySection
+              vocabulary={settings.vocabulary}
+              onSave={async (vocabulary) => {
+                const result = await commands.updateSettings({ vocabulary });
+                if (result.status === "ok") {
+                  setSettings(result.data);
+                  return { saved: result.data.vocabulary };
                 }
                 return { error: result.error.message };
               }}

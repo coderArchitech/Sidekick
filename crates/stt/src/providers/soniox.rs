@@ -71,7 +71,7 @@ pub fn config_message(cfg: &SttConfig, key: &SecretString) -> String {
         "enable_speaker_diarization": cfg.kind == StreamKind::System,
     });
     if !cfg.keyterms.is_empty() {
-        c["context"] = json!({ "terms": cfg.keyterms });
+        c["context"] = json!({ "terms": crate::keyterms_for(cfg) });
     }
     c.to_string()
 }
@@ -287,6 +287,24 @@ impl KeyVerifier for SonioxVerifier {
 #[allow(clippy::unwrap_used)]
 mod tests {
     use super::*;
+
+    fn vocabulary(n: usize) -> Vec<String> {
+        std::iter::once("Nitesh".to_owned())
+            .chain((1..n).map(|i| format!("Term{i}")))
+            .collect()
+    }
+
+    #[test]
+    fn sends_the_custom_vocabulary_up_to_the_limit() {
+        let mut cfg = SttConfig::new(StreamKind::Mic);
+        cfg.keyterms = vocabulary(150);
+        let c: serde_json::Value =
+            serde_json::from_str(&config_message(&cfg, &SecretString::from("k".to_owned())))
+                .unwrap();
+        let terms = c["context"]["terms"].as_array().unwrap();
+        assert_eq!(terms.len(), crate::MAX_KEYTERMS);
+        assert_eq!(terms[1], "Term1");
+    }
 
     #[test]
     fn config_carries_key_hints_diarization_and_terms() {

@@ -96,7 +96,7 @@ All Phase 0 code and automated tests are done and green on Linux, Windows and ma
 | T-044 | Pre-meeting brief and Knowledge Packs | 🟡 In progress: testing | 🖥️ Built with Rust, unit, Playwright and E2E tests. Needs a real-model check of brief quality (T-039) |
 | T-045 | Agents (tools) and multiple active Skills | 🟡 In progress: testing | 🖥️ Built with Rust, unit, Playwright and E2E tests. Web search tool arrives with T-046; needs a real-model check of tool choice (T-039) |
 | T-046 | Web search provider and per-session overrides | 🟡 In progress: testing | 🖥️ Built with Rust (mock HTTP), unit, Playwright and E2E tests. Needs a live check with real Tavily and Brave keys |
-| T-047 | Custom vocabulary | ⬜ To do | |
+| T-047 | Custom vocabulary | 🟡 In progress: testing | 🖥️ Built with Rust, unit, Playwright and E2E tests. Needs a live accuracy check with real providers (T-021) |
 | T-048 | Click-through mode and themes | ⬜ To do | |
 | T-049 | Glass overlay: translucent background, crisp text | 🟡 In progress: testing | 🖥️ Built and tested (Vitest, Playwright over a busy backdrop). Needs a manual look over a live call on Windows and macOS |
 
@@ -711,6 +711,20 @@ Each P1 task gets full scope and tests when it moves to In progress.
 - [x] Playwright (`tests/ui/web-search-overrides.spec.ts`): session with its own providers, agent web search shown under Tools used, axe.
 - [x] E2E (`tests/e2e/specs/web-search-overrides.e2e.ts`): providers stored by Rust; web search through the real gateway (mock mode).
 - [ ] Manual 🖥️: real Tavily and Brave keys (key check and results); a session on OpenAI while Settings says Anthropic. Speech-to-text overrides offer only providers marked implemented in the catalog (Deepgram in this build; AssemblyAI and Soniox once T-021's live checks pass).
+
+### T-047 Custom vocabulary
+
+**Refs:** PRD LIS-5 (with LIS-5a); TECHNICAL.md 7.1 (`settings`, `stt`)
+**Scope**
+- [x] Settings → Custom vocabulary: product names, acronyms and people, one per line or comma-separated; up to 100 terms of up to 50 characters; trimmed and de-duplicated; a live count.
+- [x] When a session starts, keyterms = the user's names (LIS-5a) then the vocabulary, without duplicates.
+- [x] Every speech-to-text provider gets them, at most 100: Deepgram `keyterm`, AssemblyAI `keyterms_prompt`, Soniox `context.terms`, local Whisper's prompt (cut to 600 characters).
+**Tests**
+- [x] Rust: vocabulary cleaned, limited, saved and merged after the names; each provider's request carries the terms up to the limit (names first); Whisper prompt stays in its window; mock provider applies the spellings.
+- [x] Component: save with cleaning and count, limit error, clear, axe.
+- [x] Playwright (`tests/ui/vocabulary.spec.ts`): save, count, validation, axe.
+- [x] E2E (`tests/e2e/specs/vocabulary.e2e.ts`): vocabulary saved in Settings changes the live transcript's spelling through the real speech-to-text pipeline (mock provider).
+- [ ] Manual 🖥️: accuracy gain on real audio with Deepgram, AssemblyAI and Soniox (T-021, T-027).
 
 ### T-049 Glass overlay: translucent background, crisp text
 

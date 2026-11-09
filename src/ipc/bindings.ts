@@ -1467,6 +1467,10 @@ export type Settings = {
   shortcuts: Binding[];
   profile: Profile;
   overlay: OverlayPrefs;
+  /**
+   * Product names, acronyms and people to boost in speech-to-text (PRD LIS-5).
+   */
+  vocabulary: string[];
 };
 /**
  * A partial update. Only the sections present are replaced; unknown fields are
@@ -1488,6 +1492,10 @@ export type SettingsPatch = {
   shortcuts?: Binding[] | null;
   profile?: Profile | null;
   overlay?: OverlayPrefs | null;
+  /**
+   * The full vocabulary list (PRD LIS-5).
+   */
+  vocabulary?: string[] | null;
 };
 /**
  * Error returned by every fallible Sidekick function and IPC command.
