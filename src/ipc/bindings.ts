@@ -434,6 +434,17 @@ export const commands = {
     }
   },
   /**
+   * Deletes one screenshot from the session's strip (PRD SCR-6).
+   */
+  async deleteScreenshot(screenshotId: string): Promise<Result<null, SidekickError>> {
+    try {
+      return { status: "ok", data: await TAURI_INVOKE("delete_screenshot", { screenshotId }) };
+    } catch (e) {
+      if (e instanceof Error) throw e;
+      else return { status: "error", error: e as any };
+    }
+  },
+  /**
    * Whisper models and which are downloaded.
    */
   async whisperModels(): Promise<WhisperModelEntry[]> {
@@ -794,7 +805,16 @@ export type ContextChunk = {
 /**
  * How much context to gather (tech doc 13.5: last 3 minutes, top 5 chunks).
  */
-export type ContextOptions = { windowMs: number; topK: number };
+export type ContextOptions = {
+  windowMs: number;
+  topK: number;
+  /**
+   * Answer about this screenshot of the session, whatever its age (the
+   * screenshot strip's re-ask, PRD SCR-6). Otherwise the latest from the
+   * last 10 minutes.
+   */
+  screenshotId: string | null;
+};
 export type ContextPack = {
   /**
    * The most recent `window_ms` of transcript, in time order.

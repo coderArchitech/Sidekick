@@ -3,6 +3,7 @@ import { FollowUpChips, Markdown } from "@/features/answers";
 import { useSessionStore } from "@/features/session";
 import { activeRouter, askChat, useChatStore, type AnswerView } from "@/orchestrator";
 import { CaptureMenu, PendingScreenshot } from "./CaptureMenu";
+import { ScreenshotStrip } from "./ScreenshotStrip";
 
 /** The Chat tab (PRD QA-8): ask your own questions with the session as context. */
 export function ChatView() {
@@ -61,7 +62,8 @@ export function ChatView() {
           {error ?? captureError}
         </p>
       )}
-      <PendingScreenshot />
+      <ScreenshotStrip disabled={!canAsk} />
+      <PendingScreenshot disabled={!canAsk} />
       <form onSubmit={(e) => void send(e)} className="flex items-end gap-2">
         {session && <CaptureMenu sessionId={session.id} disabled={!canAsk} />}
         <textarea

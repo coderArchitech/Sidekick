@@ -139,6 +139,19 @@ pub fn latest(
         .map_err(|e| db_err("reading screenshots", &e))
 }
 
+/// One screenshot of `session_id` (never another session's).
+pub fn get(db: &Database, session_id: &str, id: &str) -> SidekickResult<Screenshot> {
+    db.conn()
+        .query_row(
+            &format!("SELECT {COLUMNS} FROM screenshots WHERE id = ?1 AND session_id = ?2"),
+            params![id, session_id],
+            row,
+        )
+        .optional()
+        .map_err(|e| db_err("reading a screenshot", &e))?
+        .ok_or_else(|| SidekickError::internal("That screenshot no longer exists."))
+}
+
 /// The image of one screenshot.
 pub fn image(db: &Database, id: &str) -> SidekickResult<ScreenshotImage> {
     db.conn()

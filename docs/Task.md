@@ -92,7 +92,7 @@ All Phase 0 code and automated tests are done and green on Linux, Windows and ma
 | --- | --- | --- | --- |
 | T-041 | Meeting memory extras: agenda, recap, action items | 🟡 In progress: testing | 🖥️ Built with unit, Playwright and E2E tests. Needs a real-model check of agenda and recap quality (T-039) |
 | T-042 | Answer follow-up chips | 🟡 In progress: testing | 🖥️ Built with unit, Playwright and E2E tests. Needs a real-model check that each chip reshapes the answer (T-039) |
-| T-043 | Screenshot quick actions and strip | ⬜ To do | |
+| T-043 | Screenshot quick actions and strip | 🟡 In progress: testing | 🖥️ Built with unit, Playwright and E2E tests. Needs a real-model check of each action on real screenshots (T-039) |
 | T-044 | Pre-meeting brief and Knowledge Packs | ⬜ To do | |
 | T-045 | Agents (tools) and multiple active Skills | ⬜ To do | |
 | T-046 | Web search provider and per-session overrides | ⬜ To do | |
@@ -647,6 +647,21 @@ Each P1 task gets full scope and tests when it moves to In progress.
 - [x] Playwright (`tests/ui/follow-ups.spec.ts`): chip on a live answer → Chat; chips chain in Chat; axe.
 - [x] E2E (`tests/e2e/specs/follow-ups.e2e.ts`): Shorter on a detected answer answers in Chat through the real gateway.
 - [ ] Manual 🖥️: with a real model, each chip visibly reshapes the answer (T-039).
+
+### T-043 Screenshot quick actions and strip
+
+**Refs:** PRD SCR-5, SCR-6; TECHNICAL.md 6.5 (`retrieve_context`, `delete_screenshot`), 7.1 (`chat`)
+**Scope**
+- [x] Quick actions on the attached screenshot: Explain, Summarise, Extract table, Answer question on screen, Debug this code. Each sends its own prompt with that exact screenshot.
+- [x] `retrieve_context` takes an optional `screenshotId` (this session's only, any age); typed questions about an attached screenshot use it too.
+- [x] Screenshot strip in Chat: thumbnails of every capture in the session, reloaded with the session; click to attach again (re-ask), ✕ to delete (`delete_screenshot`).
+**Tests**
+- [x] Rust: one screenshot by session (never another session's), delete is idempotent; a pack with a chosen screenshot of any age, never another session's.
+- [x] Unit: the five actions and their prompts; the router passes `screenshotId` in the context options.
+- [x] Component: each action sends its prompt with that screenshot; strip lists, re-asks the exact screenshot, deletes and detaches, reloads with the session; axe.
+- [x] Playwright (`tests/ui/screenshot-actions.spec.ts`): a quick action, strip re-ask and delete, axe.
+- [x] E2E (`tests/e2e/specs/screenshot-actions.e2e.ts`): quick action, strip, re-ask and delete in the real app.
+- [ ] Manual 🖥️: each action on real screenshots (a table, an error, a question) with a vision model (T-039).
 
 ### T-049 Glass overlay: translucent background, crisp text
 

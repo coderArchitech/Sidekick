@@ -44,6 +44,7 @@
     "allow-preview-screen",
     "allow-list-screenshots",
     "allow-screenshot-image",
+    "allow-delete-screenshot",
     "allow-ingest-document",
     "allow-ingest-url",
     "allow-list-documents",

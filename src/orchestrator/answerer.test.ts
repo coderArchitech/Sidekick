@@ -1,5 +1,13 @@
 import { beforeEach, describe, expect, it } from "vitest";
-import type { ContextPack, LlmRequest, NewAnswer, Result, SidekickError, Stage } from "@/ipc";
+import type {
+  ContextOptions,
+  ContextPack,
+  LlmRequest,
+  NewAnswer,
+  Result,
+  SidekickError,
+  Stage,
+} from "@/ipc";
 import { mockAnswerBus, resetMocks } from "@/ipc/testing";
 import { AnswerRouter, type AnswerDeps, type AnswerView, type AskInput } from "./answerer";
 import { NOT_FOUND } from "./prompt";
@@ -37,10 +45,12 @@ function harness(pack: ContextPack = PACK, opts: { streamFails?: boolean } = {})
   const saved: NewAnswer[] = [];
   const latency: [Stage, number][] = [];
   const queries: string[] = [];
+  const optionsSeen: (ContextOptions | null)[] = [];
   let clock = 10_000;
   const deps: AnswerDeps = {
-    retrieveContext: (_s, query) => {
+    retrieveContext: (_s, query, options) => {
       queries.push(query);
+      optionsSeen.push(options);
       return Promise.resolve(ok(pack));
     },
     llmStream: (id, provider, req) => {
@@ -82,6 +92,7 @@ function harness(pack: ContextPack = PACK, opts: { streamFails?: boolean } = {})
     saved,
     latency,
     queries,
+    optionsSeen,
     views,
     advance: (ms: number) => (clock += ms),
   };
@@ -267,5 +278,12 @@ describe("AnswerRouter", () => {
     done(`${v.id}:full`);
     await tick();
     expect(h.saved[0]?.question).toBe("Shorter: What's the rate limit?");
+  });
+
+  it("asks about a chosen screenshot through the context options (SCR-5, SCR-6)", async () => {
+    const h = harness();
+    await h.router.ask(input("Plain question"));
+    await h.router.ask({ ...input("About this?"), source: "screenshot", screenshotId: "shot-1" });
+    expect(h.optionsSeen).toEqual([null, { windowMs: 180_000, topK: 5, screenshotId: "shot-1" }]);
   });
 });

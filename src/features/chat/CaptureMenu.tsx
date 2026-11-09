@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { commands, type WindowInfo } from "@/ipc";
 import { useChatStore } from "@/orchestrator";
 import { RegionPicker } from "./RegionPicker";
+import { QuickActions, useThumb } from "./ScreenshotStrip";
 
 type Step = "closed" | "menu" | "window" | "region";
 
@@ -114,43 +115,34 @@ function MenuItem({ onClick, children }: { onClick: () => void; children: string
   );
 }
 
-/** The screenshot waiting for the next question, with a thumbnail. */
-export function PendingScreenshot() {
+/** The screenshot waiting for the next question, with a thumbnail and quick actions. */
+export function PendingScreenshot({ disabled = false }: { disabled?: boolean }) {
   const pending = useChatStore((s) => s.pending);
   const clear = useChatStore((s) => s.clearPending);
-  const [thumb, setThumb] = useState<{ id: string; src: string } | null>(null);
-  const src = pending && thumb?.id === pending.id ? thumb.src : null;
-
-  useEffect(() => {
-    if (!pending) return;
-    let live = true;
-    void commands.screenshotImage(pending.id).then((r) => {
-      if (live && r.status === "ok") setThumb({ id: pending.id, src: r.data });
-    });
-    return () => {
-      live = false;
-    };
-  }, [pending]);
+  const src = useThumb(pending?.id ?? null);
 
   if (!pending) return null;
   return (
-    <div
-      role="status"
-      aria-label="Screenshot attached"
-      className="flex items-center gap-2 rounded-md border border-line p-1 text-xs text-fg-2"
-    >
-      {src && <img src={src} alt="Screenshot preview" className="h-10 rounded object-cover" />}
-      <span className="flex-1">
-        Screenshot attached ({pending.width}×{pending.height}). Ask about it below.
-      </span>
-      <button
-        type="button"
-        aria-label="Remove screenshot"
-        className="rounded px-1.5 hover:bg-surface-2"
-        onClick={clear}
+    <div className="space-y-1.5 rounded-md border border-line p-1.5">
+      <div
+        role="status"
+        aria-label="Screenshot attached"
+        className="flex items-center gap-2 text-xs text-fg-2"
       >
-        ✕
-      </button>
+        {src && <img src={src} alt="Screenshot preview" className="h-10 rounded object-cover" />}
+        <span className="flex-1">
+          Screenshot attached ({pending.width}×{pending.height}). Ask about it below.
+        </span>
+        <button
+          type="button"
+          aria-label="Remove screenshot"
+          className="rounded px-1.5 hover:bg-surface-2"
+          onClick={clear}
+        >
+          ✕
+        </button>
+      </div>
+      <QuickActions disabled={disabled} />
     </div>
   );
 }

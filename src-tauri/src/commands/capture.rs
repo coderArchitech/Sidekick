@@ -121,3 +121,10 @@ pub fn screenshot_image(
 ) -> SidekickResult<String> {
     Ok(repo::image(&state.db(), &screenshot_id)?.data_url())
 }
+
+/// Deletes one screenshot from the session's strip (PRD SCR-6).
+#[tauri::command]
+#[specta::specta]
+pub fn delete_screenshot(state: State<'_, AppState>, screenshot_id: String) -> SidekickResult<()> {
+    repo::delete(&state.db(), &screenshot_id)
+}
