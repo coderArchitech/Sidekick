@@ -39,6 +39,33 @@ export function skillFor(
     name: s.name,
     instructions: s.instructions,
     answerFormat: s.answerFormat ?? "cue_then_full",
+    ...(s.tools?.length ? { tools: s.tools } : {}),
+  };
+}
+
+/**
+ * The combined prompt of the session's active Skills (PRD SKL-5): the main
+ * one first, then the others, keeping those that apply to `source`. One-line
+ * cues stay unless every applicable Skill is full-only; tools are pooled.
+ */
+export function skillsFor(
+  skills: SkillEntry[],
+  skillIds: (string | null | undefined)[],
+  source: QuestionSource,
+): SkillPrompt | null {
+  const parts = [...new Set(skillIds)]
+    .map((id) => skillFor(skills, id, source))
+    .filter((p): p is SkillPrompt => p !== null);
+  if (parts.length === 0) return null;
+  if (parts.length === 1) return parts[0] ?? null;
+  const tools = [...new Set(parts.flatMap((p) => p.tools ?? []))];
+  return {
+    name: parts.map((p) => p.name).join(" + "),
+    instructions: parts.map((p) => `### ${p.name}\n${p.instructions.trim()}`).join("\n\n"),
+    answerFormat: parts.every((p) => p.answerFormat === "full_only")
+      ? "full_only"
+      : "cue_then_full",
+    ...(tools.length ? { tools } : {}),
   };
 }
 

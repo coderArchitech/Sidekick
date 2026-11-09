@@ -1,5 +1,5 @@
 import { expect } from "@wdio/globals";
-import { createAndStart, openTab, waitForLine, waitForText } from "../helpers";
+import { createAndStart, openTab, selectValue, waitForLine, waitForText } from "../helpers";
 
 // Looked up afresh each time: the Notes tab remounts when the test switches
 // tabs, and `aria/Agenda` could also match the section's "Agenda" heading.
@@ -35,7 +35,7 @@ describe("meeting memory (PRD MEM-2, MEM-3)", () => {
     // The fixture script mentions the Pro tier, then the dashboard.
     await waitForLine("Let's also look at the dashboard.");
     await openTab("Notes");
-    await $("aria/Recap period").selectByAttribute("value", "10");
+    await selectValue('select[aria-label="Recap period"]', "10");
     await $("button=What did I miss?").click();
     const card = await $("aria/What you missed");
     await card.waitForDisplayed({ timeout: 20_000 });

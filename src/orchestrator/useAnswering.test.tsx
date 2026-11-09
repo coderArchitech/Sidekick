@@ -67,7 +67,11 @@ describe("detect → answer → save", () => {
       endMs: 1200,
     });
     await wait(900);
-    const systems = stream.mock.calls.map((c) => (c[2] as LlmRequest).system ?? "");
+    const all = stream.mock.calls.map((c) => (c[2] as LlmRequest).system ?? "");
+    // Teacher lists tools, so an agent step runs first (it needs none here).
+    const agent = all.filter((sys) => sys.startsWith("You decide whether tools are needed"));
+    expect(agent).toHaveLength(1);
+    const systems = all.filter((sys) => !agent.includes(sys));
     expect(systems).toHaveLength(2);
     for (const sys of systems) expect(sys).toContain("Active Skill: Teacher");
     stream.mockRestore();

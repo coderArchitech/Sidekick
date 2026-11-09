@@ -10,6 +10,7 @@ import type {
   Stage,
 } from "@/ipc";
 import { log } from "@/lib/log";
+import { runAgent, type AgentDeps, type ToolResult } from "./agent";
 import type { ModelPlan } from "./models";
 import {
   NOT_FOUND,
@@ -37,6 +38,8 @@ export interface AnswerDeps {
   recordLatency(stage: Stage, ms: number): Promise<void>;
   events: AnswerEvents;
   now?: () => number;
+  /** Web search for agent Skills (T-046). */
+  webSearch?: AgentDeps["webSearch"];
 }
 
 export type AnswerStatus = "thinking" | "streaming" | "done" | "error" | "cancelled";
@@ -53,6 +56,8 @@ export interface AnswerView {
   error: string | null;
   /** Saved answer id, for rating. */
   answerId: string | null;
+  /** Tools an agent Skill ran for this answer (PRD SKL-4). */
+  tools?: ToolResult[];
 }
 
 export interface AskInput {
@@ -174,7 +179,30 @@ export class AnswerRouter {
     );
     if (!this.inFlight.has(id)) return view; // cancelled meanwhile
     if (ctx.status === "error") return this.fail(flight, ctx.error.message);
-    if (isEmpty(ctx.data)) {
+    // An agent Skill may use its tools first (PRD SKL-4).
+    let toolResults: ToolResult[] = [];
+    if (input.skill?.tools?.length) {
+      flight.view = { ...flight.view, tools: [] };
+      toolResults = await runAgent(
+        {
+          llmStream: (rid, provider, req) => this.deps.llmStream(rid, provider ?? "", req),
+          events: this.deps.events,
+          retrieveContext: this.deps.retrieveContext.bind(this.deps),
+          webSearch: this.deps.webSearch,
+          now: this.now,
+        },
+        {
+          sessionId: input.sessionId,
+          question: input.label ?? input.text,
+          tools: input.skill.tools,
+          plan: input.models,
+        },
+      );
+      if (!this.inFlight.has(id)) return view; // cancelled meanwhile
+      flight.view = { ...flight.view, tools: toolResults };
+      this.onUpdate({ ...flight.view });
+    }
+    if (isEmpty(ctx.data) && !toolResults.some((r) => r.ok)) {
       // Nothing to answer from: say so, never guess (QA-6).
       flight.view = { ...flight.view, cue: NOT_FOUND, body: NOT_FOUND, status: "done" };
       this.inFlight.delete(id);
@@ -182,7 +210,13 @@ export class AnswerRouter {
       return flight.view;
     }
     const full = buildPrompt(
-      { question: input.text, pack: ctx.data, skill: input.skill, history: input.history },
+      {
+        question: input.text,
+        pack: ctx.data,
+        skill: input.skill,
+        history: input.history,
+        toolResults,
+      },
       "full",
     );
     const cue = buildPrompt(
@@ -191,6 +225,7 @@ export class AnswerRouter {
         pack: ctx.data,
         skill: input.skill,
         screenshotFocus: input.source === "screenshot",
+        toolResults,
       },
       "cue",
     );

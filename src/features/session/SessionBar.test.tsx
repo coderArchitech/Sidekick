@@ -167,6 +167,39 @@ describe("Auto-answer toggle", () => {
     await waitFor(() => expect(useSessionStore.getState().session?.skillId).toBeNull());
   });
 
+  it("uses more Skills at once alongside the main one (SKL-5)", async () => {
+    const user = userEvent.setup();
+    render(<SessionBar />);
+    await createSession(user);
+    // No main Skill yet: nothing to add to.
+    expect(screen.queryByRole("button", { name: /More Skills/ })).toBeNull();
+    const picker = screen.getByRole("combobox", { name: "Skill" });
+    await waitFor(() => expect(within(picker).getAllByRole("option").length).toBeGreaterThan(2));
+    await user.selectOptions(picker, "teacher");
+
+    await user.click(await screen.findByRole("button", { name: /More Skills/ }));
+    const dialog = screen.getByRole("dialog", { name: "Also use" });
+    expect(within(dialog).queryByRole("checkbox", { name: "Teacher" })).toBeNull(); // the main one
+    await user.click(within(dialog).getByRole("checkbox", { name: "Sales Discovery" }));
+    await user.click(within(dialog).getByRole("checkbox", { name: "Interview Coach" }));
+    await waitFor(() =>
+      expect(useSessionStore.getState().session?.extraSkillIds).toEqual([
+        "sales-discovery",
+        "interview-coach",
+      ]),
+    );
+    // Two extra at most: the rest are disabled.
+    expect(within(dialog).getByRole("checkbox", { name: "Negotiation Coach" })).toBeDisabled();
+    expect(screen.getByRole("button", { name: /More Skills/ })).toHaveTextContent("+2");
+
+    // Switching the main Skill to an extra one moves it.
+    await user.keyboard("{Escape}");
+    await user.selectOptions(picker, "sales-discovery");
+    await waitFor(() =>
+      expect(useSessionStore.getState().session?.extraSkillIds).toEqual(["interview-coach"]),
+    );
+  });
+
   async function endedSession(user: ReturnType<typeof userEvent.setup>) {
     render(<SessionBar />);
     await createSession(user, "Retro");

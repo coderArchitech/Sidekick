@@ -1,4 +1,4 @@
-import { useEffect, useId, useState } from "react";
+import { useEffect, useId, useRef, useState } from "react";
 import { sessionEvents, type Retention } from "@/ipc";
 import { useSkillsStore } from "@/orchestrator";
 import { ConsentDialog } from "./ConsentDialog";
@@ -113,6 +113,7 @@ export function SessionBar() {
             Auto
           </button>
           <SkillPicker />
+          <ExtraSkills />
           <button type="button" className={button} disabled={busy} onClick={() => void end()}>
             End
           </button>
@@ -173,6 +174,86 @@ function SkillPicker() {
     </select>
   );
 }
+
+/**
+ * Skills also in use alongside the main one (PRD SKL-5), up to two. Their
+ * instructions are added to the main Skill's; the dropdown and the Switch
+ * Skill shortcut still change the main one.
+ */
+function ExtraSkills() {
+  const session = useSessionStore((s) => s.session);
+  const setExtraSkills = useSessionStore((s) => s.setExtraSkills);
+  const busy = useSessionStore((s) => s.busy);
+  const skills = useSkillsStore((s) => s.skills);
+  const [open, setOpen] = useState(false);
+  const ref = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    if (!open) return;
+    const close = (e: MouseEvent) => {
+      if (!ref.current?.contains(e.target as Node)) setOpen(false);
+    };
+    const esc = (e: KeyboardEvent) => e.key === "Escape" && setOpen(false);
+    document.addEventListener("mousedown", close);
+    document.addEventListener("keydown", esc);
+    return () => {
+      document.removeEventListener("mousedown", close);
+      document.removeEventListener("keydown", esc);
+    };
+  }, [open]);
+  if (!session || session.status === "ended" || !session.skillId) return null;
+  const extra = session.extraSkillIds;
+  const others = skills.filter(
+    (s) => s.id !== session.skillId && (s.enabled || extra.includes(s.id)),
+  );
+  if (others.length === 0) return null;
+  const full = extra.length >= MAX_EXTRA_SKILLS;
+  return (
+    <div ref={ref} className="relative">
+      <button
+        type="button"
+        aria-haspopup="dialog"
+        aria-expanded={open}
+        title="Use more Skills at the same time"
+        className="btn btn-ghost btn-sm text-xs"
+        disabled={busy}
+        onClick={() => setOpen((o) => !o)}
+      >
+        {extra.length ? `+${extra.length}` : "+"}
+        <span className="sr-only"> More Skills</span>
+      </button>
+      {open && (
+        <div
+          role="dialog"
+          aria-label="Also use"
+          className="absolute right-0 z-20 mt-1 w-56 space-y-1 rounded-lg border border-line bg-popover p-2 text-xs text-fg-2 shadow-xl shadow-black/40"
+        >
+          <p className="text-fg-muted">Also use, with the main Skill (up to {MAX_EXTRA_SKILLS}):</p>
+          {others.map((s) => {
+            const on = extra.includes(s.id);
+            return (
+              <label key={s.id} className="flex items-center gap-2">
+                <input
+                  type="checkbox"
+                  checked={on}
+                  disabled={busy || (!on && full)}
+                  onChange={(e) =>
+                    void setExtraSkills(
+                      e.target.checked ? [...extra, s.id] : extra.filter((x) => x !== s.id),
+                    )
+                  }
+                />
+                <span className="truncate">{s.name}</span>
+              </label>
+            );
+          })}
+        </div>
+      )}
+    </div>
+  );
+}
+
+/** Matches `MAX_EXTRA_SKILLS` in Rust (`sidekick_session::repo`). */
+const MAX_EXTRA_SKILLS = 2;
 
 const KEEP_LABELS: Record<Retention, string> = {
   session: "Delete now",

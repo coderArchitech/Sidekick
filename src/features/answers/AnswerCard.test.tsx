@@ -181,3 +181,36 @@ describe("AnswerCard follow-up chips (PRD QA-9)", () => {
     expect(await screen.findByRole("alert")).toHaveTextContent("Start a session");
   });
 });
+
+describe("AnswerCard tools (PRD SKL-4)", () => {
+  beforeEach(resetMocks);
+
+  it("lists the tools an agent Skill used, with failures", () => {
+    render(
+      <AnswerCard
+        view={view({
+          tools: [
+            { tool: "calculator", input: "2400 * 15%", output: "360", ok: true },
+            {
+              tool: "web_search",
+              input: "fed rate",
+              output: "Web search isn't set up.",
+              ok: false,
+            },
+          ],
+        })}
+      />,
+    );
+    const list = screen.getByRole("list", { name: "Tools used" });
+    expect(
+      within(list)
+        .getAllByRole("listitem")
+        .map((l) => l.textContent),
+    ).toEqual(["Calculator: 2400 * 15% = 360", "Web search: fed rate (Web search isn't set up.)"]);
+  });
+
+  it("says it's checking while the agent step runs", () => {
+    render(<AnswerCard view={view({ status: "thinking", cue: "", body: "", tools: [] })} />);
+    expect(screen.getByText("Checking whether tools help…")).toBeInTheDocument();
+  });
+});
