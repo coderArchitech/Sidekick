@@ -42,8 +42,23 @@ jobs:
           node-version: 24
           cache: pnpm
       - run: pnpm install --frozen-lockfile
+      # Tauri downloads WiX and NSIS from GitHub releases on every fresh runner,
+      # and those downloads sometimes fail with 504. Keep them between runs.
+      - uses: actions/cache@v4
+        with:
+          path: ~\AppData\Local\tauri
+          key: tauri-bundler-tools-windows-v1
       - name: Build the app and both installers
-        run: pnpm tauri build --bundles msi,nsis
+        shell: pwsh
+        # A retry only re-runs the bundling: the compiled app is reused.
+        run: |
+          for ($i = 1; $i -le 3; $i++) {
+            pnpm tauri build --bundles msi,nsis
+            if ($LASTEXITCODE -eq 0) { exit 0 }
+            Write-Host "::warning::Installer build attempt $i failed; retrying in $(30 * $i) s (tool downloads can fail with 504)."
+            Start-Sleep -Seconds (30 * $i)
+          }
+          exit 1
       - name: Upload the installers
         uses: actions/upload-artifact@v4
         with:
