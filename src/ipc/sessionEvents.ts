@@ -67,9 +67,13 @@ export function createMockSessionBus() {
     drop: new Set(),
   };
   function on<K extends keyof Payloads>(kind: K, cb: (e: Payloads[K]) => void): Promise<Unlisten> {
-    handlers[kind].add(cb);
+    // One entry per registration, like Tauri's listen(): the same function
+    // registered twice (React StrictMode re-runs effects) must not collapse
+    // into one Set entry, or the first cleanup would remove both.
+    const entry = (e: Payloads[K]) => cb(e);
+    handlers[kind].add(entry);
     return Promise.resolve(() => {
-      handlers[kind].delete(cb);
+      handlers[kind].delete(entry);
     });
   }
   function emit<K extends keyof Payloads>(kind: K, e: Payloads[K]) {

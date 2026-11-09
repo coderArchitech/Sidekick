@@ -21,7 +21,7 @@ The working task list for building Sidekick end to end, derived from the [techni
 2. Every test listed under the task is written and passing; `pnpm verify` is green locally.
 3. CI is green on Windows and macOS (once CI runs on pull requests, see T-002).
 4. Docs updated: TECHNICAL.md (and an ADR if a significant decision was made), IPC tables if commands or events changed, crate status in TECHNICAL.md 3.2.
-5. Tasks marked 🖥️ also pass their manual check on a real Windows and macOS machine. Until then they stay at "In progress: testing" with a note.
+5. Tasks marked 🖥️ are tested on a real macOS machine before closing. Their Windows hardware check is its own task in [Phase 5: Windows testing](#phase-5-windows-testing), so a feature task doesn't stay open waiting for Windows.
 
 **Test levels** used below: **Unit** (cargo test / Vitest), **Integration** (cargo test in `tests/`, mock HTTP with wiremock), **UI** (Playwright with mocked IPC), **E2E** (WebdriverIO on the real app with mock providers), **Manual** (checklist on real machines). See [TECHNICAL.md 8.1](TECHNICAL.md#81-test-strategy).
 
@@ -31,7 +31,7 @@ The working task list for building Sidekick end to end, derived from the [techni
 
 ### Phase 0: Foundation and risk retirement
 
-All Phase 0 code and automated tests are done and green on Linux, Windows and macOS. T-008 to T-012 stay at "testing" until the hardware checks in [phase-0-manual-checks.md](phase-0-manual-checks.md) are done on real Windows and macOS machines.
+All Phase 0 code and automated tests are done and green on Linux, Windows and macOS. T-008 to T-012 were closed after macOS testing; their Windows hardware checks are tracked in [Phase 5: Windows testing](#phase-5-windows-testing).
 
 | ID | Task | Status | Notes |
 | --- | --- | --- | --- |
@@ -42,11 +42,11 @@ All Phase 0 code and automated tests are done and green on Linux, Windows and ma
 | T-005 | `store` crate: encrypted database and migrations | ✅ Done |  |
 | T-006 | Settings storage and commands | ✅ Done |  |
 | T-007 | `gateway` crate: LLM provider trait, mock and Anthropic | ✅ Done |  |
-| T-008 | Settings window: providers and API keys | 🟡 In progress: testing | CI green; needs a check in the real app on Windows/macOS |
-| T-009 | `audio` crate: microphone and system audio capture | 🟡 In progress: testing | 🖥️ Automated tests pass; needs device checks on Windows and macOS 14.6+ (ADR-014) |
-| T-010 | `stt` crate: Deepgram streaming | 🟡 In progress: testing | Automated tests pass; live latency check with a real key pending |
-| T-011 | `window` crate: capture exclusion and protection status | 🟡 In progress: testing | 🖥️ Exclusion and shield done; manual checklist on Windows/macOS pending; screen-share detection for auto-hide still open |
-| T-012 | `diagnostics` crate: latency metrics and baselines | 🟡 In progress: testing | Metrics and panel done; baselines need the reference laptops |
+| T-008 | Settings window: providers and API keys | ✅ Done | Closed after macOS testing (2026-11-09). Passed: Settings Playwright (WebKit), real-app E2E add/test/remove key, real keychain round trip. Not run on macOS: save with a real Anthropic key. Windows: T-052. Report: [macOS test report](Macos_testing_report.md#t-008-settings-window-providers-and-api-keys) |
+| T-009 | `audio` crate: microphone and system audio capture | ✅ Done | Closed after macOS testing (2026-11-09). Passed: microphone and system-audio device tests on macOS 26.7 (system audio with audio playing, as the check specifies). Not run: live-call glitch check, denied-permission message. Windows: T-053. Report: [macOS test report](Macos_testing_report.md#t-009-audio-capture-microphone-and-system-audio) |
+| T-010 | `stt` crate: Deepgram streaming | ✅ Done | Closed after macOS testing (2026-11-09). Passed: Deepgram adapter tests (local WebSocket server). Live latency with a real key carried by T-039. Windows: T-054. Report: [macOS test report](Macos_testing_report.md#t-010-deepgram-streaming) |
+| T-011 | `window` crate: capture exclusion and protection status | ✅ Done | Closed after macOS testing (2026-11-09). Passed: shield and Diagnostics protection states in Playwright (WebKit), window crate tests. Not run: hiding in live meeting apps with a second viewer, ADR-015 window titles. Windows: T-055. Report: [macOS test report](Macos_testing_report.md#t-011-capture-exclusion-and-protection-status) |
+| T-012 | `diagnostics` crate: latency metrics and baselines | ✅ Done | Closed after macOS testing (2026-11-09). Passed: Diagnostics Playwright (WebKit) and Rust tests. Reference-laptop baselines carried by T-038. Windows: T-056. Report: [macOS test report](Macos_testing_report.md#t-012-latency-metrics-and-baselines) |
 
 ### Phase 1: MVP (all P0 requirements)
 
@@ -54,21 +54,21 @@ All Phase 0 code and automated tests are done and green on Linux, Windows and ma
 | --- | --- | --- | --- |
 | T-013 | Sessions and consent | ✅ Done | E2E passes with the T-033 suite |
 | T-014 | Live transcript tab | ✅ Done | Verified in the real app with fixture audio |
-| T-015 | `hotkeys` crate: global shortcuts | 🟡 In progress: testing | 🖥️ Waiting on hardware: verified on Linux (X11); needs a check on Windows and macOS. All actions are wired |
+| T-015 | `hotkeys` crate: global shortcuts | ✅ Done | Closed after macOS testing (2026-11-09). Passed: shortcut-driven flows in Playwright (WebKit: Auto, Ask, click-through) and Rust validation. Not run: shortcuts while a meeting app has focus. Windows: T-057. Report: [macOS test report](Macos_testing_report.md#t-015-global-shortcuts) |
 | T-016 | Profile: name and nicknames | ✅ Done | Detection use lands in T-020 |
-| T-017 | `ingest` crate: parse, chunk, embed | 🟡 In progress: testing | Waiting on dependency: image files need a vision model (T-025/T-026); Gemini, Voyage and Ollama embeddings come with T-026. Everything else done |
+| T-017 | `ingest` crate: parse, chunk, embed | ✅ Done | Closed after macOS testing (2026-11-09). Passed: ingest Rust tests and library flows in Playwright (WebKit). Image files through a vision model carried by T-039. Report: [macOS test report](Macos_testing_report.md#t-017-ingest-parse-chunk-embed) |
 | T-018 | `retrieval` crate: hybrid search and context packs | ✅ Done | 20k-chunk search 8 ms in release; latest screenshot joined with T-025 |
-| T-019 | Library feature: documents in a session | 🟡 In progress: testing | Waiting on dependency: Playwright drag-and-drop spec comes with the UI suite (T-032); native picker/drop check on Windows/macOS |
+| T-019 | Library feature: documents in a session | ✅ Done | Closed after macOS testing (2026-11-09). Passed: `library.spec.ts` in WebKit (picker, drop, refusal, retry, links, axe). Not run: native macOS picker and Finder drag. Windows: T-058. Report: [macOS test report](Macos_testing_report.md#t-019-library-documents-in-a-session) |
 | T-020 | Orchestrator: question detection and modes | ✅ Done | Rules meet the targets on a never-tuned set (95% / 100%); real-meeting check in T-039 |
-| T-021 | Orchestrator: prompts, Skills, two-tier answers | 🟡 In progress: testing | Waiting on dependency: live-model quality check in T-039. Active Skill done with T-028 |
+| T-021 | Orchestrator: prompts, Skills, two-tier answers | ✅ Done | Closed after macOS testing (2026-11-09). Passed: answers, Skills and agents in Playwright (WebKit) and real-app E2E. Live-model quality carried by T-039. Report: [macOS test report](Macos_testing_report.md#t-021-prompts-skills-two-tier-answers) |
 | T-022 | Live Answers tab | ✅ Done | Follow-up chips not in scope; Playwright pass in T-032 |
 | T-023 | Chat tab | ✅ Done | Voice input to Chat later; Playwright pass in T-032 |
 | T-024 | Rolling notes | ✅ Done | Summary written by the overlay after End; quality checked in T-039 |
-| T-025 | `capture` crate: screenshots and answer from screen | 🟡 In progress: testing | 🖥️ Code and automated tests done. Waiting on: real capture on Windows/macOS during a live call (doesn't notify the meeting app), macOS Screen Recording prompt |
+| T-025 | `capture` crate: screenshots and answer from screen | ✅ Done | Closed after macOS testing (2026-11-09). Passed: capture-and-ask in Playwright (WebKit) and real-app E2E. Not run: capture during a live call, Screen Recording prompt. Windows: T-059. Report: [macOS test report](Macos_testing_report.md#t-025-screenshots-and-answer-from-screen) |
 | T-026 | More LLM providers: OpenAI, Gemini, Ollama | ✅ Done | Default model names may need refreshing as providers release new ones; live-key check in T-039 |
-| T-027 | More STT providers: AssemblyAI, Soniox, local Whisper | 🟡 In progress: testing | Code and automated tests done. Waiting on: Whisper accuracy run with a real model (Hugging Face is blocked in the cloud dev environment), live AssemblyAI/Soniox checks, Hinglish comparison (PRD open question). Whisper ships behind the `local-whisper` cargo feature |
+| T-027 | More STT providers: AssemblyAI, Soniox, local Whisper | ✅ Done | Closed after macOS testing (2026-11-09). Passed: adapter Rust tests, Whisper model list and download in Playwright (WebKit). Live AssemblyAI/Soniox, Whisper accuracy and Hinglish carried by T-039. Windows: T-060. Report: [macOS test report](Macos_testing_report.md#t-027-stt-providers-assemblyai-soniox-local-whisper) |
 | T-028 | `skills` crate and Skill builder | ✅ Done | Golden cases run against live models in T-039; tool use itself comes with Agents (T-045) |
-| T-029 | Overlay controls and private display | 🟡 In progress: testing | 🖥️ Waiting on hardware: multi-monitor restore on Windows/macOS. Snap and restore verified in the real app on Linux (Xvfb, one monitor) |
+| T-029 | Overlay controls and private display | ✅ Done | Closed after macOS testing (2026-11-09). Passed: `overlay-controls.spec.ts` in WebKit, placement unit tests. Not run: two-monitor restore (one display attached). Windows: T-061. Report: [macOS test report](Macos_testing_report.md#t-029-overlay-controls-and-private-display) |
 | T-030 | Data control: retention, delete session | ✅ Done | Also fixed: deleting a session now deletes its vectors (they have no foreign key) |
 | T-031 | Logging to file and log export | ✅ Done | Log scan runs after every E2E pass |
 | T-032 | UI test suite (Playwright) | ✅ Done | 16 specs; UI job green in CI. axe found and fixed: A−/A+ names, low-contrast grey text |
@@ -82,23 +82,49 @@ All Phase 0 code and automated tests are done and green on Linux, Windows and ma
 | T-035 | Usage and cost meter | ⬜ To do | |
 | T-036 | Backup and restore | ⬜ To do | |
 | T-037 | Release pipeline: signing and auto-update | ⬜ To do | Needs signing certificates |
-| T-038 | Performance soak and baselines | ⬜ To do | |
-| T-039 | Answer quality eval | ⬜ To do | Needs real provider keys |
+| T-038 | Performance soak and baselines | ⬜ To do | Also carries the T-012 baselines on the 8 GB reference laptops |
+| T-039 | Answer quality eval | ⬜ To do | Needs real provider keys. Also carries the live-key and real-model checks of T-010, T-017, T-021, T-027, T-041 to T-047 (moved here when those tasks closed after macOS testing) |
 | T-040 | Release checklist and first beta | ⬜ To do | 🖥️ |
 
 ### Phase 3: P1 features (ship if time allows)
 
 | ID | Task | Status | Notes |
 | --- | --- | --- | --- |
-| T-041 | Meeting memory extras: agenda, recap, action items | 🟡 In progress: testing | 🖥️ Built with unit, Playwright and E2E tests. Needs a real-model check of agenda and recap quality (T-039) |
-| T-042 | Answer follow-up chips | 🟡 In progress: testing | 🖥️ Built with unit, Playwright and E2E tests. Needs a real-model check that each chip reshapes the answer (T-039) |
-| T-043 | Screenshot quick actions and strip | 🟡 In progress: testing | 🖥️ Built with unit, Playwright and E2E tests. Needs a real-model check of each action on real screenshots (T-039) |
-| T-044 | Pre-meeting brief and Knowledge Packs | 🟡 In progress: testing | 🖥️ Built with Rust, unit, Playwright and E2E tests. Needs a real-model check of brief quality (T-039) |
-| T-045 | Agents (tools) and multiple active Skills | 🟡 In progress: testing | 🖥️ Built with Rust, unit, Playwright and E2E tests. Web search tool arrives with T-046; needs a real-model check of tool choice (T-039) |
-| T-046 | Web search provider and per-session overrides | 🟡 In progress: testing | 🖥️ Built with Rust (mock HTTP), unit, Playwright and E2E tests. Needs a live check with real Tavily and Brave keys |
-| T-047 | Custom vocabulary | 🟡 In progress: testing | 🖥️ Built with Rust, unit, Playwright and E2E tests. Needs a live accuracy check with real providers (T-021) |
-| T-048 | Click-through mode and themes | 🟡 In progress: testing | 🖥️ Built with Rust, unit, Playwright (axe per theme) and E2E tests. Needs a manual check that clicks pass through on Windows and macOS |
-| T-049 | Glass overlay: translucent background, crisp text | 🟡 In progress: testing | 🖥️ Built and tested (Vitest, Playwright over a busy backdrop). Needs a manual look over a live call on Windows and macOS |
+| T-041 | Meeting memory extras: agenda, recap, action items | ✅ Done | Closed after macOS testing (2026-11-09). Passed: Playwright (WebKit) and real-app E2E. Real-model quality carried by T-039. Report: [macOS test report](Macos_testing_report.md#t-041-meeting-memory-agenda-recap-action-items) |
+| T-042 | Answer follow-up chips | ✅ Done | Closed after macOS testing (2026-11-09). Passed: Playwright (WebKit) and real-app E2E. Real-model check carried by T-039. Report: [macOS test report](Macos_testing_report.md#t-042-answer-follow-up-chips) |
+| T-043 | Screenshot quick actions and strip | ✅ Done | Closed after macOS testing (2026-11-09). Passed: Playwright (WebKit) and real-app E2E. Real-model check carried by T-039. Report: [macOS test report](Macos_testing_report.md#t-043-screenshot-quick-actions-and-strip) |
+| T-044 | Pre-meeting brief and Knowledge Packs | ✅ Done | Closed after macOS testing (2026-11-09). Passed: Playwright (WebKit) and real-app E2E. Brief quality carried by T-039. Report: [macOS test report](Macos_testing_report.md#t-044-pre-meeting-brief-and-knowledge-packs) |
+| T-045 | Agents (tools) and multiple active Skills | ✅ Done | Closed after macOS testing (2026-11-09). Passed: Playwright (WebKit) and real-app E2E. Real-model tool choice carried by T-039. Report: [macOS test report](Macos_testing_report.md#t-045-agents-and-multiple-active-skills) |
+| T-046 | Web search provider and per-session overrides | ✅ Done | Closed after macOS testing (2026-11-09). Passed: Playwright (WebKit), real-app E2E, Rust mock-HTTP tests. Live Tavily and Brave check carried by T-039. Report: [macOS test report](Macos_testing_report.md#t-046-web-search-and-per-session-overrides) |
+| T-047 | Custom vocabulary | ✅ Done | Closed after macOS testing (2026-11-09). Passed: Playwright (WebKit), real-app E2E. Live accuracy check carried by T-039. Report: [macOS test report](Macos_testing_report.md#t-047-custom-vocabulary) |
+| T-048 | Click-through mode and themes | ✅ Done | Closed after macOS testing (2026-11-09). Passed: axe per theme and click-through in Playwright (WebKit) and real-app E2E. Not run: physical clicks through to another app. Windows: T-062. Report: [macOS test report](Macos_testing_report.md#t-048-click-through-mode-and-themes) |
+| T-049 | Glass overlay: translucent background, crisp text | ✅ Done | Closed after macOS testing (2026-11-09). Passed: `glass.spec.ts` in WebKit, real-app E2E. Not run: a look over a live call. Windows: T-063. Report: [macOS test report](Macos_testing_report.md#t-049-glass-overlay) |
+
+### Phase 4: macOS verification
+
+| ID | Task | Status | Notes |
+| --- | --- | --- | --- |
+| T-051 | macOS device verification | ✅ Done | Tested 2026-11-09 on macOS 26.7 (arm64). Playwright 53/53 in WebKit and Chromium, Vitest 277/277, `cargo test --workspace` 292/292, real-app E2E 13/13, keychain, microphone and system-audio device tests. Every in-progress task closed; what wasn't run is listed per task in [Phase 4 details](#phase-4-details). Report with screenshots: [Macos_testing_report.md](Macos_testing_report.md) |
+
+### Phase 5: Windows testing
+
+The Windows half of every hardware check, split out when the macOS half closed. Run on a Windows 10 and a Windows 11 laptop (the 8 GB reference machine for baselines). Steps in [Phase 5 details](#phase-5-details).
+
+| ID | Task | Status | Notes |
+| --- | --- | --- | --- |
+| T-050 | Windows setup and automated suite | 🟡 In progress: testing | 🖥️ `pnpm verify` and `pnpm test:e2e` green on a real Windows 10 and 11 machine (CI already runs them on Windows Server) |
+| T-052 | Windows: Settings keys in the real app (T-008) | 🟡 In progress: testing | 🖥️ Key saved, survives restart, removed from Credential Manager |
+| T-053 | Windows: audio capture (T-009) | 🟡 In progress: testing | 🖥️ Ignored audio tests pass; no glitches in a real call |
+| T-054 | Windows: Deepgram latency (T-010) | 🟡 In progress: testing | 🖥️ p50 under 1,000 ms, p95 under 1,500 ms; needs a Deepgram key |
+| T-055 | Windows: screen-share hiding (T-011) | 🟡 In progress: testing | 🖥️ Teams, Zoom, Meet, Webex, Slack; full screen and window; ADR-015 titles |
+| T-056 | Windows: baselines (T-012) | 🟡 In progress: testing | 🖥️ Cold start, `.msi` size, idle CPU and RAM on the 8 GB laptop |
+| T-057 | Windows: shortcuts with a meeting app focused (T-015) | 🟡 In progress: testing | 🖥️ |
+| T-058 | Windows: native picker and Explorer drag-and-drop (T-019) | 🟡 In progress: testing | 🖥️ |
+| T-059 | Windows: screenshots during a live call (T-025) | 🟡 In progress: testing | 🖥️ No meeting-app notification; window and area capture |
+| T-060 | Windows: STT providers (T-027) | 🟡 In progress: testing | 🖥️ AssemblyAI, Soniox, local Whisper; needs keys |
+| T-061 | Windows: two-monitor position restore (T-029) | 🟡 In progress: testing | 🖥️ |
+| T-062 | Windows: click-through (T-048) | 🟡 In progress: testing | 🖥️ |
+| T-063 | Windows: glass over a live call (T-049) | 🟡 In progress: testing | 🖥️ |
 
 ---
 
@@ -259,6 +285,7 @@ All Phase 0 code and automated tests are done and green on Linux, Windows and ma
 - [x] Unit: auto-hide rule applies only while sharing, with auto-hide on, and protection not guaranteed.
 - [x] Unit: disabled flag and failure to apply produce `disabled` / `unavailable`.
 - [x] Component: shield shows each state with colour, label and tooltip reason.
+- [x] UI (`tests/ui/protection.spec.ts`): header shield says "Visible in screen share" in a browser; Diagnostics shows the reason for protected, not guaranteed and disabled.
 - [x] Manual: real app on Linux applies protection at startup and shows the red shield.
 - [x] Screen-share detection design: [ADR-015](adr/0015-screen-share-detection.md) (proposed) detects meeting apps' own share windows; manual hide hotkey (T-015) stays as the fallback.
 - [ ] Validate ADR-015: record the top-level window lists while sharing in each meeting app on Windows and macOS (do this during the manual check below), then implement it as its own task.
@@ -275,6 +302,7 @@ All Phase 0 code and automated tests are done and green on Linux, Windows and ma
 - [x] Unit: health against targets; no verdict without samples.
 - [x] Integration: the gateway records LLM time-to-first-token.
 - [x] Component: Diagnostics panel shows every stage, p50/p95, Healthy / Slow / No data, and refreshes.
+- [x] UI (`tests/ui/diagnostics.spec.ts`): latency table lists all five stages with targets, passes axe; log export reports success and does nothing when cancelled.
 - [ ] Manual: Phase 0 baselines recorded in TECHNICAL.md 13.2 on the reference Windows and macOS laptops (needs T-013 for end-to-end numbers).
 
 ## Phase 1 details
@@ -376,7 +404,7 @@ All Phase 0 code and automated tests are done and green on Linux, Windows and ma
 - [x] Component: picked files and files dropped onto the window call `ingest_document`; progress events move them to Ready with a count in the header.
 - [x] Component: failed documents show the reason and a retry; unsupported files are refused with the reason.
 - [x] Component: links added (http/https only, others refused), documents removed.
-- [ ] UI: drag and drop with mocked IPC in Playwright (T-032).
+- [x] UI (`tests/ui/library.spec.ts`): picker, drop onto the window (opens the panel), unsupported file refused, damaged file fails with retry and remove, links validated, axe with a failure showing.
 - [ ] Manual: native file picker and OS drag-and-drop on Windows and macOS.
 
 ### T-020 Orchestrator: question detection and modes
@@ -499,6 +527,7 @@ All Phase 0 code and automated tests are done and green on Linux, Windows and ma
 - [x] Unit: snapping and per-monitor position persistence logic (`sidekick_window::placement`, settings validation).
 - [x] Component: font size and compact mode change layout and are saved; shield colour follows protection status (T-011 tests).
 - [x] Accessibility (axe): overlay has no violations.
+- [x] UI (`tests/ui/overlay-controls.spec.ts`): text size stops at 12 and 20 px, Compact hides the session bar and documents and restores them, background slider limited to 20–100%.
 - [ ] Manual: position restored across restarts on multi-monitor setups. (Linux, one monitor: moved to 1490,15 → snapped to 1500,0; moved to 700,250, restarted → restored at 700,250.)
 
 ### T-030 Data control: retention, delete session
@@ -757,5 +786,93 @@ Each P1 task gets full scope and tests when it moves to In progress.
 - [x] Component: the opacity setting sets the background tint, and the panel itself is never faded (no CSS `opacity` on the root).
 - [x] Component: the slider is labelled "Background opacity".
 - [x] Playwright: overlay over a busy backdrop image at 40% and 100%; axe on every tab still passes.
-- [ ] E2E: suite passes unchanged (CI).
+- [x] E2E: suite passes unchanged (macOS 26.7 local run, 12 specs; CI also runs it).
 - [ ] Manual 🖥️: over a live video call on Windows and macOS, the call is visible behind the panel and answers stay readable at the default opacity.
+
+## Phase 4 details
+
+### T-051 macOS device verification 🖥️
+
+**Refs:** [phase-0-manual-checks.md](phase-0-manual-checks.md), [phase-1-manual-checks.md](phase-1-manual-checks.md)
+**Scope:** Test every in-progress task on macOS and close it; move the Windows half to Phase 5 and live-key checks to T-039.
+**Environment:** macOS 26.7, Apple Silicon (Mac17,8, 48 GB, one built-in display), Node 22.23, Rust 1.97.0, Playwright WebKit 26.6 (the engine of the macOS Tauri webview) and Chromium. No provider keys, no Ollama, no second display.
+
+**Tests run and passed (2026-11-09)** · Report: [results](Macos_testing_report.md#results), [changes made while testing](Macos_testing_report.md#changes-made-while-testing), [per-task evidence](Macos_testing_report.md#tasks-closed-after-macos-testing), [real-app E2E](Macos_testing_report.md#real-app-end-to-end-on-macos), [all 53 screenshots](Macos_testing_report.md#all-53-playwright-tests-in-webkit)
+- [x] Playwright UI suite in WebKit: 53/53, one screenshot per test. Same suite in Chromium: 53/53. `code-copy.spec.ts` now stubs the clipboard on WebKit (Playwright has no clipboard permission there) and keeps the real clipboard on Chromium.
+- [x] 15 new Playwright specs: `library` (T-019, T-017), `overlay-controls` (T-029), `protection` (T-011), `diagnostics` (T-012). They found and fixed a mock event-bus bug that dropped listeners under React StrictMode (`src/ipc/sessionEvents.ts`; browser mock only).
+- [x] Vitest: 277/277. `pnpm lint` and `pnpm typecheck`: clean.
+- [x] `cargo test --workspace`: 292 passed, 0 failed.
+- [x] WebdriverIO E2E on the real app (WebKit, mock providers, fixture audio): 13 tests in 12 specs passed; log scan found no keys or meeting content.
+- [x] Device tests: real keychain round trip; microphone frames; system-audio frames with audio playing (0.32 s). In silence the system-audio test fails after its 3 s timeout, which matches the check's "play any audio" precondition. The first run hung over 60 s, most likely on the one-time System Audio Recording prompt; it hasn't recurred.
+
+**Not run on macOS, accepted at closure** (each task's section in the [report](Macos_testing_report.md#tasks-closed-after-macos-testing) has the same line)
+
+| Task | Check not run | Now tracked in |
+| --- | --- | --- |
+| [T-008](Macos_testing_report.md#t-008-settings-window-providers-and-api-keys) | Save with a real Anthropic key; keychain "Always Allow" prompt | (accepted; keychain round trip passed) |
+| [T-009](Macos_testing_report.md#t-009-audio-capture-microphone-and-system-audio) | Live-call glitch check; denied-permission message | (accepted) |
+| [T-010](Macos_testing_report.md#t-010-deepgram-streaming) | Live Deepgram latency | T-039 |
+| [T-011](Macos_testing_report.md#t-011-capture-exclusion-and-protection-status) | Hiding in live meeting apps with a second viewer; ADR-015 titles | (accepted on macOS) |
+| [T-012](Macos_testing_report.md#t-012-latency-metrics-and-baselines) | Baselines on the 8 GB MacBook Air | T-038 |
+| [T-015](Macos_testing_report.md#t-015-global-shortcuts) | Shortcuts while a meeting app has focus | (accepted on macOS) |
+| [T-017](Macos_testing_report.md#t-017-ingest-parse-chunk-embed) | Image files through a vision model | T-039 |
+| [T-019](Macos_testing_report.md#t-019-library-documents-in-a-session) | Native picker and Finder drag | (accepted; Playwright covers the flows) |
+| [T-021](Macos_testing_report.md#t-021-prompts-skills-two-tier-answers), [T-041](Macos_testing_report.md#t-041-meeting-memory-agenda-recap-action-items) to [T-047](Macos_testing_report.md#t-047-custom-vocabulary) | Real-model quality, live Tavily/Brave, live vocabulary accuracy | T-039 |
+| [T-025](Macos_testing_report.md#t-025-screenshots-and-answer-from-screen) | Capture during a live call; Screen Recording prompt | (accepted on macOS) |
+| [T-027](Macos_testing_report.md#t-027-stt-providers-assemblyai-soniox-local-whisper) | Live AssemblyAI/Soniox, Whisper accuracy, Hinglish | T-039 |
+| [T-029](Macos_testing_report.md#t-029-overlay-controls-and-private-display) | Two-monitor restore | (accepted on macOS) |
+| [T-048](Macos_testing_report.md#t-048-click-through-mode-and-themes) | Physical clicks through to another app | (accepted on macOS) |
+| [T-049](Macos_testing_report.md#t-049-glass-overlay) | Look over a live call | (accepted on macOS) |
+
+## Phase 5 details
+
+Tick each box with the Windows build, meeting app and result. Record screen-share results in [TECHNICAL.md 8.5](TECHNICAL.md#85-known-issues-and-limitations) and baselines in [TECHNICAL.md 13.2](TECHNICAL.md#132-benchmarks-and-baselines). Differences from macOS are expected for window exclusion, system audio and click-through; note them in the box.
+
+### T-050 Windows setup and automated suite 🖥️
+
+Prerequisites in [TECHNICAL.md 6.1](TECHNICAL.md#61-prerequisites) (Rust via rustup, Node 22+ with pnpm, Microsoft C++ Build Tools).
+
+```powershell
+git clone https://github.com/coderArchitech/Sidekick.git
+cd Sidekick
+pnpm install
+pnpm verify
+pnpm build:e2e
+pnpm test:e2e
+```
+
+- [ ] Windows 10: `pnpm verify` and `pnpm test:e2e` green.
+- [ ] Windows 11: `pnpm verify` and `pnpm test:e2e` green.
+
+### T-052 to T-063 Windows checks 🖥️
+
+- [ ] T-052 (T-008): key saved, survives restart, removed from Credential Manager. Steps: [phase-0, T-008](phase-0-manual-checks.md#t-008-settings-window-in-the-real-app-5-minutes).
+- [ ] T-053 (T-009): `cargo test -p sidekick-audio -- --ignored` passes with audio playing, and again during a real call with no glitches for the other participants. Steps: [phase-0, T-009](phase-0-manual-checks.md#t-009-audio-capture-10-minutes).
+- [ ] T-054 (T-010): Deepgram p50 under 1,000 ms and p95 under 1,500 ms (NFR-1). Steps: [phase-0, T-010](phase-0-manual-checks.md#t-010-deepgram-latency-10-minutes).
+- [ ] T-055 (T-011): hidden from the viewer in Teams, Zoom, Meet, Webex and Slack huddles (full screen and window); share-window titles recorded for ADR-015. Steps: [phase-0, T-011](phase-0-manual-checks.md#t-011-screen-share-hiding-20-minutes-per-os).
+- [ ] T-056 (T-012): cold start, `.msi` size, idle CPU and RAM on the 8 GB reference laptop. Steps: [phase-0, T-012](phase-0-manual-checks.md#t-012-baselines-15-minutes).
+- [ ] T-057 (T-015): every shortcut acts in Sidekick while a meeting app has focus, and the app doesn't react. Steps: [phase-1, T-015](phase-1-manual-checks.md#t-015-shortcuts-while-a-meeting-app-has-focus-5-minutes-per-os).
+- [ ] T-058 (T-019): native picker and Explorer drag-and-drop (steps below).
+- [ ] T-059 (T-025): capture during a live call shows no notification; window and area capture work. Steps: [phase-1, T-025](phase-1-manual-checks.md#t-025-screenshots-during-a-live-call-10-minutes-per-os).
+- [ ] T-060 (T-027): AssemblyAI, Soniox and local Whisper (models under `%APPDATA%\com.sidekick.app\models`). Steps: [phase-1, T-027](phase-1-manual-checks.md#t-027-speech-to-text-providers-30-minutes).
+- [ ] T-061 (T-029): overlay position restored across restarts on two monitors; falls back when one is unplugged. Steps: [phase-1, T-029](phase-1-manual-checks.md#t-029-overlay-position-on-two-monitors-10-minutes-per-os).
+- [ ] T-062 (T-048): clicks pass through to the app behind; the shortcut brings the overlay back (steps below).
+- [ ] T-063 (T-049): the call is visible behind the glass and answers stay readable at 80% (steps below).
+
+**Steps for checks that had none**
+
+*T-058, native picker and drag-and-drop (5 minutes)*
+1. Start a session and open **Documents**.
+2. Click **Add files**, pick a PDF and a `.docx` in the Windows picker. Both reach **Ready**.
+3. Drag a `.pptx` from Explorer onto the overlay. The Documents panel opens by itself and the file reaches **Ready**.
+4. Drag a `.png` or `.exe`. Sidekick refuses it with the list of supported types.
+
+*T-062, click-through (5 minutes)*
+1. Put a browser window behind the overlay. Turn on **View → Click-through**.
+2. Click a link in the browser through the overlay. The click reaches the browser.
+3. Press the click-through shortcut (shown in the View menu). The overlay takes clicks again.
+
+*T-063, glass over a live call (5 minutes)*
+1. Join a video call with the default opacity (80%).
+2. The participants' video is visible behind the overlay and answer text is readable over bright and dark scenes.
+3. Move **View → Background** between 20% and 100%. Text never fades, only the tint.
