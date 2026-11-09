@@ -36,9 +36,13 @@ function harness(pack: ContextPack = PACK, opts: { streamFails?: boolean } = {})
   const cancelled: string[] = [];
   const saved: NewAnswer[] = [];
   const latency: [Stage, number][] = [];
+  const queries: string[] = [];
   let clock = 10_000;
   const deps: AnswerDeps = {
-    retrieveContext: () => Promise.resolve(ok(pack)),
+    retrieveContext: (_s, query) => {
+      queries.push(query);
+      return Promise.resolve(ok(pack));
+    },
     llmStream: (id, provider, req) => {
       streams.push({ id, provider, req });
       return Promise.resolve(
@@ -77,6 +81,7 @@ function harness(pack: ContextPack = PACK, opts: { streamFails?: boolean } = {})
     cancelled,
     saved,
     latency,
+    queries,
     views,
     advance: (ms: number) => (clock += ms),
   };
@@ -236,5 +241,31 @@ describe("AnswerRouter", () => {
       body: "600 requests/min [2].",
     });
     expect(h.saved).toHaveLength(1);
+  });
+
+  it("a follow-up shows and saves its label and searches with the original question (QA-9)", async () => {
+    const h = harness();
+    const v = await h.router.ask({
+      ...input(
+        'About "What\'s the rate limit?": Give the same answer again in at most two short sentences.',
+      ),
+      label: "Shorter: What's the rate limit?",
+      query: "What's the rate limit?",
+      history: [
+        { role: "user", content: "What's the rate limit?" },
+        { role: "assistant", content: "600 requests/min." },
+      ],
+    });
+    expect(h.views.get(v.id)?.question).toBe("Shorter: What's the rate limit?");
+    expect(h.queries).toEqual(["What's the rate limit?"]);
+    const full = h.streams.find((s) => s.id.endsWith(":full"));
+    expect(full?.req.messages[0]).toEqual({ role: "user", content: "What's the rate limit?" });
+    expect(full?.req.messages.at(-1)?.content).toContain("at most two short sentences");
+    token(`${v.id}:cue`, "600/min");
+    token(`${v.id}:full`, "600 requests per minute.");
+    done(`${v.id}:cue`);
+    done(`${v.id}:full`);
+    await tick();
+    expect(h.saved[0]?.question).toBe("Shorter: What's the rate limit?");
   });
 });

@@ -141,3 +141,67 @@ describe("Chat tab", () => {
     expect(box).toHaveFocus();
   });
 });
+
+describe("Follow-up chips (PRD QA-9)", () => {
+  beforeEach(() => {
+    resetMocks();
+    vi.restoreAllMocks();
+    useSessionStore.setState({ session: null, warnings: [], error: null, busy: false });
+    useChatStore.setState({ sessionId: null, turns: [], focusTick: 0, showTick: 0 });
+  });
+
+  it("each chip asks its follow-up with the original exchange as history", async () => {
+    const user = userEvent.setup();
+    const requests: LlmRequest[] = [];
+    const real = mockCommands.llmStream.bind(mockCommands);
+    vi.spyOn(mockCommands, "llmStream").mockImplementation((id, p, req) => {
+      requests.push(req);
+      return real(id, p, req);
+    });
+    const s = await liveSession();
+    render(<Harness session={s} />);
+    await wait(20);
+    await user.type(
+      screen.getByRole("textbox", { name: "Ask a question" }),
+      "What's the rate limit?{Enter}",
+    );
+    await wait(200);
+
+    const first = screen.getByRole("article", { name: "Chat: What's the rate limit?" });
+    const chips = within(first).getByRole("group", { name: "Follow-ups" });
+    expect(
+      within(chips)
+        .getAllByRole("button")
+        .map((b) => b.textContent),
+    ).toEqual(["Shorter", "More detail", "Give an example", "Explain simply"]);
+    const before = useChatStore.getState().showTick;
+    requests.length = 0;
+    await user.click(within(chips).getByRole("button", { name: "Explain simply" }));
+    await wait(200);
+
+    expect(
+      screen.getByRole("article", { name: "Chat: Explain simply: What's the rate limit?" }),
+    ).toBeInTheDocument();
+    expect(useChatStore.getState().showTick).toBe(before + 1);
+    const full = requests.find((r) => r.maxTokens > 100);
+    expect(full?.messages[0]).toEqual({ role: "user", content: "What's the rate limit?" });
+    expect(full?.messages[1]?.role).toBe("assistant");
+    expect(full?.messages.at(-1)?.content).toContain("no jargon");
+    // Saved with its label, so it reloads the same way.
+    const saved = await mockCommands.listAnswers(s.id, null);
+    expect(saved.status === "ok" && saved.data.map((a) => a.question)).toContain(
+      "Explain simply: What's the rate limit?",
+    );
+  });
+
+  it("no chips while an answer streams", async () => {
+    const s = await liveSession();
+    vi.spyOn(mockCommands, "llmStream").mockResolvedValue({ status: "ok", data: null });
+    const user = userEvent.setup();
+    render(<Harness session={s} />);
+    await wait(20);
+    await user.type(screen.getByRole("textbox", { name: "Ask a question" }), "Hello?{Enter}");
+    await wait(50);
+    expect(screen.queryByRole("group", { name: "Follow-ups" })).toBeNull();
+  });
+});

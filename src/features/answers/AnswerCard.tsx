@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { commands } from "@/ipc";
 import { activeRouter, type AnswerView } from "@/orchestrator";
+import { FollowUpChips } from "./FollowUpChips";
 import { Markdown } from "./Markdown";
 
 /** One answer: cue first, expandable full answer, then sources (PRD QA-5, QA-6). */
@@ -78,6 +79,8 @@ export function AnswerCard({ view }: { view: AnswerView }) {
           )}
         </>
       )}
+
+      <FollowUpChips view={view} />
 
       {view.status === "done" && view.answerId && (
         <div className="mt-2 flex gap-0.5 text-xs">

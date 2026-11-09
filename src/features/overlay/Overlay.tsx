@@ -6,7 +6,7 @@ import { NotesView } from "@/features/notes";
 import { SessionBar, useSessionStore } from "@/features/session";
 import { TranscriptView } from "@/features/transcript";
 import { commands, type AppInfo } from "@/ipc";
-import { useAnswering, useNotes, useQuestionDetection } from "@/orchestrator";
+import { useAnswering, useChatStore, useNotes, useQuestionDetection } from "@/orchestrator";
 import { ProtectionShield } from "./ProtectionShield";
 import { ViewMenu } from "./ViewMenu";
 import { useHotkeyActions } from "./useHotkeyActions";
@@ -42,6 +42,12 @@ export function Overlay() {
   useEffect(() => {
     void load();
   }, [load]);
+
+  // A follow-up chip asked in Chat: show it.
+  const showTick = useChatStore((s) => s.showTick);
+  useEffect(() => {
+    if (showTick > 0) setTab("chat");
+  }, [showTick, setTab]);
 
   // Text sizes are rem-based; the overlay has its own webview, so scale the root.
   useEffect(() => {

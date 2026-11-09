@@ -162,3 +162,22 @@ describe("LiveAnswers", () => {
     ]);
   });
 });
+
+describe("AnswerCard follow-up chips (PRD QA-9)", () => {
+  beforeEach(resetMocks);
+
+  it("shows the four chips on a finished answer only", () => {
+    const { rerender } = render(<AnswerCard view={view({ status: "streaming" })} />);
+    expect(screen.queryByRole("group", { name: "Follow-ups" })).toBeNull();
+    rerender(<AnswerCard view={view()} />);
+    const chips = screen.getByRole("group", { name: "Follow-ups" });
+    expect(within(chips).getAllByRole("button")).toHaveLength(4);
+  });
+
+  it("without a live session a chip says to start one", async () => {
+    const user = userEvent.setup();
+    render(<AnswerCard view={view()} />);
+    await user.click(screen.getByRole("button", { name: "Shorter" }));
+    expect(await screen.findByRole("alert")).toHaveTextContent("Start a session");
+  });
+});

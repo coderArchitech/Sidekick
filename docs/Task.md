@@ -91,7 +91,7 @@ All Phase 0 code and automated tests are done and green on Linux, Windows and ma
 | ID | Task | Status | Notes |
 | --- | --- | --- | --- |
 | T-041 | Meeting memory extras: agenda, recap, action items | 🟡 In progress: testing | 🖥️ Built with unit, Playwright and E2E tests. Needs a real-model check of agenda and recap quality (T-039) |
-| T-042 | Answer follow-up chips | ⬜ To do | |
+| T-042 | Answer follow-up chips | 🟡 In progress: testing | 🖥️ Built with unit, Playwright and E2E tests. Needs a real-model check that each chip reshapes the answer (T-039) |
 | T-043 | Screenshot quick actions and strip | ⬜ To do | |
 | T-044 | Pre-meeting brief and Knowledge Packs | ⬜ To do | |
 | T-045 | Agents (tools) and multiple active Skills | ⬜ To do | |
@@ -633,6 +633,20 @@ Each P1 task gets full scope and tests when it moves to In progress.
 - [x] Playwright (`tests/ui/meeting-memory.spec.ts`): agenda moves and closes when the session ends, recap, action items, axe.
 - [x] E2E (`tests/e2e/specs/meeting-memory.e2e.ts`): agenda stored, moved by the notes job and closed on End in the real app; recap of the fixture transcript.
 - [ ] Manual 🖥️: agenda and recap quality with a real model (T-039).
+
+### T-042 Answer follow-up chips
+
+**Refs:** PRD QA-9; TECHNICAL.md 7.1 (`answers`)
+**Scope**
+- [x] Chips under every finished answer in Live Answers and Chat: Shorter, More detail, Give an example, Explain simply. None while streaming or on errors.
+- [x] A chip asks through the answer router (`source = chat`): instruction tied to the original question, the original exchange as history, documents searched with the original question.
+- [x] The follow-up shows and is saved as "Shorter: question"; the overlay switches to Chat; a chip on a follow-up refers back to the first question.
+**Tests**
+- [x] Unit: each chip's instruction, label, query and history; chaining; cue fallback; which answers take chips; the router shows/saves the label and searches with the query.
+- [x] Component: chips on finished answers only, each chip sends the right follow-up with history and switches to Chat, saved with its label; no session → notice.
+- [x] Playwright (`tests/ui/follow-ups.spec.ts`): chip on a live answer → Chat; chips chain in Chat; axe.
+- [x] E2E (`tests/e2e/specs/follow-ups.e2e.ts`): Shorter on a detected answer answers in Chat through the real gateway.
+- [ ] Manual 🖥️: with a real model, each chip visibly reshapes the answer (T-039).
 
 ### T-049 Glass overlay: translucent background, crisp text
 

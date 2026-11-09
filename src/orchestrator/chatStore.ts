@@ -17,6 +17,9 @@ interface ChatState {
   turns: AnswerView[];
   /** Bumped by the Ask hotkey; the Chat input focuses when it changes. */
   focusTick: number;
+  /** Bumped when something asks in Chat from elsewhere; the overlay switches to Chat. */
+  showTick: number;
+  requestShow: () => void;
   upsert: (v: AnswerView) => void;
   /** Loads saved chat for a session (PRD QA-8: history per session). */
   load: (sessionId: string | null) => Promise<void>;
@@ -54,6 +57,8 @@ export const useChatStore = create<ChatState>((set, get) => ({
   sessionId: null,
   turns: [],
   focusTick: 0,
+  showTick: 0,
+  requestShow: () => set((s) => ({ showTick: s.showTick + 1 })),
   upsert: (v) =>
     set((s) => {
       const i = s.turns.findIndex((x) => x.id === v.id);
