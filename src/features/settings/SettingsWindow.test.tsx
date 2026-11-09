@@ -36,6 +36,28 @@ describe("SettingsWindow", () => {
     ).toEqual(["Anthropic (Claude)", "OpenAI", "Google Gemini", "Ollama (local)"]);
   });
 
+  it("picks a theme for both windows (UI-8)", async () => {
+    const user = userEvent.setup();
+    await renderSettings();
+    const theme = screen.getByRole("combobox", { name: "Theme" });
+    expect(theme).toHaveValue("dark");
+    expect(
+      within(theme)
+        .getAllByRole("option")
+        .map((o) => o.textContent),
+    ).toEqual(["Dark", "Light", "High contrast", "Same as the system"]);
+    await user.selectOptions(theme, "high_contrast");
+    await waitFor(async () => {
+      const s = await mockCommands.getSettings();
+      expect(s.status === "ok" && s.data.theme).toBe("high_contrast");
+    });
+  });
+
+  it("lists the Click-through shortcut (UI-5)", async () => {
+    await renderSettings();
+    expect(screen.getByText("Click-through on/off")).toBeInTheDocument();
+  });
+
   it("masks the key by default and toggles visibility", async () => {
     const user = userEvent.setup();
     await renderSettings();

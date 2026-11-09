@@ -23,6 +23,17 @@ interface OverlayState {
   setCompact: (compact: boolean) => void;
   /** Loads the saved appearance (PRD UI-1, UI-3). */
   load: () => Promise<void>;
+  /** Clicks pass through the overlay to the app behind (PRD UI-5). Never saved. */
+  clickThrough: boolean;
+  clickThroughError: string | null;
+  /** The shortcut that turns click-through off, for display. */
+  clickThroughKeys: string;
+  setClickThrough: (on: boolean) => Promise<void>;
+}
+
+/** "CmdOrCtrl+Shift+T" → "Ctrl/Cmd+Shift+T". */
+export function displayKeys(keys: string): string {
+  return keys.replace("CmdOrCtrl", "Ctrl/Cmd").replace("Super", "Cmd");
 }
 
 const clamp = (v: number, lo: number, hi: number) => Math.min(hi, Math.max(lo, v));
@@ -61,9 +72,24 @@ export const useOverlayStore = create<OverlayState>((set) => ({
     save({ compact }, 0);
   },
   load: async () => {
-    const r = await commands.getSettings();
+    const [r, ct] = await Promise.all([commands.getSettings(), commands.getClickThrough()]);
+    set({ clickThrough: ct });
     if (r.status !== "ok") return;
     const o = r.data.overlay;
-    set({ opacity: o.opacity / 100, fontSize: o.fontSize, compact: o.compact });
+    const keys = r.data.shortcuts.find((b) => b.action === "click_through")?.keys;
+    set({
+      opacity: o.opacity / 100,
+      fontSize: o.fontSize,
+      compact: o.compact,
+      ...(keys ? { clickThroughKeys: displayKeys(keys) } : {}),
+    });
+  },
+  clickThrough: false,
+  clickThroughError: null,
+  clickThroughKeys: displayKeys("CmdOrCtrl+Shift+T"),
+  setClickThrough: async (on) => {
+    const r = await commands.setClickThrough(on);
+    if (r.status === "ok") set({ clickThrough: r.data, clickThroughError: null });
+    else set({ clickThroughError: r.error.message });
   },
 }));

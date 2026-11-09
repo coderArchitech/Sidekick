@@ -4,7 +4,8 @@
 use serde::Deserialize;
 use sidekick_core::SidekickResult;
 use sidekick_settings::{OverlayPrefs, SettingsPatch};
-use tauri::State;
+use tauri::{AppHandle, Manager, State};
+use tauri_specta::Event;
 
 use crate::state::AppState;
 
@@ -48,4 +49,38 @@ pub fn set_overlay(
         },
     )?
     .overlay)
+}
+
+/// Click-through (PRD UI-5): the overlay stays visible but mouse clicks go to
+/// the app behind it. Not saved: the overlay always starts clickable. The
+/// Click-through shortcut turns it off again.
+#[tauri::command]
+#[specta::specta]
+pub fn set_click_through(
+    app: AppHandle,
+    state: State<'_, AppState>,
+    on: bool,
+) -> SidekickResult<bool> {
+    let window = app
+        .get_webview_window("overlay")
+        .ok_or_else(|| sidekick_core::SidekickError::internal("The overlay window isn't open."))?;
+    window.set_ignore_cursor_events(on).map_err(|e| {
+        tracing::warn!(target: "window", error = %e, "click-through failed");
+        sidekick_core::SidekickError::internal("Couldn't change click-through on this system.")
+    })?;
+    state
+        .click_through
+        .store(on, std::sync::atomic::Ordering::Relaxed);
+    tracing::info!(target: "window", on, "click-through");
+    let _ = crate::events::ClickThroughChanged { on }.emit(&app);
+    Ok(on)
+}
+
+/// Whether click-through is on.
+#[tauri::command]
+#[specta::specta]
+pub fn get_click_through(state: State<'_, AppState>) -> bool {
+    state
+        .click_through
+        .load(std::sync::atomic::Ordering::Relaxed)
 }

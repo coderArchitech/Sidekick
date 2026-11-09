@@ -127,11 +127,7 @@ export function KeyField({ provider, providerName, status, onChanged }: Props) {
             </button>
           </div>
           <div className="flex gap-2">
-            <button
-              type="submit"
-              className={`${button} bg-accent hover:bg-accent-hover`}
-              disabled={busy || !value.trim()}
-            >
+            <button type="submit" className="btn btn-primary" disabled={busy || !value.trim()}>
               {busy ? "Testing…" : "Save and test"}
             </button>
             {replacing && (

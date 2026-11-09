@@ -99,6 +99,19 @@ impl OverlayPrefs {
     }
 }
 
+/// Colour theme for both windows (PRD UI-8).
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Serialize, Deserialize)]
+#[cfg_attr(feature = "specta", derive(specta::Type))]
+#[serde(rename_all = "snake_case")]
+pub enum Theme {
+    /// Follows the operating system (dark or light).
+    System,
+    #[default]
+    Dark,
+    Light,
+    HighContrast,
+}
+
 /// All user settings.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[cfg_attr(feature = "specta", derive(specta::Type))]
@@ -117,6 +130,7 @@ pub struct Settings {
     pub overlay: OverlayPrefs,
     /// Product names, acronyms and people to boost in speech-to-text (PRD LIS-5).
     pub vocabulary: Vec<String>,
+    pub theme: Theme,
 }
 
 /// Most vocabulary terms, and the longest term.
@@ -174,6 +188,7 @@ impl Default for Settings {
             profile: Profile::default(),
             overlay: OverlayPrefs::default(),
             vocabulary: Vec::new(),
+            theme: Theme::default(),
         }
     }
 }
@@ -208,6 +223,8 @@ pub struct SettingsPatch {
     /// The full vocabulary list (PRD LIS-5).
     #[serde(default)]
     pub vocabulary: Option<Vec<String>>,
+    #[serde(default)]
+    pub theme: Option<Theme>,
 }
 
 impl Settings {
@@ -261,6 +278,9 @@ impl Settings {
             }
             self.vocabulary = v;
         }
+        if let Some(v) = patch.theme {
+            self.theme = v;
+        }
         self.validate()?;
         Ok(self)
     }
@@ -301,13 +321,14 @@ pub fn load(db: &Database) -> SidekickResult<Settings> {
         auto_answer: section(db, "autoAnswer")?.unwrap_or(d.auto_answer),
         retention: section(db, "retention")?.unwrap_or(d.retention),
         shortcuts: section::<Vec<Binding>>(db, "shortcuts")?
-            .and_then(|b| sidekick_hotkeys::validate(&b).ok())
+            .and_then(|b| sidekick_hotkeys::validate(&sidekick_hotkeys::complete(&b)).ok())
             .unwrap_or(d.shortcuts),
         profile: section(db, "profile")?.unwrap_or(d.profile),
         overlay: section::<OverlayPrefs>(db, "overlay")?
             .filter(|o| o.validate().is_ok())
             .unwrap_or(d.overlay),
         vocabulary: section(db, "vocabulary")?.unwrap_or(d.vocabulary),
+        theme: section(db, "theme")?.unwrap_or(d.theme),
     })
 }
 
@@ -343,6 +364,9 @@ pub fn update(db: &Database, patch: SettingsPatch) -> SidekickResult<Settings> {
     }
     if patch.vocabulary.is_some() {
         raw::set(db, "vocabulary", &to_json(&updated.vocabulary)?)?;
+    }
+    if patch.theme.is_some() {
+        raw::set(db, "theme", &to_json(&updated.theme)?)?;
     }
     Ok(updated)
 }
@@ -687,6 +711,20 @@ mod tests {
             s.keyterms(),
             ["Priya Raman", "PR", "Kubernetes", "SOC 2"],
             "names first, no duplicates"
+        );
+    }
+
+    #[test]
+    fn theme_defaults_to_dark_and_saves() {
+        let db = db();
+        assert_eq!(load(&db).unwrap().theme, Theme::Dark);
+        let patch: SettingsPatch =
+            serde_json::from_value(serde_json::json!({ "theme": "high_contrast" })).unwrap();
+        assert_eq!(update(&db, patch).unwrap().theme, Theme::HighContrast);
+        assert_eq!(load(&db).unwrap().theme, Theme::HighContrast);
+        assert!(
+            serde_json::from_value::<SettingsPatch>(serde_json::json!({ "theme": "neon" }))
+                .is_err()
         );
     }
 }

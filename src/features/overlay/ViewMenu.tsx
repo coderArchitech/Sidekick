@@ -3,7 +3,18 @@ import { MAX_FONT, MAX_OPACITY, MIN_FONT, MIN_OPACITY, useOverlayStore } from ".
 
 /** Display options in one menu, to keep the header calm (PRD UI-1, UI-3). */
 export function ViewMenu() {
-  const { opacity, fontSize, compact, setOpacity, setFontSize, setCompact } = useOverlayStore();
+  const {
+    opacity,
+    fontSize,
+    compact,
+    setOpacity,
+    setFontSize,
+    setCompact,
+    clickThrough,
+    clickThroughError,
+    clickThroughKeys,
+    setClickThrough,
+  } = useOverlayStore();
   const [open, setOpen] = useState(false);
   const root = useRef<HTMLDivElement>(null);
 
@@ -93,6 +104,29 @@ export function ViewMenu() {
               onChange={(e) => setCompact(e.target.checked)}
             />
           </label>
+          <label className="flex items-center justify-between gap-2">
+            <span>
+              Click-through
+              <span className="block text-fg-muted">
+                Clicks go to the app behind. Turn off with {clickThroughKeys}.
+              </span>
+            </span>
+            <input
+              type="checkbox"
+              role="switch"
+              aria-label="Click-through"
+              checked={clickThrough}
+              onChange={(e) => {
+                void setClickThrough(e.target.checked);
+                if (e.target.checked) setOpen(false);
+              }}
+            />
+          </label>
+          {clickThroughError && (
+            <p role="alert" className="text-warning">
+              {clickThroughError}
+            </p>
+          )}
         </div>
       )}
     </div>

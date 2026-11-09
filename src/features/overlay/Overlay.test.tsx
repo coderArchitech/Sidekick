@@ -1,10 +1,11 @@
-import { fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { act, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import axe from "axe-core";
 import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it } from "vitest";
 import { Overlay } from "./Overlay";
 import { mockCommands, mockWindowCalls, resetMocks } from "@/ipc/testing";
 import { useOverlayStore } from "./store";
+import { handle } from "./useHotkeyActions";
 
 describe("Overlay", () => {
   beforeEach(() => useOverlayStore.setState({ tab: "answers", opacity: 0.9 }));
@@ -148,5 +149,37 @@ describe("Overlay appearance (PRD UI-1, UI-3)", () => {
     await screen.findByText("v0.0.0-mock");
     const results = await axe.run(container, { rules: { "color-contrast": { enabled: false } } });
     expect(results.violations.map((v) => `${v.id}: ${v.help}`)).toEqual([]);
+  });
+});
+
+describe("Click-through (PRD UI-5)", () => {
+  beforeEach(() => {
+    resetMocks();
+    useOverlayStore.setState({ tab: "answers", clickThrough: false, clickThroughError: null });
+  });
+
+  it("the View menu turns it on, shows how to turn it off, and the shortcut turns it off", async () => {
+    const user = userEvent.setup();
+    render(<Overlay />);
+    await user.click(screen.getByRole("button", { name: "View" }));
+    await user.click(screen.getByRole("switch", { name: "Click-through" }));
+    expect(await mockCommands.getClickThrough()).toBe(true);
+    const notice = await screen.findByText(/Click-through is on/);
+    expect(notice).toHaveTextContent("Ctrl/Cmd+Shift+T turns it off");
+    // The menu closes so the panel is just visible.
+    expect(screen.queryByRole("dialog", { name: "View options" })).toBeNull();
+
+    await act(() => handle("click_through"));
+    await waitFor(() => expect(screen.queryByText(/Click-through is on/)).toBeNull());
+    expect(await mockCommands.getClickThrough()).toBe(false);
+  });
+
+  it("follows changes made elsewhere", async () => {
+    render(<Overlay />);
+    await screen.findByText("v0.0.0-mock"); // initial load done
+    await act(async () => {
+      await mockCommands.setClickThrough(true);
+    });
+    expect(await screen.findByText(/Click-through is on/)).toBeInTheDocument();
   });
 });

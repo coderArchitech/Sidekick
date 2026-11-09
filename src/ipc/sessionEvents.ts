@@ -3,11 +3,13 @@
  * features don't depend on Tauri's event API and tests can emit them directly.
  */
 import type {
+  ClickThroughChanged,
   HotkeyPressed,
   IngestProgress,
   ModelDownloadProgress,
   ScreenshotCaptured,
   SessionChanged,
+  SettingsChanged,
   SttStatusChanged,
   TranscriptPartial,
   TranscriptSegment,
@@ -27,6 +29,10 @@ export interface SessionEvents {
   onScreenshotCaptured(cb: (e: ScreenshotCaptured) => void): Promise<Unlisten>;
   /** Whisper model download progress (Settings). */
   onModelDownloadProgress(cb: (e: ModelDownloadProgress) => void): Promise<Unlisten>;
+  /** Settings were saved, e.g. the theme (PRD UI-8). */
+  onSettingsChanged(cb: (e: SettingsChanged) => void): Promise<Unlisten>;
+  /** Click-through turned on or off (PRD UI-5). */
+  onClickThroughChanged(cb: (e: ClickThroughChanged) => void): Promise<Unlisten>;
   /** Mock only: files dropped onto the window (Tauri uses the webview's drop event). */
   onFileDrop(cb: (paths: string[]) => void): Promise<Unlisten>;
 }
@@ -40,6 +46,8 @@ type Payloads = {
   ingest: IngestProgress;
   screenshot: ScreenshotCaptured;
   model: ModelDownloadProgress;
+  settings: SettingsChanged;
+  clickThrough: ClickThroughChanged;
   drop: string[];
 };
 
@@ -54,6 +62,8 @@ export function createMockSessionBus() {
     ingest: new Set(),
     screenshot: new Set(),
     model: new Set(),
+    settings: new Set(),
+    clickThrough: new Set(),
     drop: new Set(),
   };
   function on<K extends keyof Payloads>(kind: K, cb: (e: Payloads[K]) => void): Promise<Unlisten> {
@@ -74,6 +84,8 @@ export function createMockSessionBus() {
     onIngestProgress: (cb) => on("ingest", cb),
     onScreenshotCaptured: (cb) => on("screenshot", cb),
     onModelDownloadProgress: (cb) => on("model", cb),
+    onSettingsChanged: (cb) => on("settings", cb),
+    onClickThroughChanged: (cb) => on("clickThrough", cb),
     onFileDrop: (cb) => on("drop", cb),
   };
   return { events, emit };

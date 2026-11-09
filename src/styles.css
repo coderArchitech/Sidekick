@@ -98,6 +98,88 @@ body,
     0 1px 3px var(--glass-shadow);
 }
 
+/*
+ * Themes (PRD UI-8): dark is the default above. `data-theme` on <html> is set
+ * from Settings → Appearance (System follows the OS). Every text token keeps
+ * WCAG AA on its surfaces; the Playwright suite runs axe in each theme.
+ */
+:root[data-theme="light"] {
+  color-scheme: light;
+  --color-canvas: #ffffff;
+  --color-surface: #f6f7f9;
+  --color-surface-2: #ffffff;
+  --color-surface-3: #eceef2;
+  --color-line: #dfe2e7;
+  --color-line-strong: #c9ced6;
+  --color-fg: #15171c;
+  --color-fg-2: #353a44;
+  --color-fg-muted: #565d69;
+  --color-accent: #4b4bc7;
+  --color-accent-hover: #3f3fb0;
+  --color-accent-text: #3c3cb0;
+  --color-accent-soft: #e8e8fb;
+  --color-success: #1b6e45;
+  --color-success-soft: #e2f4ea;
+  --color-warning: #7a4f00;
+  --color-warning-soft: #fcf1d8;
+  --color-danger: #b02020;
+  --color-danger-solid: #c42f2f;
+  --color-danger-soft: #fce7e7;
+  --color-popover: #ffffff;
+}
+
+:root[data-theme="high-contrast"] {
+  --color-canvas: #000000;
+  --color-surface: #000000;
+  --color-surface-2: #0b0b0b;
+  --color-surface-3: #1f1f1f;
+  --color-line: #9a9a9a;
+  --color-line-strong: #ffffff;
+  --color-fg: #ffffff;
+  --color-fg-2: #ffffff;
+  --color-fg-muted: #e6e6e6;
+  --color-accent: #4646d8;
+  --color-accent-hover: #3a3ac0;
+  --color-accent-text: #b8bcff;
+  --color-accent-soft: #15154a;
+  --color-success: #72f0ad;
+  --color-success-soft: #002814;
+  --color-warning: #ffd36b;
+  --color-warning-soft: #2b2000;
+  --color-danger: #ffa3a3;
+  --color-danger-solid: #c62828;
+  --color-danger-soft: #330000;
+  --color-popover: #000000;
+}
+
+/* Light glass: a white tint, dark text, a light halo. */
+:root[data-theme="light"] .glass {
+  --color-surface: rgb(250 250 252 / var(--glass-alpha, 0.8));
+  --color-surface-2: rgb(255 255 255 / 0.7);
+  --color-surface-3: rgb(228 231 236 / 0.8);
+  --color-canvas: rgb(255 255 255 / 0.75);
+  --color-line: rgb(0 0 0 / 0.1);
+  --color-line-strong: rgb(0 0 0 / 0.18);
+  --color-accent-soft: rgb(75 75 199 / 0.14);
+  --color-fg-2: #2b2f37;
+  --color-fg-muted: #474d58;
+  --glass-shadow: rgb(255 255 255 / calc((1 - var(--glass-alpha, 0.8)) * 0.9));
+}
+
+/* High contrast is never see-through: solid black, no halo, strong lines. */
+:root[data-theme="high-contrast"] .glass {
+  --color-surface: #000000;
+  --color-surface-2: #0b0b0b;
+  --color-surface-3: #1f1f1f;
+  --color-canvas: #000000;
+  --color-line: #9a9a9a;
+  --color-line-strong: #ffffff;
+  --color-accent-soft: #15154a;
+  --color-fg-2: #ffffff;
+  --color-fg-muted: #e6e6e6;
+  text-shadow: none;
+}
+
 /* Times and counts line up. */
 time,
 .tabular {

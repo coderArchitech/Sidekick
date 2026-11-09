@@ -3,6 +3,7 @@
 use sidekick_core::SidekickResult;
 use sidekick_settings::{Settings, SettingsPatch};
 use tauri::{AppHandle, State};
+use tauri_specta::Event;
 
 use crate::state::AppState;
 
@@ -25,5 +26,10 @@ pub fn update_settings(
         let validated = sidekick_hotkeys::validate(new)?;
         crate::shortcuts::apply(&app, &validated, &previous)?;
     }
-    sidekick_settings::update(&state.db(), patch)
+    let settings = sidekick_settings::update(&state.db(), patch)?;
+    let _ = crate::events::SettingsChanged {
+        settings: settings.clone(),
+    }
+    .emit(&app);
+    Ok(settings)
 }
