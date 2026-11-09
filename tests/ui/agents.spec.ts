@@ -1,11 +1,11 @@
 import { expect, test } from "@playwright/test";
-import { expectAccessible, open, startSession } from "./helpers";
+import { expectAccessible, open, startSession, choose } from "./helpers";
 
 /** T-045: agent Skills use tools (PRD SKL-4); several Skills at once (SKL-5). */
 test("an agent Skill uses the calculator before answering", async ({ page }) => {
   await open(page);
   await startSession(page);
-  await page.getByRole("combobox", { name: "Skill" }).selectOption("negotiation-coach");
+  await choose(page.getByRole("combobox", { name: "Skill" }), "negotiation-coach");
   await page.getByRole("tab", { name: "Chat" }).click();
   await page
     .getByRole("textbox", { name: "Ask a question" })
@@ -25,7 +25,7 @@ test("more Skills can be used at once", async ({ page }) => {
   await open(page);
   await startSession(page);
   const picker = page.getByRole("combobox", { name: "Skill" });
-  await picker.selectOption("teacher");
+  await choose(picker, "teacher");
   await page.getByRole("button", { name: /More Skills/ }).click();
   const dialog = page.getByRole("dialog", { name: "Also use" });
   await dialog.getByRole("checkbox", { name: "Technical Architect" }).check();

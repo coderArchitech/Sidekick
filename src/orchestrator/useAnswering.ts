@@ -1,5 +1,11 @@
 import { useEffect, useRef } from "react";
-import { answerEvents, commands, type QuestionSource, type Session } from "@/ipc";
+import {
+  answerEvents,
+  commands,
+  type CaptureRequest,
+  type QuestionSource,
+  type Session,
+} from "@/ipc";
 import { createBatcher } from "@/lib/batcher";
 import { AnswerRouter, type AnswerView } from "./answerer";
 import { useAnswersStore } from "./answersStore";
@@ -58,9 +64,9 @@ export function useAnswering(session: Session | null) {
     // Questions the user asked (Chat, capture-and-ask) go to the Chat tab;
     // detected ones to Live Answers.
     const upsert = (v: AnswerView) =>
-      v.source !== "detected"
-        ? useChatStore.getState().upsert(v)
-        : useAnswersStore.getState().upsert(v);
+      v.source === "detected" || v.live
+        ? useAnswersStore.getState().upsert(v)
+        : useChatStore.getState().upsert(v);
     const batcher = createBatcher<AnswerView>(50, (views) => {
       // Only the latest state of each answer matters.
       const latest = new Map(views.map((v) => [v.id, v]));
@@ -175,6 +181,33 @@ export async function askFollowUp(view: AnswerView, kind: FollowUpKind): Promise
     endedAt: Date.now(),
     models: active.models(),
     history: f.history,
+  });
+  return null;
+}
+
+/**
+ * Takes a screenshot and answers the question on it, in Live Answers (the
+ * Screenshot button there, or the Screenshot shortcut while it is open). The
+ * capture also joins the session's screenshot strip.
+ */
+export async function captureAndAnswer(request: CaptureRequest): Promise<string | null> {
+  const active = current;
+  if (!active) return "Start a session to ask about your screen.";
+  const shot = await commands.captureScreenshot(active.sessionId, request);
+  if (shot.status === "error") return shot.error.message;
+  useChatStore.setState((s) => ({ screenshots: [...s.screenshots, shot.data] }));
+  const action = screenshotAction("answer");
+  await active.router.ask({
+    sessionId: active.sessionId,
+    text: action.prompt,
+    label: "Question on screen",
+    directed: true,
+    source: "screenshot",
+    skill: active.skill("screenshot"),
+    endedAt: Date.now(),
+    models: active.models(),
+    screenshotId: shot.data.id,
+    live: true,
   });
   return null;
 }

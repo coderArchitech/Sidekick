@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { Select } from "@/lib/Select";
 import {
   commands,
   hideCurrentWindow,
@@ -144,33 +145,29 @@ export function SettingsWindow() {
               <label className="mt-3 block text-sm text-fg-2" htmlFor="retention">
                 Keep session data
               </label>
-              <select
+              <Select
                 id="retention"
-                className="field mt-1"
+                className="mt-1 max-w-xs"
                 value={settings.retention}
-                onChange={(e) => void update({ retention: e.target.value as Retention })}
-              >
-                {(Object.keys(RETENTION_LABELS) as Retention[]).map((r) => (
-                  <option key={r} value={r}>
-                    {RETENTION_LABELS[r]}
-                  </option>
-                ))}
-              </select>
+                onChange={(v) => void update({ retention: v as Retention })}
+                options={(Object.keys(RETENTION_LABELS) as Retention[]).map((r) => ({
+                  value: r,
+                  label: RETENTION_LABELS[r],
+                }))}
+              />
               <label className="mt-3 block text-sm text-fg-2" htmlFor="theme">
                 Theme
               </label>
-              <select
+              <Select
                 id="theme"
-                className="field mt-1"
+                className="mt-1 max-w-xs"
                 value={settings.theme}
-                onChange={(e) => void update({ theme: e.target.value as Theme })}
-              >
-                {(Object.keys(THEME_LABELS) as Theme[]).map((t) => (
-                  <option key={t} value={t}>
-                    {THEME_LABELS[t]}
-                  </option>
-                ))}
-              </select>
+                onChange={(v) => void update({ theme: v as Theme })}
+                options={(Object.keys(THEME_LABELS) as Theme[]).map((t) => ({
+                  value: t,
+                  label: THEME_LABELS[t],
+                }))}
+              />
               <p className="mt-1 text-xs text-fg-muted">
                 Applies to both windows. High contrast also makes the overlay solid.
               </p>

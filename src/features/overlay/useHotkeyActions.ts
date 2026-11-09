@@ -2,7 +2,7 @@ import { useEffect } from "react";
 import { useSessionStore } from "@/features/session";
 import { bookmarkNow } from "@/features/transcript";
 import { sessionEvents, type Action } from "@/ipc";
-import { nextSkillId, useChatStore, useSkillsStore } from "@/orchestrator";
+import { captureAndAnswer, nextSkillId, useChatStore, useSkillsStore } from "@/orchestrator";
 import { useOverlayStore } from "./store";
 
 /**
@@ -35,8 +35,13 @@ export async function handle(action: Action): Promise<void> {
       await bookmarkNow(store.session);
       break;
     case "screenshot":
-      // Capture-and-ask (SCR-4): full screen now, then type the question.
       if (store.session && store.session.status !== "ended") {
+        // On Live Answers the screen is the question: answer it right there.
+        if (useOverlayStore.getState().tab === "answers") {
+          await captureAndAnswer({ mode: "screen" });
+          break;
+        }
+        // Elsewhere, capture-and-ask (SCR-4): full screen now, then type the question.
         useOverlayStore.getState().setTab("chat");
         await useChatStore.getState().capture(store.session.id, { mode: "screen" });
       }

@@ -12,6 +12,7 @@ export {
   askChat,
   askFollowUp,
   askScreenshotAction,
+  captureAndAnswer,
   useAnswering,
 } from "./useAnswering";
 export {

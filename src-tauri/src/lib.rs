@@ -15,6 +15,7 @@ mod placement;
 mod protection;
 mod shortcuts;
 mod state;
+mod topmost;
 
 #[cfg(test)]
 mod capabilities_test;
@@ -55,8 +56,11 @@ pub fn run() {
             placement::restore(app.handle());
             housekeeping::start(app.handle());
             if let Some(w) = app.get_webview_window("overlay") {
+                topmost::pin(&w);
                 let handle = app.handle().clone();
+                let overlay = w.clone();
                 w.on_window_event(move |e| {
+                    topmost::on_event(&overlay, e);
                     if matches!(
                         e,
                         tauri::WindowEvent::Moved(_) | tauri::WindowEvent::Resized(_)

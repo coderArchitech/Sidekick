@@ -1,5 +1,5 @@
 import { expect, test } from "@playwright/test";
-import { expectAccessible, open, say, startSession, type SidekickTest } from "./helpers";
+import { expectAccessible, open, say, startSession, type SidekickTest, choose } from "./helpers";
 
 /** T-041: agenda tracking, "What did I miss?" and action items (PRD MEM-2 to MEM-4). */
 test("agenda moves on as the meeting goes, and closes when it ends", async ({ page }) => {
@@ -21,13 +21,24 @@ test("agenda moves on as the meeting goes, and closes when it ends", async ({ pa
   // keywords move the agenda), then closes the item still in progress.
   await page.getByRole("button", { name: "End", exact: true }).click();
   await expect(agenda).toContainText("2/3 covered");
-  await expect(agenda.getByLabel("Status of Pro tier pricing")).toHaveValue("covered");
-  await expect(agenda.getByLabel("Status of Dashboard")).toHaveValue("covered");
-  await expect(agenda.getByLabel("Status of Hiring")).toHaveValue("not_started");
+  await expect(
+    agenda.getByRole("combobox", { name: "Status of Pro tier pricing" }),
+  ).toHaveAttribute("data-value", "covered");
+  await expect(agenda.getByRole("combobox", { name: "Status of Dashboard" })).toHaveAttribute(
+    "data-value",
+    "covered",
+  );
+  await expect(agenda.getByRole("combobox", { name: "Status of Hiring" })).toHaveAttribute(
+    "data-value",
+    "not_started",
+  );
 
   // A manual change sticks.
-  await agenda.getByLabel("Status of Hiring").selectOption("in_progress");
-  await expect(agenda.getByLabel("Status of Hiring")).toHaveValue("in_progress");
+  await choose(agenda.getByRole("combobox", { name: "Status of Hiring" }), "in_progress");
+  await expect(agenda.getByRole("combobox", { name: "Status of Hiring" })).toHaveAttribute(
+    "data-value",
+    "in_progress",
+  );
 });
 
 test("'What did I miss?' recaps the last minutes", async ({ page }) => {
@@ -35,7 +46,7 @@ test("'What did I miss?' recaps the last minutes", async ({ page }) => {
   await startSession(page);
   await say(page, "Priya, can you send the quote by Friday?");
   await page.getByRole("tab", { name: "Notes" }).click();
-  await page.getByLabel("Recap period").selectOption("2");
+  await choose(page.getByRole("combobox", { name: "Recap period" }), "2");
   await page.getByRole("button", { name: "What did I miss?" }).click();
   const card = page.getByRole("region", { name: "What you missed" });
   await expect(card).toContainText("Last 2 minutes");

@@ -1,5 +1,5 @@
 import AxeBuilder from "@axe-core/playwright";
-import { expect, type Page } from "@playwright/test";
+import { expect, type Locator, type Page } from "@playwright/test";
 
 /** Opens the overlay (or the Settings window) with fresh mocks. */
 export async function open(page: Page, which: "overlay" | "settings" = "overlay") {
@@ -87,3 +87,11 @@ interface SidekickTest {
 }
 
 export type { SidekickTest };
+
+/** Picks `value` in an in-window dropdown (src/lib/Select.tsx). */
+export async function choose(combobox: Locator, value: string) {
+  await combobox.click();
+  const listId = await combobox.getAttribute("aria-controls");
+  await combobox.page().locator(`[id="${listId}"] [role="option"][data-value="${value}"]`).click();
+  await expect(combobox).toHaveAttribute("data-value", value);
+}

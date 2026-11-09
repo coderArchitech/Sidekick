@@ -13,7 +13,7 @@ fn db() -> Database {
 
 #[test]
 fn every_template_validates_and_matches_its_file_name() {
-    assert_eq!(TEMPLATES.len(), 5);
+    assert_eq!(TEMPLATES.len(), 6);
     for (id, text) in TEMPLATES {
         let s = format::validate(text).unwrap_or_else(|e| panic!("{id}: {e:?}"));
         assert_eq!(s.id, *id);
@@ -45,7 +45,7 @@ fn every_template_has_one_golden_answer_case() {
 fn seeds_templates_once_then_lists_by_name() {
     let db = db();
     let dir = tempfile::tempdir().unwrap();
-    assert_eq!(repo::seed(&db, dir.path()).unwrap(), 5);
+    assert_eq!(repo::seed(&db, dir.path()).unwrap(), 6);
     assert_eq!(repo::seed(&db, dir.path()).unwrap(), 0, "only on first run");
     let names: Vec<String> = repo::list(&db)
         .unwrap()
@@ -58,6 +58,7 @@ fn seeds_templates_once_then_lists_by_name() {
             "Interview Coach",
             "Negotiation Coach",
             "Sales Discovery",
+            "Staff Engineer Interview (JS)",
             "Teacher",
             "Technical Architect"
         ]
@@ -161,4 +162,59 @@ fn export_then_import_is_lossless() {
         let back = repo::preview_import(&db, &out).unwrap().skill;
         assert_eq!(back, repo::get(&db, id).unwrap().skill, "{id}");
     }
+}
+
+#[test]
+fn an_update_adds_new_built_in_skills_once_without_restoring_deleted_ones() {
+    let db = db();
+    let dir = tempfile::tempdir().unwrap();
+    // An install from before the interview Skill: the first five were seeded,
+    // and the user deleted one of them.
+    for (id, text) in TEMPLATES
+        .iter()
+        .filter(|(id, _)| *id != "staff-engineer-interview")
+    {
+        repo::save(
+            &db,
+            dir.path(),
+            &sidekick_skills::format::parse(text).unwrap(),
+        )
+        .unwrap();
+        let _ = id;
+    }
+    repo::delete(&db, dir.path(), "teacher").unwrap();
+
+    assert_eq!(repo::seed(&db, dir.path()).unwrap(), 1, "only the new one");
+    assert!(repo::get(&db, "staff-engineer-interview").is_ok());
+    assert!(
+        repo::get(&db, "teacher").is_err(),
+        "a deleted built-in stays deleted"
+    );
+
+    // Offered once: deleting it later doesn't bring it back.
+    repo::delete(&db, dir.path(), "staff-engineer-interview").unwrap();
+    assert_eq!(repo::seed(&db, dir.path()).unwrap(), 0);
+    assert!(repo::get(&db, "staff-engineer-interview").is_err());
+}
+
+#[test]
+fn the_interview_skill_covers_js_coding_and_system_design() {
+    let (_, text) = TEMPLATES
+        .iter()
+        .find(|(id, _)| *id == "staff-engineer-interview")
+        .unwrap();
+    let skill = sidekick_skills::format::parse(text).unwrap();
+    assert_eq!(skill.name, "Staff Engineer Interview (JS)");
+    for must in [
+        "Staff Engineer",
+        "JavaScript",
+        "Coding round",
+        "Low-level design",
+        "High-level design (HLD), backend",
+        "High-level design (HLD), frontend",
+        "first person",
+    ] {
+        assert!(skill.instructions.contains(must), "missing {must}");
+    }
+    assert!(skill.instructions.chars().count() <= 8_000);
 }

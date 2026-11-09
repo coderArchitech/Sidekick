@@ -34,6 +34,7 @@ export const config: WebdriverIO.Config = {
     ? ["./specs/llm-failure.e2e.ts"]
     : [
         "./specs/session.e2e.ts",
+        "./specs/user-issues.e2e.ts",
         "./specs/meeting-memory.e2e.ts",
         "./specs/follow-ups.e2e.ts",
         "./specs/screenshot.e2e.ts",

@@ -10,7 +10,10 @@ const MIN_SIZE = 0.02;
 export function RegionPicker({
   onPick,
   onCancel,
+  down = false,
 }: {
+  /** Open below the button instead of above it. */
+  down?: boolean;
   onPick: (r: Region) => void;
   onCancel: () => void;
 }) {
@@ -55,7 +58,7 @@ export function RegionPicker({
     <div
       role="dialog"
       aria-label="Select an area"
-      className="absolute bottom-full left-0 z-10 mb-1 w-80 rounded-md border border-line bg-popover p-2 text-xs shadow-lg"
+      className={`absolute ${down ? "top-full mt-1" : "bottom-full mb-1"} left-0 z-10 w-80 rounded-md border border-line bg-popover p-2 text-xs shadow-lg`}
     >
       <p className="mb-1 text-fg-2">Drag over the area to capture.</p>
       {error && <p className="text-danger">{error}</p>}

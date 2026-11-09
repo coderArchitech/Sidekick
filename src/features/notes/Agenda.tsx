@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { commands, type AgendaStatus, type Notes } from "@/ipc";
+import { Select } from "@/lib/Select";
 import { useNotesStore } from "@/orchestrator";
 
 const LABEL: Record<AgendaStatus, string> = {
@@ -101,24 +102,20 @@ export function Agenda({ sessionId, notes }: { sessionId: string; notes: Notes |
                 >
                   {a.text}
                 </span>
-                <select
+                <Select
                   aria-label={`Status of ${a.text}`}
-                  className="field field-sm w-auto"
+                  small
                   value={a.status}
-                  onChange={(e) =>
+                  onChange={(v) =>
                     void commands
-                      .updateAgenda(sessionId, [
-                        { id: a.id, status: e.target.value as AgendaStatus },
-                      ])
+                      .updateAgenda(sessionId, [{ id: a.id, status: v as AgendaStatus }])
                       .then(apply)
                   }
-                >
-                  {(Object.keys(LABEL) as AgendaStatus[]).map((s) => (
-                    <option key={s} value={s}>
-                      {LABEL[s]}
-                    </option>
-                  ))}
-                </select>
+                  options={(Object.keys(LABEL) as AgendaStatus[]).map((s) => ({
+                    value: s,
+                    label: LABEL[s],
+                  }))}
+                />
               </li>
             ))}
           </ol>

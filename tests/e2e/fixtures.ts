@@ -6,6 +6,8 @@ export const SCRIPT = [
   "Welcome everyone to the design review.",
   "What's the rate limit for the Pro tier?",
   "Let's also look at the dashboard.",
+  // An interviewer's task, not a question (bug: tasks weren't answered).
+  "Design a URL shortener for our docs.",
   "Thanks, that's all for today.",
 ];
 

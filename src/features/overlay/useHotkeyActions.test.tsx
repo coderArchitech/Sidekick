@@ -2,9 +2,16 @@ import { act, render } from "@testing-library/react";
 import { beforeEach, describe, expect, it } from "vitest";
 import { useSessionStore } from "@/features/session";
 import { mockCommands, mockSessionBus, resetMocks } from "@/ipc/testing";
-import { useChatStore } from "@/orchestrator";
+import type { Session } from "@/ipc";
+import { useAnswering, useAnswersStore, useChatStore } from "@/orchestrator";
 import { useOverlayStore } from "./store";
 import { useHotkeyActions } from "./useHotkeyActions";
+
+function AnsweringHarness({ session }: { session: Session }) {
+  useHotkeyActions();
+  useAnswering(session);
+  return null;
+}
 
 function Harness() {
   useHotkeyActions();
@@ -91,8 +98,8 @@ describe("auto-answer shortcut", () => {
     expect(useChatStore.getState().focusTick).toBe(before + 1);
   });
 
-  it("Screenshot captures the screen and opens Chat to ask about it", async () => {
-    useOverlayStore.setState({ tab: "answers" });
+  it("Screenshot (outside Live Answers) captures the screen and opens Chat to ask about it", async () => {
+    useOverlayStore.setState({ tab: "notes" });
     useChatStore.setState({ pending: null, captureError: null });
     await liveSession();
     render(<Harness />);
@@ -101,6 +108,25 @@ describe("auto-answer shortcut", () => {
     await tick();
     expect(useOverlayStore.getState().tab).toBe("chat");
     expect(useChatStore.getState().pending).toMatchObject({ width: 1568, height: 882 });
+  });
+
+  it("Screenshot on Live Answers answers the question on screen right there", async () => {
+    useOverlayStore.setState({ tab: "answers" });
+    useChatStore.setState({ pending: null, captureError: null, screenshots: [] });
+    useAnswersStore.getState().clear();
+    const s = await liveSession();
+    render(<AnsweringHarness session={s} />);
+    await tick();
+    mockSessionBus.emit("hotkey", { action: "screenshot" });
+    await tick(300);
+    expect(useOverlayStore.getState().tab).toBe("answers");
+    expect(useChatStore.getState().pending).toBeNull();
+    expect(useChatStore.getState().screenshots).toHaveLength(1);
+    expect(useAnswersStore.getState().views[0]).toMatchObject({
+      question: "Question on screen",
+      source: "screenshot",
+      live: true,
+    });
   });
 
   it("Screenshot does nothing without a session", async () => {
@@ -117,7 +143,7 @@ describe("auto-answer shortcut", () => {
     render(<Harness />);
     await tick();
     const ids: (string | null)[] = [];
-    for (let i = 0; i < 6; i++) {
+    for (let i = 0; i < 7; i++) {
       mockSessionBus.emit("hotkey", { action: "switch_skill" });
       await tick(40);
       ids.push(useSessionStore.getState().session?.skillId ?? null);
@@ -126,6 +152,7 @@ describe("auto-answer shortcut", () => {
       "interview-coach",
       "negotiation-coach",
       "sales-discovery",
+      "staff-engineer-interview",
       "teacher",
       "technical-architect",
       null,

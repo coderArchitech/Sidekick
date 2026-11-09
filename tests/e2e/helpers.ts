@@ -58,23 +58,23 @@ export async function waitForText(
 }
 
 /**
- * Picks an option in a `<select>`. WebDriver's own select commands don't fire
- * `change` on WebKitGTK, so set the value the way React listens for it.
+ * Picks `value` in an in-window dropdown (src/lib/Select.tsx), found by its
+ * accessible name: opens it and clicks the option.
  */
-export async function selectValue(selector: string, value: string) {
-  await $(`${selector} option[value="${value}"]`).waitForExist();
-  await browser.execute(
-    (sel: string, v: string) => {
-      const el = document.querySelector<HTMLSelectElement>(sel);
-      const set = Object.getOwnPropertyDescriptor(HTMLSelectElement.prototype, "value")?.set;
-      if (!el || !set) throw new Error(`no select ${sel}`);
-      set.call(el, v);
-      el.dispatchEvent(new Event("change", { bubbles: true }));
-    },
-    selector,
-    value,
-  );
-  await browser.waitUntil(async () => (await $(selector).getValue()) === value, {
-    timeoutMsg: `${selector} never became "${value}"`,
+export async function selectValue(name: string, value: string) {
+  const box = await $(`[role="combobox"][aria-label="${name}"], button#${name}`);
+  await box.waitForExist();
+  await box.click();
+  const listId = await box.getAttribute("aria-controls");
+  const option = await $(`[id="${listId}"] [role="option"][data-value="${value}"]`);
+  await option.waitForExist();
+  await option.click();
+  await browser.waitUntil(async () => (await box.getAttribute("data-value")) === value, {
+    timeoutMsg: `"${name}" never became "${value}"`,
   });
+}
+
+/** The value of an in-window dropdown, by its accessible name. */
+export async function selectedValue(name: string): Promise<string> {
+  return (await $(`[role="combobox"][aria-label="${name}"]`).getAttribute("data-value")) ?? "";
 }

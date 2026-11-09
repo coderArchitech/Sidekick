@@ -1,18 +1,36 @@
 import { useEffect, useState } from "react";
-import { commands, type WindowInfo } from "@/ipc";
+import { commands, type CaptureRequest, type WindowInfo } from "@/ipc";
 import { useChatStore } from "@/orchestrator";
 import { RegionPicker } from "./RegionPicker";
 import { QuickActions, useThumb } from "./ScreenshotStrip";
 
 type Step = "closed" | "menu" | "window" | "region";
 
-/** Screenshot button for capture-and-ask (PRD SCR-1, SCR-4): screen, a window or a region. */
-export function CaptureMenu({ sessionId, disabled }: { sessionId: string; disabled: boolean }) {
+/**
+ * Screenshot button for capture-and-ask (PRD SCR-1, SCR-4): screen, a window
+ * or a region. By default the capture is attached to the next Chat question;
+ * `onTake` does something else with the request (Live Answers answers it).
+ */
+export function CaptureMenu({
+  sessionId,
+  disabled,
+  onTake,
+  down = false,
+}: {
+  sessionId: string;
+  disabled: boolean;
+  onTake?: (request: CaptureRequest) => Promise<void>;
+  /** Open the menus below the button (the button is at the top). */
+  down?: boolean;
+}) {
   const [step, setStep] = useState<Step>("closed");
   const [windows, setWindows] = useState<WindowInfo[] | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [taking, setTaking] = useState(false);
   const capture = useChatStore((s) => s.capture);
-  const capturing = useChatStore((s) => s.capturing);
+  const chatCapturing = useChatStore((s) => s.capturing);
+  const capturing = onTake ? taking : chatCapturing;
+  const place = down ? "top-full mt-1" : "bottom-full mb-1";
 
   useEffect(() => {
     if (step !== "window") return;
@@ -22,9 +40,18 @@ export function CaptureMenu({ sessionId, disabled }: { sessionId: string; disabl
     });
   }, [step]);
 
-  async function take(request: Parameters<typeof capture>[1]) {
+  async function take(request: CaptureRequest) {
     setStep("closed");
-    await capture(sessionId, request);
+    if (!onTake) {
+      await capture(sessionId, request);
+      return;
+    }
+    setTaking(true);
+    try {
+      await onTake(request);
+    } finally {
+      setTaking(false);
+    }
   }
 
   return (
@@ -47,7 +74,7 @@ export function CaptureMenu({ sessionId, disabled }: { sessionId: string; disabl
         <div
           role="menu"
           aria-label="Capture"
-          className="absolute bottom-full left-0 z-10 mb-1 w-40 rounded-md border border-line bg-popover p-1 text-sm shadow-lg"
+          className={`absolute ${place} left-0 z-10 w-40 rounded-md border border-line bg-popover p-1 text-sm shadow-lg`}
         >
           <MenuItem onClick={() => void take({ mode: "screen" })}>Full screen</MenuItem>
           <MenuItem
@@ -66,7 +93,7 @@ export function CaptureMenu({ sessionId, disabled }: { sessionId: string; disabl
         <div
           role="dialog"
           aria-label="Choose a window"
-          className="absolute bottom-full left-0 z-10 mb-1 max-h-64 w-64 overflow-y-auto rounded-md border border-line bg-popover p-1 text-sm shadow-lg"
+          className={`absolute ${place} left-0 z-10 max-h-64 w-64 overflow-y-auto rounded-md border border-line bg-popover p-1 text-sm shadow-lg`}
         >
           {error && <p className="p-1 text-danger">{error}</p>}
           {!windows && !error && <p className="p-1 text-fg-muted">Finding windows…</p>}
@@ -94,6 +121,7 @@ export function CaptureMenu({ sessionId, disabled }: { sessionId: string; disabl
 
       {step === "region" && (
         <RegionPicker
+          down={down}
           onCancel={() => setStep("closed")}
           onPick={(region) => void take({ mode: "region", region })}
         />

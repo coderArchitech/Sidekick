@@ -45,14 +45,20 @@ fn on_action<R: Runtime>(app: &AppHandle<R>, action: Action) {
         let _ = if visible {
             w.hide()
         } else {
-            w.show().and_then(|()| w.set_focus())
+            w.show().and_then(|()| {
+                crate::topmost::pin(&w);
+                w.set_focus()
+            })
         };
     }
     // Ask types into Chat, so the overlay has to be visible and focused.
     if action == Action::Ask
         && let Some(w) = app.get_webview_window("overlay")
     {
-        let _ = w.show().and_then(|()| w.set_focus());
+        let _ = w.show().and_then(|()| {
+            crate::topmost::pin(&w);
+            w.set_focus()
+        });
     }
     let _ = HotkeyPressed { action }.emit(app);
 }

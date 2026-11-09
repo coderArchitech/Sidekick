@@ -1,5 +1,6 @@
 import { render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
+import { choose } from "@/test/select";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { mockCommands, resetMocks } from "@/ipc/testing";
 import { SettingsWindow } from "./SettingsWindow";
@@ -11,13 +12,9 @@ describe("Local Whisper in Settings", () => {
     const user = userEvent.setup();
     render(<SettingsWindow />);
     const stt = await screen.findByRole("region", { name: /speech-to-text/i });
-    await waitFor(() =>
-      expect(within(stt).getAllByRole("option", { name: /local whisper/i })).toHaveLength(1),
-    );
-    await user.selectOptions(
-      within(stt).getByRole("combobox", { name: "Provider" }),
-      "whisper-local",
-    );
+    const provider = within(stt).getByRole("combobox", { name: "Provider" });
+    await waitFor(() => expect(provider).toHaveTextContent("Deepgram"));
+    await choose(user, within(stt).getByRole("combobox", { name: "Provider" }), "whisper-local");
     return { user, stt };
   }
 
@@ -25,7 +22,7 @@ describe("Local Whisper in Settings", () => {
     const { stt } = await chooseWhisper();
     expect(within(stt).getByText("Runs on this computer. No key needed.")).toBeInTheDocument();
     const model = await within(stt).findByRole("combobox", { name: "Model" });
-    await waitFor(() => expect((model as HTMLSelectElement).value).toBe("base"));
+    await waitFor(() => expect(model).toHaveAttribute("data-value", "base"));
     expect(within(stt).getByText(/Hinglish/)).toBeInTheDocument();
     expect(within(stt).getByRole("button", { name: "Download (142 MB)" })).toBeInTheDocument();
   });
@@ -34,16 +31,16 @@ describe("Local Whisper in Settings", () => {
     const download = vi.spyOn(mockCommands, "downloadWhisperModel");
     const { user, stt } = await chooseWhisper();
     const model = await within(stt).findByRole("combobox", { name: "Model" });
-    await user.selectOptions(model, "tiny.en");
-    await waitFor(() => expect((model as HTMLSelectElement).value).toBe("tiny.en"));
+    await choose(user, model, "tiny.en");
+    await waitFor(() => expect(model).toHaveAttribute("data-value", "tiny.en"));
     await user.click(within(stt).getByRole("button", { name: "Download (75 MB)" }));
     expect(download).toHaveBeenCalledWith("tiny.en");
     expect(
       await within(stt).findByText("Ready. Audio stays on this computer."),
     ).toBeInTheDocument();
-    expect(
-      within(stt).getByRole("option", { name: /tiny\.en.*\(downloaded\)/ }),
-    ).toBeInTheDocument();
+    expect(within(stt).getByRole("combobox", { name: "Model" })).toHaveTextContent(
+      /tiny\.en.*\(downloaded\)/,
+    );
   });
 
   it("shows a failed checksum", async () => {

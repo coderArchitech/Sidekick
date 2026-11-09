@@ -58,6 +58,8 @@ export interface AnswerView {
   answerId: string | null;
   /** Tools an agent Skill ran for this answer (PRD SKL-4). */
   tools?: ToolResult[];
+  /** Shown in Live Answers (detected questions, or a screenshot taken there). */
+  live?: boolean;
 }
 
 export interface AskInput {
@@ -77,6 +79,8 @@ export interface AskInput {
   query?: string;
   /** Answer about this screenshot (quick actions, re-ask; PRD SCR-5, SCR-6). */
   screenshotId?: string;
+  /** Show it in Live Answers even though the user asked (a screenshot taken there). */
+  live?: boolean;
 }
 
 interface InFlight {
@@ -139,6 +143,7 @@ export class AnswerRouter {
       id,
       question: input.label ?? input.text,
       directed: input.directed,
+      ...(input.live ? { live: true } : {}),
       source: input.source,
       cue: "",
       body: "",

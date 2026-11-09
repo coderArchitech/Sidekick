@@ -126,6 +126,18 @@ The Windows half of every hardware check, split out when the macOS half closed. 
 | T-062 | Windows: click-through (T-048) | 🟡 In progress: testing | 🖥️ |
 | T-063 | Windows: glass over a live call (T-049) | 🟡 In progress: testing | 🖥️ |
 
+### Phase 6: Fixes from real use
+
+Reported after using the app on macOS (2026-11-09). Each fix has unit, component, Playwright and real-app E2E tests (`tests/ui/user-issues.spec.ts`, `tests/e2e/specs/user-issues.e2e.ts`). Steps in [Phase 6 details](#phase-6-details).
+
+| ID | Task | Status | Notes |
+| --- | --- | --- | --- |
+| T-064 | Overlay stays on top of other apps | 🟡 In progress: testing | 🖥️ Built and E2E-checked (always on top after a focus change). Needs a look on macOS and Windows: switch apps, full-screen meeting, hide and show |
+| T-065 | Dropdowns hidden in screen shares | 🟡 In progress: testing | 🖥️ Native `<select>` popups replaced by an in-window dropdown (none left; checked in Playwright and E2E). Needs a look in a real screen share |
+| T-066 | Staff Engineer Interview (JS) Skill | ✅ Done | Built-in Skill for coding, LLD and HLD (frontend and backend); added once to existing installs |
+| T-067 | Screenshot on Live Answers is the question | ✅ Done | Screenshot button and shortcut on Live Answers answer what's on screen there |
+| T-068 | Hear and answer the other person | 🟡 In progress: testing | 🖥️ Interview tasks detected (38% → 100% on the interview set), mic echo dropped, room mode without system audio. Needs a live interview call on speakers and on headphones |
+
 ---
 
 ## Phase 0 details
@@ -878,3 +890,52 @@ pnpm test:e2e
 1. Join a video call with the default opacity (80%).
 2. The participants' video is visible behind the overlay and answer text is readable over bright and dark scenes.
 3. Move **View → Background** between 20% and 100%. Text never fades, only the tint.
+
+## Phase 6 details
+
+### T-064 Overlay stays on top of other apps
+
+**Problem:** switching to another app could put Sidekick behind it. Tauri's always-on-top uses the lowest floating level on macOS, isn't re-applied after hide and show, and doesn't follow full-screen Spaces.
+**Fix:** `src-tauri/src/topmost.rs` pins the overlay (always on top, on every Space) when the app starts, after the Show/hide and Ask shortcuts show it, and whenever it loses focus. On Windows it re-asserts topmost so other topmost windows (meeting toolbars) don't keep it under. On macOS it uses the status-window level, joins all Spaces including full-screen ones (`FullScreenAuxiliary`), and doesn't hide when Sidekick isn't the active app. `visibleOnAllWorkspaces` is set in `tauri.conf.json`.
+**Tests**
+- [x] E2E: the overlay reports always-on-top, also after the Settings window took focus.
+- [ ] Manual 🖥️ (macOS and Windows): switch to another app, put a meeting app in full screen, hide and show with the shortcut. The overlay stays visible on top each time.
+
+### T-065 Dropdowns hidden in screen shares
+
+**Problem:** a native `<select>` opens its list as a separate OS popup window. Screen-share exclusion protects Sidekick's windows, not that popup, so the options showed in shared screens.
+**Fix:** `src/lib/Select.tsx`, a dropdown drawn inside the page (ARIA combobox and listbox, full keyboard support). All 12 native selects in the overlay and Settings use it.
+**Tests**
+- [x] Unit: mouse and keyboard selection, disabled options, outside click, axe open and closed.
+- [x] Component, Playwright and E2E: no `<select>` left in either window; every flow that picked from a dropdown passes with the new one.
+- [ ] Manual 🖥️: share the screen in a meeting app, open the Skill dropdown and the Settings dropdowns. The viewer sees nothing.
+
+### T-066 Staff Engineer Interview (JS) Skill
+
+**Fix:** `skills/templates/staff-engineer-interview.md`: answers in the first person as a Staff Engineer candidate, code in JavaScript, with playbooks for the coding round, low-level design and high-level design for frontend and backend, plus behavioural questions. Built-in Skills are now added once per install (`skills.seededTemplates`), so existing installs get it on the next start, and a deleted built-in stays deleted.
+**Tests**
+- [x] Rust: the template validates and covers each round; an update adds it once without restoring deleted built-ins; golden answer case.
+- [x] Component, Playwright and E2E: the Skill is listed and can be picked.
+
+### T-067 Screenshot on Live Answers is the question
+
+**Fix:** a **Screenshot** menu (full screen, a window, an area) at the top of Live Answers. The capture is answered there with the "Answer question on screen" prompt and shows as "Question on screen". The Screenshot shortcut does the same while Live Answers is open, and still opens Chat from other tabs. Captures join the screenshot strip.
+**Tests**
+- [x] Component: the button and the shortcut answer in Live Answers with that screenshot; a failed capture is explained.
+- [x] Playwright and E2E: a capture on Live Answers is answered there.
+
+### T-068 Hear and answer the other person
+
+**Problems found:**
+1. Interviewers give tasks, not questions ("Design a URL shortener", "Implement debounce", "Given an array…"). Detection caught 38% of them, so most were never answered.
+2. On speakers, the microphone also hears the other person, so their words came back as "Me" lines.
+3. Without system audio (an older macOS or a failure), the other person was only heard through the microphone, labelled as the user, and never answered.
+**Fix:**
+1. Task rules in `orchestrator/detect.ts` (design, implement, write, given…, let's code, your task is…), after leading fillers ("okay so", "now"): 100% precision and recall on the new interview set; the meeting sets stay at 99%/98%.
+2. `sidekick_session::sinks::EchoFilter` drops a mic line that repeats what the system stream heard (same words, within 4 s).
+3. System audio starts first. If it fails, `RoomSink` marks mic lines as "Room" (not the user) so their questions are answered, with a clear warning.
+**Tests**
+- [x] Unit: interview fixture (precision and recall ≥ 95%), detector with tasks and room lines; Rust echo filter, room mode, and the runner's stream order.
+- [x] Playwright and E2E: the other person's task is transcribed, detected and answered (the fixture script now includes one).
+- [ ] Manual 🖥️: a mock interview on a real call, once on speakers and once on headphones. Questions and tasks from the interviewer are answered; your own words aren't.
+

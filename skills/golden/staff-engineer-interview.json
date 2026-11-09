@@ -1,0 +1,12 @@
+{
+  "skill": "staff-engineer-interview",
+  "question": "Implement a debounce function in JavaScript and tell me its time complexity.",
+  "documents": [
+    {
+      "name": "interview-notes.md",
+      "text": "Coding round: the interviewer asks for utility functions such as debounce and throttle, written in JavaScript."
+    }
+  ],
+  "mustMention": ["function", "setTimeout", "clearTimeout"],
+  "mustNotMention": []
+}

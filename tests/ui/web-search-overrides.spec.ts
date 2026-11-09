@@ -1,5 +1,5 @@
 import { expect, test } from "@playwright/test";
-import { expectAccessible, open, type SidekickTest } from "./helpers";
+import { expectAccessible, open, type SidekickTest, choose } from "./helpers";
 
 /** T-046: web search for agent Skills (PRD KEY-8) and per-session providers (KEY-9). */
 test("a session with its own providers; an agent searches the web", async ({ page }) => {
@@ -21,10 +21,8 @@ test("a session with its own providers; an agent searches the web", async ({ pag
   });
 
   await page.getByRole("button", { name: "Options" }).click();
-  await page.getByRole("combobox", { name: "Answers for this session" }).selectOption("openai");
-  await page
-    .getByRole("combobox", { name: "Speech-to-text for this session" })
-    .selectOption("soniox");
+  await choose(page.getByRole("combobox", { name: "Answers for this session" }), "openai");
+  await choose(page.getByRole("combobox", { name: "Speech-to-text for this session" }), "soniox");
   await expectAccessible(page);
   await page.getByLabel("Session name").fill("Market call");
   await page.getByRole("button", { name: "New session" }).click();
@@ -40,7 +38,7 @@ test("a session with its own providers; an agent searches the web", async ({ pag
   });
   expect(stored).toMatchObject({ sttProvider: "soniox", llmProvider: "openai" });
 
-  await page.getByRole("combobox", { name: "Skill" }).selectOption("market-watch");
+  await choose(page.getByRole("combobox", { name: "Skill" }), "market-watch");
   await page.getByRole("tab", { name: "Chat" }).click();
   await page.getByRole("textbox", { name: "Ask a question" }).fill("What is the latest Fed rate?");
   await page.keyboard.press("Enter");

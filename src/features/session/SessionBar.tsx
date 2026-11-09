@@ -6,6 +6,7 @@ import {
   type SessionOverrides,
   type SessionProviderOptions,
 } from "@/ipc";
+import { Select } from "@/lib/Select";
 import { useSkillsStore } from "@/orchestrator";
 import { ConsentDialog } from "./ConsentDialog";
 import { useSessionStore } from "./store";
@@ -203,22 +204,23 @@ function ProviderOverrides({
   ) => (
     <label className="flex items-center gap-2">
       <span className="w-28 shrink-0 text-fg-muted">{label}</span>
-      <select
+      <Select
         aria-label={`${label} for this session`}
-        className="field field-sm min-w-0 flex-1"
+        small
+        className="min-w-0 flex-1"
         value={current ?? ""}
-        onChange={(e) => set(e.target.value || null)}
-      >
-        <option value="">Default ({list.find((p) => p.id === def)?.name ?? def})</option>
-        {list
-          .filter((p) => p.id !== def)
-          .map((p) => (
-            <option key={p.id} value={p.id} disabled={!p.ready}>
-              {p.name}
-              {p.ready ? "" : " (add its key in Settings)"}
-            </option>
-          ))}
-      </select>
+        onChange={(v) => set(v || null)}
+        options={[
+          { value: "", label: `Default (${list.find((p) => p.id === def)?.name ?? def})` },
+          ...list
+            .filter((p) => p.id !== def)
+            .map((p) => ({
+              value: p.id,
+              label: p.ready ? p.name : `${p.name} (add its key in Settings)`,
+              disabled: !p.ready,
+            })),
+        ]}
+      />
     </label>
   );
   return (
@@ -247,22 +249,20 @@ function SkillPicker() {
   if (!session || session.status === "ended") return null;
   const enabled = skills.filter((s) => s.enabled || s.id === session.skillId);
   return (
-    <select
+    <Select
       aria-label="Skill"
       title="Skill: how Sidekick answers in this session"
-      className="max-w-32 field field-sm text-xs"
+      small
+      className="w-32 text-xs"
       value={session.skillId ?? ""}
       disabled={busy}
-      onFocus={() => void load()}
-      onChange={(e) => void setSkill(e.target.value || null)}
-    >
-      <option value="">No Skill</option>
-      {enabled.map((s) => (
-        <option key={s.id} value={s.id}>
-          {s.name}
-        </option>
-      ))}
-    </select>
+      onOpen={() => void load()}
+      onChange={(v) => void setSkill(v || null)}
+      options={[
+        { value: "", label: "No Skill" },
+        ...enabled.map((s) => ({ value: s.id, label: s.name })),
+      ]}
+    />
   );
 }
 
@@ -365,19 +365,17 @@ function EndedSessionData() {
     <div className="flex items-center gap-2 text-fg-muted">
       <label className="flex items-center gap-1">
         Keep “{session.title}”
-        <select
+        <Select
           aria-label="Keep this session"
-          className="field field-sm"
+          small
           value={session.retention}
           disabled={busy}
-          onChange={(e) => void setRetention(e.target.value as Retention)}
-        >
-          {(["7d", "30d", "forever"] as Retention[]).map((r) => (
-            <option key={r} value={r}>
-              {KEEP_LABELS[r]}
-            </option>
-          ))}
-        </select>
+          onChange={(v) => void setRetention(v as Retention)}
+          options={(["7d", "30d", "forever"] as Retention[]).map((r) => ({
+            value: r,
+            label: KEEP_LABELS[r],
+          }))}
+        />
       </label>
       {confirming ? (
         <>

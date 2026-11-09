@@ -1,4 +1,5 @@
 import { useEffect, useId, useState } from "react";
+import { Select } from "@/lib/Select";
 import { commands, sessionEvents, type WhisperModelEntry } from "@/ipc";
 
 const DEFAULT = "base";
@@ -54,20 +55,17 @@ export function WhisperModels({ model, onChoose }: Props) {
       <label htmlFor={selectId} className="block text-fg-2">
         Model
       </label>
-      <select
+      <Select
         id={selectId}
-        className="field"
+        className="max-w-md"
         value={chosen}
         disabled={busy}
-        onChange={(e) => onChoose(e.target.value)}
-      >
-        {models.map((m) => (
-          <option key={m.name} value={m.name}>
-            {m.name} · {m.sizeMb} MB · {m.englishOnly ? "English" : "multilingual"}
-            {m.downloaded ? " (downloaded)" : ""}
-          </option>
-        ))}
-      </select>
+        onChange={onChoose}
+        options={models.map((m) => ({
+          value: m.name,
+          label: `${m.name} · ${m.sizeMb} MB · ${m.englishOnly ? "English" : "multilingual"}${m.downloaded ? " (downloaded)" : ""}`,
+        }))}
+      />
       {entry && !entry.downloaded && !busy && (
         <button type="button" className="btn btn-primary ml-2" onClick={() => void download()}>
           Download ({entry.sizeMb} MB)
