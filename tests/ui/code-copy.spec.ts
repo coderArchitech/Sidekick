@@ -1,7 +1,25 @@
 import { expect, test } from "@playwright/test";
 import { open, say, startSession } from "./helpers";
 
-test.use({ permissions: ["clipboard-read", "clipboard-write"] });
+// Chromium grants real clipboard access. WebKit (the macOS webview engine) has
+// no clipboard permissions in Playwright, so it gets an in-memory clipboard
+// with the same API: the app's copy button is exercised the same way.
+test.beforeEach(async ({ context, browserName }) => {
+  if (browserName === "chromium") {
+    await context.grantPermissions(["clipboard-read", "clipboard-write"]);
+    return;
+  }
+  await context.addInitScript(() => {
+    let text = "";
+    Object.defineProperty(navigator, "clipboard", {
+      configurable: true,
+      value: {
+        writeText: (t: string) => ((text = t), Promise.resolve()),
+        readText: () => Promise.resolve(text),
+      },
+    });
+  });
+});
 
 test("code in an answer is highlighted and copied only on click", async ({ page }) => {
   await open(page);

@@ -39,6 +39,7 @@
 | [Implementation tasks](docs/Task.md)                        | Every task to build Sidekick end to end, its tests and its current status                                              |
 | [Phase 0 manual checks](docs/phase-0-manual-checks.md)      | Step-by-step hardware checks that close Phase 0                                                                        |
 | [Phase 1 manual checks](docs/phase-1-manual-checks.md)      | Hardware and live-meeting checks for Phase 1 tasks (shortcuts, screenshots, speech-to-text providers, multi-monitor)   |
+| [macOS test report](docs/Macos_testing_report.md)           | What was tested on macOS for each task (T-051), with a screenshot of every Playwright test                             |
 | [End-to-end tests](tests/e2e/README.md)                     | How the full-app WebdriverIO suite builds, runs and is written                                                         |
 | [Architecture decision records](docs/adr/README.md)         | One file per significant decision (ADR-001 onwards)                                                                    |
 | [Module boundaries](docs/TECHNICAL.md#78-module-boundaries) | How the code is split and the rules that keep it modular                                                               |
@@ -112,6 +113,8 @@ Build an installer (unsigned):
 ```bash
 pnpm tauri build
 ```
+
+Or build installers for both platforms on GitHub: **Actions → Build installers → Run workflow**, pick the branch and `all`, `windows` or `macos`. When it finishes, download them from the run page: `sidekick-windows` (`.msi` and setup `.exe`), `sidekick-macos-apple-silicon` and `sidekick-macos-intel` (`.dmg`). They're unsigned, so Windows SmartScreen and macOS Gatekeeper warn on first open. The button appears once the workflow is on `main`.
 
 Build with local Whisper speech-to-text (needs CMake and Clang):
 
