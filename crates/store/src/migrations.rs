@@ -10,6 +10,7 @@ const MIGRATIONS: &[&str] = &[
     include_str!("../migrations/0004_agenda.sql"),
     include_str!("../migrations/0005_packs_and_brief.sql"),
     include_str!("../migrations/0006_session_skills.sql"),
+    include_str!("../migrations/0007_consent_others_only.sql"),
 ];
 
 /// Schema version after all migrations (`PRAGMA user_version`).

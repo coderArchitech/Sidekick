@@ -3,7 +3,7 @@ import { createAndStart, openTab, waitForLine, waitForText } from "../helpers";
 
 describe("session [smoke]", () => {
   it("consent → fixture audio → transcript → detected question → cited answer", async () => {
-    await createAndStart("Design review", "Participants know and agree to transcription");
+    await createAndStart("Design review", "The other people and me");
 
     await waitForLine("What's the rate limit for the Pro tier?");
 

@@ -193,6 +193,11 @@ impl Dialect for DeepgramProvider {
     fn finish(&self) -> Option<Message> {
         Some(Message::Text(r#"{"type":"CloseStream"}"#.into()))
     }
+
+    /// Returns the final text for what was said so far, without waiting for more audio.
+    fn finalize(&self) -> Option<Message> {
+        Some(Message::Text(r#"{"type":"Finalize"}"#.into()))
+    }
 }
 
 #[async_trait::async_trait]

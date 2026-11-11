@@ -16,6 +16,8 @@ interface SessionState {
   warnings: string[];
   /** Speech-to-text state per stream of the current session (`stt.status`). */
   stt: Partial<Record<Stream, SttState>>;
+  /** Whether the user's own voice is transcribed; null when the session has no microphone to switch. */
+  meOn: boolean | null;
   error: string | null;
   busy: boolean;
   /** Creates a draft session; `overrides` picks other providers for it (PRD KEY-9). */
@@ -27,6 +29,8 @@ interface SessionState {
   end: () => Promise<void>;
   /** Auto-answer on/off for this session (QA-3). */
   toggleAuto: () => Promise<void>;
+  /** Transcribes the user's own voice, or stops, while the other people keep being transcribed. */
+  toggleMe: () => Promise<void>;
   /** Sets the session's active Skill, or none (PRD SKL-1). */
   setSkill: (skillId: string | null) => Promise<void>;
   /** Skills also in use alongside the main one (PRD SKL-5). */
@@ -63,12 +67,13 @@ export const useSessionStore = create<SessionState>((set, get) => {
     session: null,
     warnings: [],
     stt: {},
+    meOn: null,
     error: null,
     busy: false,
 
     create: async (title, overrides) => {
       const session = await run(() => commands.createSession(title, overrides ?? null));
-      if (session) set({ session, warnings: [], stt: {} });
+      if (session) set({ session, warnings: [], stt: {}, meOn: null });
     },
 
     confirmAndStart: async (option) => {
@@ -78,7 +83,12 @@ export const useSessionStore = create<SessionState>((set, get) => {
       if (!consented) return;
       set({ session: consented });
       const started = await run(() => commands.startSession(current.id));
-      if (started) set({ session: started.session, warnings: started.warnings });
+      if (started)
+        set({
+          session: started.session,
+          warnings: started.warnings,
+          meOn: option === "participants_agreed" ? true : null,
+        });
     },
 
     pause: async () => {
@@ -99,7 +109,7 @@ export const useSessionStore = create<SessionState>((set, get) => {
       const id = get().session?.id;
       if (!id) return;
       const s = await run(() => commands.endSession(id));
-      if (s) set({ session: s, warnings: [], stt: {} });
+      if (s) set({ session: s, warnings: [], stt: {}, meOn: null });
     },
 
     setSkill: async (skillId) => {
@@ -121,6 +131,13 @@ export const useSessionStore = create<SessionState>((set, get) => {
       if (updated) set({ session: updated });
     },
 
+    toggleMe: async () => {
+      const { session: s, meOn } = get();
+      if (!s || meOn === null || s.status === "ended") return;
+      const on = await run(() => commands.setMyTranscription(s.id, !meOn));
+      if (on !== null) set({ meOn: on });
+    },
+
     setRetention: async (retention) => {
       const s = get().session;
       if (!s) return;
@@ -138,7 +155,7 @@ export const useSessionStore = create<SessionState>((set, get) => {
       if (r.status === "error") set({ error: message(r.error) });
       else get().reset();
     },
-    reset: () => set({ session: null, warnings: [], stt: {}, error: null }),
+    reset: () => set({ session: null, warnings: [], stt: {}, meOn: null, error: null }),
 
     applyChange: (session) => {
       if (get().session?.id === session.id) set({ session });

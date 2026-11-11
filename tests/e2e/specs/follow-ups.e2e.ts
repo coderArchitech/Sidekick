@@ -6,7 +6,7 @@ import { createAndStart, openTab, waitForLine, waitForText } from "../helpers";
  */
 describe("follow-up chips (PRD QA-9)", () => {
   it("Shorter on a live answer answers in Chat", async () => {
-    await createAndStart("Follow-ups", "Participants know and agree to transcription");
+    await createAndStart("Follow-ups", "The other people and me");
     await waitForLine("What's the rate limit for the Pro tier?");
 
     await openTab("Live Answers");

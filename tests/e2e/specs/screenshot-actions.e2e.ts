@@ -12,7 +12,7 @@ async function captureScreen() {
 
 describe("screenshot quick actions and strip (PRD SCR-5, SCR-6)", () => {
   it("quick action, strip, re-ask and delete", async () => {
-    await createAndStart("Screen review", "Transcribe me only");
+    await createAndStart("Screen review", "Only me");
     await openTab("Chat");
 
     await captureScreen();

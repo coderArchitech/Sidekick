@@ -66,9 +66,7 @@ describe("SessionBar", () => {
     await user.click(screen.getByRole("button", { name: "Start" }));
     const dialog = screen.getByRole("dialog", { name: "Before Sidekick listens" });
     expect(within(dialog).getByRole("button", { name: "Start listening" })).toBeDisabled();
-    expect(
-      within(dialog).getByRole("radio", { name: /participants know and agree/i }),
-    ).toHaveFocus();
+    expect(within(dialog).getByRole("radio", { name: /the other people only/i })).toHaveFocus();
   });
 
   it("cancelling consent starts nothing", async () => {
@@ -91,12 +89,12 @@ describe("SessionBar", () => {
     expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
   });
 
-  it("'Transcribe me only' starts the microphone only", async () => {
+  it("'Only me' starts the microphone only", async () => {
     const user = userEvent.setup();
     render(<SessionBar />);
     await createSession(user);
     await user.click(screen.getByRole("button", { name: "Start" }));
-    await user.click(screen.getByRole("radio", { name: "Transcribe me only" }));
+    await user.click(screen.getByRole("radio", { name: "Only me" }));
     await user.click(screen.getByRole("button", { name: "Start listening" }));
     expect(await screen.findByText("Listening (you only)")).toBeInTheDocument();
     expect(mockCalls.streams).toEqual(["mic"]);
@@ -108,7 +106,7 @@ describe("SessionBar", () => {
     render(<SessionBar />);
     await createSession(user);
     await user.click(screen.getByRole("button", { name: "Start" }));
-    await user.click(screen.getByRole("radio", { name: /participants know and agree/i }));
+    await user.click(screen.getByRole("radio", { name: /the other people and me/i }));
     await user.click(screen.getByRole("button", { name: "Start listening" }));
     expect(await screen.findByText("Listening")).toBeInTheDocument();
     expect(mockCalls.streams).toEqual(["mic", "system"]);
@@ -120,6 +118,45 @@ describe("SessionBar", () => {
     await user.click(screen.getByRole("button", { name: "End" }));
     expect(await screen.findByText("Session ended.")).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "New session" })).toBeInTheDocument();
+  });
+
+  it("'The other people only' starts system audio only, with no Me switch", async () => {
+    const user = userEvent.setup();
+    render(<SessionBar />);
+    await createSession(user);
+    await user.click(screen.getByRole("button", { name: "Start" }));
+    await user.click(screen.getByRole("radio", { name: /the other people only/i }));
+    await user.click(screen.getByRole("button", { name: "Start listening" }));
+    expect(await screen.findByText("Listening (others only)")).toBeInTheDocument();
+    expect(mockCalls.streams).toEqual(["system"]);
+    expect(screen.queryByRole("button", { name: "Me" })).not.toBeInTheDocument();
+  });
+
+  it("Me turns the user's own transcription off and on during the session", async () => {
+    const user = userEvent.setup();
+    render(<SessionBar />);
+    await createSession(user);
+    await user.click(screen.getByRole("button", { name: "Start" }));
+    await user.click(screen.getByRole("radio", { name: /the other people and me/i }));
+    await user.click(screen.getByRole("button", { name: "Start listening" }));
+    const me = await screen.findByRole("button", { name: "Me" });
+    expect(me).toHaveAttribute("aria-pressed", "true");
+    expect(mockCalls.micOn).toBe(true);
+
+    await user.click(me);
+    expect(me).toHaveAttribute("aria-pressed", "false");
+    expect(mockCalls.micOn).toBe(false);
+    expect(screen.getByText("Listening (others only)")).toBeInTheDocument();
+
+    // Pausing and resuming keeps the choice.
+    await user.click(screen.getByRole("button", { name: "Pause" }));
+    await user.click(await screen.findByRole("button", { name: "Resume" }));
+    expect(await screen.findByText("Listening (others only)")).toBeInTheDocument();
+
+    await user.click(screen.getByRole("button", { name: "Me" }));
+    expect(screen.getByRole("button", { name: "Me" })).toHaveAttribute("aria-pressed", "true");
+    expect(mockCalls.micOn).toBe(true);
+    expect(screen.getByText("Listening")).toBeInTheDocument();
   });
 
   it("shows errors from the core", async () => {
@@ -134,7 +171,7 @@ describe("SessionBar", () => {
     }
     await user.click(screen.getByRole("button", { name: "New session" }));
     await user.click(await screen.findByRole("button", { name: "Start" }));
-    await user.click(screen.getByRole("radio", { name: "Transcribe me only" }));
+    await user.click(screen.getByRole("radio", { name: "Only me" }));
     await user.click(screen.getByRole("button", { name: "Start listening" }));
     expect(await screen.findByRole("alert")).toHaveTextContent("End the current session");
   });
@@ -237,7 +274,7 @@ describe("Auto-answer toggle", () => {
     render(<SessionBar />);
     await createSession(user, "Retro");
     await user.click(screen.getByRole("button", { name: "Start" }));
-    await user.click(screen.getByLabelText("Transcribe me only"));
+    await user.click(screen.getByLabelText("Only me"));
     await user.click(screen.getByRole("button", { name: "Start listening" }));
     await user.click(await screen.findByRole("button", { name: "End" }));
     return screen.findByRole("combobox", { name: "Keep this session" });

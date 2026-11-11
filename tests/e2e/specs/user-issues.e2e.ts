@@ -46,7 +46,7 @@ describe("reported issues", () => {
   });
 
   it("2 + 3: the Skill dropdown opens in the window and offers the interview Skill", async () => {
-    await createAndStart("Staff interview", "Participants know and agree to transcription");
+    await createAndStart("Staff interview", "The other people and me");
     const nativeSelects = await browser.execute(() => document.querySelectorAll("select").length);
     if (nativeSelects !== 0) throw new Error(`${nativeSelects} native <select> popups remain`);
     const picker = await $('[role="combobox"][aria-label="Skill"]');

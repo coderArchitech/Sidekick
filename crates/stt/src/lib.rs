@@ -63,6 +63,10 @@ pub trait SttSink: Send + Sync {
     fn partial(&self, partial: Partial);
     fn segment(&self, segment: Segment);
     fn status(&self, kind: StreamKind, status: SttStatus);
+    /// How long the provider took to finalize a result: from sending the
+    /// audio of its last word to receiving the final text (transcript lag,
+    /// tech doc 13.1). Optional.
+    fn latency(&self, _kind: StreamKind, _ms: u64) {}
 }
 
 /// Most keyterms sent to a provider (Deepgram and AssemblyAI accept 100).

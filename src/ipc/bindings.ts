@@ -278,6 +278,22 @@ export const commands = {
     }
   },
   /**
+   * Turns transcription of the user's own voice on or off during a live
+   * session; the other people keep being transcribed. Returns whether it is on.
+   * Only a session with "The other people and me" has a microphone to switch.
+   */
+  async setMyTranscription(
+    sessionId: string,
+    on: boolean,
+  ): Promise<Result<boolean, SidekickError>> {
+    try {
+      return { status: "ok", data: await TAURI_INVOKE("set_my_transcription", { sessionId, on }) };
+    } catch (e) {
+      if (e instanceof Error) throw e;
+      else return { status: "error", error: e as any };
+    }
+  },
+  /**
    * Saves a finished answer with its question (tech doc 5.1 `save_answer`).
    */
   async saveAnswer(answer: NewAnswer): Promise<Result<string, SidekickError>> {
@@ -1082,7 +1098,12 @@ export type ConsentOption =
   /**
    * "Transcribe me only": the microphone only, never other participants.
    */
-  | "me_only";
+  | "me_only"
+  /**
+   * "Transcribe the other people only": system audio only, never the
+   * microphone. The other participants agree to transcription.
+   */
+  | "others_only";
 /**
  * A document passage with what a citation needs.
  */

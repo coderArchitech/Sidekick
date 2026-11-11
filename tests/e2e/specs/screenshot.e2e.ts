@@ -3,7 +3,7 @@ import { createAndStart, openTab, waitForText } from "../helpers";
 
 describe("screenshot [smoke]", () => {
   it("captures the screen and answers a question about it", async () => {
-    await createAndStart("Bug triage", "Transcribe me only");
+    await createAndStart("Bug triage", "Only me");
     await openTab("Chat");
     await $("button=Screenshot").click();
     await $("aria/Full screen").click();

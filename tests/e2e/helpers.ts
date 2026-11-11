@@ -11,7 +11,7 @@ export async function endIfLive() {
 
 export async function createAndStart(
   title: string,
-  consent: "Participants know and agree to transcription" | "Transcribe me only",
+  consent: "The other people and me" | "Only me",
 ) {
   await endIfLive();
   await $('input[placeholder="New session name"]').setValue(title);

@@ -30,7 +30,7 @@ async function waitForAgenda(text: string, timeout = 15_000) {
  */
 describe("meeting memory (PRD MEM-2, MEM-3)", () => {
   it("agenda, recap and end-of-meeting agenda status", async () => {
-    await createAndStart("Agenda review", "Participants know and agree to transcription");
+    await createAndStart("Agenda review", "The other people and me");
 
     await openTab("Notes");
     await $("button=Add agenda").click();

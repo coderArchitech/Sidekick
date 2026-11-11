@@ -321,6 +321,32 @@ async fn change_live(
     Ok(session)
 }
 
+/// Turns transcription of the user's own voice on or off during a live
+/// session; the other people keep being transcribed. Returns whether it is on.
+/// Only a session with "The other people and me" has a microphone to switch.
+#[tauri::command]
+#[specta::specta]
+pub async fn set_my_transcription(
+    state: State<'_, AppState>,
+    session_id: String,
+    on: bool,
+) -> SidekickResult<bool> {
+    let live = state.live.lock().await;
+    match live.as_ref() {
+        Some((id, runner)) if *id == session_id => {
+            if runner.set_mic(on) {
+                Ok(runner.mic_on())
+            } else {
+                Err(SidekickError::new(
+                    ErrorCode::Internal,
+                    "This session doesn't transcribe your microphone. Start a new one with \"The other people and me\".",
+                ))
+            }
+        }
+        _ => Err(SidekickError::internal("This session isn't running.")),
+    }
+}
+
 #[tauri::command]
 #[specta::specta]
 pub async fn pause_session(

@@ -169,6 +169,11 @@ impl Dialect for AssemblyAiProvider {
     fn finish(&self) -> Option<Message> {
         Some(Message::Text(r#"{"type":"Terminate"}"#.into()))
     }
+
+    /// Returns the final text for what was said so far, without waiting for more audio.
+    fn finalize(&self) -> Option<Message> {
+        Some(Message::Text(r#"{"type":"ForceEndpoint"}"#.into()))
+    }
 }
 
 #[async_trait::async_trait]

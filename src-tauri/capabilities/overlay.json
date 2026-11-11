@@ -27,6 +27,7 @@
     "allow-rename-speaker",
     "allow-add-bookmark",
     "allow-set-auto-answer",
+    "allow-set-my-transcription",
     "allow-save-answer",
     "allow-rate-answer",
     "allow-list-answers",

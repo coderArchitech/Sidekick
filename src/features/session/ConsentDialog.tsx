@@ -8,13 +8,20 @@ interface Props {
 
 const OPTIONS: { value: ConsentOption; label: string; detail: string }[] = [
   {
+    value: "others_only",
+    label: "The other people only",
+    detail:
+      "They know and agree to transcription. Sidekick transcribes the meeting audio, never your microphone.",
+  },
+  {
     value: "participants_agreed",
-    label: "Participants know and agree to transcription",
-    detail: "Sidekick transcribes your microphone and the meeting audio.",
+    label: "The other people and me",
+    detail:
+      "They know and agree to transcription. Sidekick transcribes the meeting audio and your microphone; you can turn yourself off and on during the session.",
   },
   {
     value: "me_only",
-    label: "Transcribe me only",
+    label: "Only me",
     detail: "Sidekick transcribes only your microphone. Other people are never recorded.",
   },
 ];
@@ -52,7 +59,7 @@ export function ConsentDialog({ onConfirm, onCancel }: Props) {
           Recording rules differ by place and company. Sidekick never tells the meeting for you.
         </p>
         <fieldset className="mt-3 space-y-2">
-          <legend className="sr-only">Who may be transcribed</legend>
+          <legend className="font-medium text-fg">Who should Sidekick transcribe?</legend>
           {OPTIONS.map((o, i) => (
             <div key={o.value} className="flex gap-2 rounded-md border border-line p-2">
               <input
@@ -63,7 +70,7 @@ export function ConsentDialog({ onConfirm, onCancel }: Props) {
                 value={o.value}
                 checked={choice === o.value}
                 aria-describedby={`${titleId}-${o.value}-detail`}
-                className="mt-1 h-4 w-4 shrink-0 accent-blue-500"
+                className="mt-1 h-4 w-4 shrink-0"
                 onChange={() => setChoice(o.value)}
               />
               <div>

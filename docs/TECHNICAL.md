@@ -134,7 +134,7 @@ Full requirements with priorities are in the PRD. This table maps each requireme
 
 - No hosted backend: everything runs in the desktop app.
 - Capture exclusion depends on OS behaviour and can't be guaranteed for every capture method (see ADR-007).
-- macOS system audio capture requires macOS 14.6+ and the System Audio Recording permission (ADR-014). On macOS 13.0–14.5, sessions run in "Transcribe me only" mode.
+- macOS system audio capture requires macOS 14.6+ and the System Audio Recording permission (ADR-014). On macOS 13.0–14.5, sessions run in "Only me" mode.
 - Provider rate limits and pricing are outside our control.
 - Single developer at the start, so the design favours simplicity over flexibility.
 
@@ -200,7 +200,7 @@ Each module below is its own crate at `crates/<module>/`, named `sidekick-<modul
 | Crate | Responsibility | Status |
 | --- | --- | --- |
 | `audio` | Microphone and system audio as separate 16 kHz mono streams of 50 ms frames via cpal (WASAPI loopback on Windows, Core Audio tap on macOS 14.6+); windowed-sinc resampler; energy VAD flag per frame; pause/resume/stop; WAV `FixtureSource` for tests and `SIDEKICK_AUDIO_FIXTURE`; never writes audio (ADR-014) | Done (manual device checks pending) |
-| `stt` | `SttProvider` (one `run` per audio stream). WebSocket providers share one engine (`providers::ws`): silence not sent apart from a short tail, a `Timeline` mapping provider time back to meeting time, keep-alives, reconnect with backoff and replay of unfinalised and buffered audio (up to 10 s), flush at the end; each provider is a `Dialect` (URL and auth, first message, keep-alive and finish messages, a message parser). Adapters: Deepgram Nova-3 (interim + final, diarization, `keyterm`), AssemblyAI Universal Streaming v3 (formatted turns, `keyterms_prompt`, no streaming diarization), Soniox (word-piece tokens joined into words, `<end>` endpoints, diarization, `en`+`hi` hints for `multi`), and local Whisper behind the `local-whisper` cargo feature (utterances cut by the VAD at 600 ms of silence or 15 s, transcribed on a blocking thread while audio keeps flowing; names as the initial prompt). Key verifiers for the cloud providers; `models` lists Whisper models and downloads them to `<data>/models`, kept only if the checksum matches; mock provider; speaker labels `me` / `speaker_N` | Done (live checks pending) **Keyterms** (LIS-5, LIS-5a): every provider gets the session's keyterms (names, then the custom vocabulary), at most 100 (`MAX_KEYTERMS`): Deepgram `keyterm` parameters, AssemblyAI `keyterms_prompt`, Soniox `context.terms`, local Whisper the initial prompt (cut to 600 characters). The mock provider writes a keyterm said in any case the way the vocabulary spells it, so tests can see the boost |
+| `stt` | `SttProvider` (one `run` per audio stream). WebSocket providers share one engine (`providers::ws`): silence not sent apart from a short tail (500 ms) and a 300 ms pre-roll before speech, a `finalize` message right after each tail (Deepgram `Finalize`, AssemblyAI `ForceEndpoint`, Soniox `finalize`) so the last line of a pause never waits for the next speaker, transcript lag per final result (`SttSink::latency`, shown in Diagnostics), a `Timeline` mapping provider time back to meeting time, keep-alives, reconnect with backoff and replay of unfinalised and buffered audio (up to 10 s), flush at the end; each provider is a `Dialect` (URL and auth, first message, keep-alive and finish messages, a message parser). Adapters: Deepgram Nova-3 (interim + final, diarization, `keyterm`), AssemblyAI Universal Streaming v3 (formatted turns, `keyterms_prompt`, no streaming diarization), Soniox (word-piece tokens joined into words, `<end>` endpoints and `<fin>` after a finalize, diarization, `en`+`hi` hints for `multi`), and local Whisper behind the `local-whisper` cargo feature (utterances cut by the VAD at 600 ms of silence or 15 s, transcribed on a blocking thread while audio keeps flowing; names as the initial prompt). Key verifiers for the cloud providers; `models` lists Whisper models and downloads them to `<data>/models`, kept only if the checksum matches; mock provider; speaker labels `me` / `speaker_N` | Done (live checks pending) **Keyterms** (LIS-5, LIS-5a): every provider gets the session's keyterms (names, then the custom vocabulary), at most 100 (`MAX_KEYTERMS`): Deepgram `keyterm` parameters, AssemblyAI `keyterms_prompt`, Soniox `context.terms`, local Whisper the initial prompt (cut to 600 characters). The mock provider writes a keyterm said in any case the way the vocabulary spells it, so tests can see the boost |
 | `capture` | Full screen (main display), one window (other apps only, not minimised) or a region (fractions of the main display, chosen on an unsaved 800 px preview and captured afresh); downscale to 1568 px on the long side and JPEG at quality 85 (about 200 KB); SQL for `screenshots` (image BLOB in the encrypted database, never on disk, the clipboard or shared folders). Real capture uses `xcap` on Windows and macOS only; Linux (dev/CI) and mock mode use `MockCapturer`, a synthetic 2560 x 1440 screen. A failed capture maps to `PERMISSION_DENIED` with the macOS Screen Recording hint | Done (manual check on a live call pending) |
 | `window` | Capture-exclusion status rules per OS and version (Windows build 19041+ protected; macOS 13–14 protected, 15+ not guaranteed because ScreenCaptureKit can bypass it; Linux unavailable) and the auto-hide rule. Pure logic: the shell applies `set_content_protected(true)` to every window at startup. `placement`: snap to work-area edges within 24 px, keep the window on screen (shrinking it if needed), find the monitor under the window's centre, and remember one position per monitor (`<name>@<width>x<height>`, up to 8, most recent first) and restore the most recent one whose monitor is connected. The shell restores at startup and, 500 ms after the last move or resize, snaps and saves. Click-through (T-048) and screen-share detection (ADR-015) still to come | Started (status and placement done; manual checks pending) |
 | `hotkeys` | Actions, defaults (12.3) and validation (normalise, one modifier minimum, no duplicates, every action once). The shell registers them with `tauri-plugin-global-shortcut`, handles show/hide itself, emits `hotkey-pressed`, and only saves a new set after the OS accepts it | Done (Linux verified; Windows/macOS check pending) |
@@ -537,7 +537,7 @@ CREATE TABLE consent_log (
   id            TEXT PRIMARY KEY,
   session_id    TEXT NOT NULL,
   session_title TEXT NOT NULL DEFAULT '',
-  option        TEXT NOT NULL CHECK (option IN ('participants_agreed','me_only')),
+  option        TEXT NOT NULL CHECK (option IN ('participants_agreed','me_only','others_only')), -- 0007 adds others_only
   confirmed_at  INTEGER NOT NULL
 );
 CREATE INDEX idx_consent_session ON consent_log(session_id);
@@ -1438,7 +1438,7 @@ In memory, keys are held in `SecretString` (zeroed on drop) only for the duratio
 | Overlay leak during screen share | Private answers seen by others | Capture exclusion, status indicator, auto-hide fallback (ADR-007) |
 | Malicious update | Tampered installer | Signed installers, notarization, updater signature check |
 | Supply-chain attack | Compromised dependency | Lockfiles, `cargo deny`, `pnpm audit`, Dependabot, minimal dependencies |
-| Recording without consent | User captures others without agreement | Consent confirmation required before capturing others; "Transcribe me only" mode; consent log |
+| Recording without consent | User captures others without agreement | Consent confirmation required before capturing others; "Only me" and "The other people only" modes; consent log |
 | Provider data handling | Provider retains meeting content | User chooses providers; local mode (Whisper, Ollama) for sensitive meetings; link to each provider's data policy in Settings |
 
 ### 11.6 Vulnerability management and patching
@@ -1474,7 +1474,7 @@ This is not legal advice; confirm requirements with legal counsel before any pub
 
 1. Click **New session**, give it a name, and drag in the agenda and any related documents. Wait until each shows "Ready". Documents you use in many meetings (product specs, price lists) go in a **Knowledge Pack** (Settings → Knowledge Packs); tick it in the Documents panel. **Write brief** in the Notes tab summarises it all, with key numbers and likely questions.
 2. Optional: choose a Skill (e.g. Interview Coach for mock interview practice).
-3. Click **Start**. Confirm that participants are aware of transcription, or choose **Transcribe me only**.
+3. Click **Start** and choose who Sidekick transcribes: **The other people only**, **The other people and me** (participants know and agree; a **Me** button turns your own voice off and on during the session), or **Only me**.
 4. Sidekick listens. Answers appear in **Live Answers**: a one-line cue first, then the full answer and sources. Chips under each answer (**Shorter**, **More detail**, **Give an example**, **Explain simply**) rework it in Chat.
 5. Optional: in the **Notes** tab, **Add agenda** (one item per line). Items are marked In progress and Covered as the meeting gets to them. Looked away? **What did I miss?** recaps the last 2, 5 or 10 minutes.
 **Different providers for one meeting:** under **Options** next to **New session**, pick another speech-to-text or answer provider for that session only (one with a saved key). **Web search** (Settings → Web search: Tavily or Brave, with your key) lets Skills that list the web search tool look up current facts.
@@ -1528,7 +1528,7 @@ All shortcuts can be changed in Settings → Shortcuts.
 
 **Does Sidekick record audio?** No. Audio is streamed for transcription and not saved.
 
-**Why does it only transcribe me?** On macOS, hearing other participants needs macOS 14.6 or later and the System Audio Recording permission. Also check you didn't choose "Transcribe me only".
+**Why does it only transcribe me?** On macOS, hearing other participants needs macOS 14.6 or later and the System Audio Recording permission. Also check you didn't choose "Only me".
 
 **How much will it cost?** You pay providers directly for what you use. See Settings → Usage for estimates.
 

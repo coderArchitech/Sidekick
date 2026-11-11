@@ -24,6 +24,8 @@ export interface DetectorOptions {
   names: string[];
   /** Wait this long after a segment ends, so a question split across segments is read whole (tech doc 5.5). */
   debounceMs?: number;
+  /** The shorter wait after a segment that ends with "?": the speaker has finished asking. */
+  questionDebounceMs?: number;
   onQuestion: (q: DetectedQuestion) => void;
 }
 
@@ -33,10 +35,12 @@ export interface DetectorOptions {
  *   speaker's turn at once (they stopped talking).
  * - Consecutive segments from the same speaker within the debounce are read
  *   together, so "What's the rate limit" + "for the Pro tier?" is one question.
+ * - A segment that ends with "?" is decided after 250 ms instead of 600 ms.
  */
 export class QuestionDetector {
   private names: string[];
   private readonly debounceMs: number;
+  private readonly questionDebounceMs: number;
   private readonly onQuestion: (q: DetectedQuestion) => void;
   private pending: { speakerLabel: string; segs: SegmentIn[] } | null = null;
   private timer: ReturnType<typeof setTimeout> | null = null;
@@ -44,6 +48,7 @@ export class QuestionDetector {
   constructor(opts: DetectorOptions) {
     this.names = opts.names;
     this.debounceMs = opts.debounceMs ?? 600;
+    this.questionDebounceMs = opts.questionDebounceMs ?? 250;
     this.onQuestion = opts.onQuestion;
   }
 
@@ -60,7 +65,10 @@ export class QuestionDetector {
     this.pending ??= { speakerLabel: seg.speakerLabel, segs: [] };
     this.pending.segs.push(seg);
     if (this.timer) clearTimeout(this.timer);
-    this.timer = setTimeout(() => this.flush(), this.debounceMs);
+    // A line ending in "?" is a finished question: decide almost at once, but
+    // still leave a moment for an immediate follow-on ("…for the Pro tier?").
+    const wait = seg.text.trim().endsWith("?") ? this.questionDebounceMs : this.debounceMs;
+    this.timer = setTimeout(() => this.flush(), wait);
   }
 
   /** Decides on what's pending now. */

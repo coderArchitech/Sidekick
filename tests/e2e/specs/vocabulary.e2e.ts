@@ -23,7 +23,7 @@ describe("custom vocabulary (PRD LIS-5)", () => {
   it("is sent to speech-to-text when a session starts", async () => {
     await endIfLive();
     await saveVocabulary("PRO Tier\nKubernetes");
-    await createAndStart("Vocabulary check", "Transcribe me only");
+    await createAndStart("Vocabulary check", "Only me");
     await waitForLine("What's the rate limit for the PRO Tier?");
     await $("button=End").click();
     await $('input[placeholder="New session name"]').waitForDisplayed();

@@ -2,6 +2,7 @@
 
 use std::path::PathBuf;
 use std::sync::Arc;
+use std::sync::atomic::{AtomicBool, Ordering};
 use std::time::Duration;
 
 use sidekick_audio::{
@@ -67,6 +68,10 @@ struct Stream {
 pub struct LiveSession {
     streams: Vec<Stream>,
     cancel: CancellationToken,
+    /// The whole session is paused (LIS-6).
+    paused: AtomicBool,
+    /// The user turned their own transcription off (the microphone stream).
+    mic_off: AtomicBool,
     /// Non-fatal problems to show the user (e.g. system audio unavailable).
     pub warnings: Vec<String>,
 }
@@ -136,7 +141,14 @@ impl LiveSession {
                         e.message
                     ));
                 }
-                Err(e) => {
+                Err(mut e) => {
+                    if kind == StreamKind::System {
+                        // "The other people only": there is no other way to hear them.
+                        e.message = format!(
+                            "{} To listen through your microphone instead, choose \"The other people and me\".",
+                            e.message
+                        );
+                    }
                     cancel.cancel();
                     for s in streams {
                         s.capture.stop();
@@ -152,6 +164,8 @@ impl LiveSession {
         Ok(Self {
             streams,
             cancel,
+            paused: AtomicBool::new(false),
+            mic_off: AtomicBool::new(false),
             warnings,
         })
     }
@@ -164,15 +178,45 @@ impl LiveSession {
 
     /// Stops listening; audio during the pause is discarded, never sent (LIS-6).
     pub fn pause(&self) {
+        self.paused.store(true, Ordering::SeqCst);
         for s in &self.streams {
             s.capture.pause();
         }
     }
 
+    /// Listens again; the microphone stays off if the user turned it off.
     pub fn resume(&self) {
+        self.paused.store(false, Ordering::SeqCst);
+        let mic_off = self.mic_off.load(Ordering::SeqCst);
         for s in &self.streams {
-            s.capture.resume();
+            if !(mic_off && s.kind == StreamKind::Mic) {
+                s.capture.resume();
+            }
         }
+    }
+
+    /// Turns transcription of the user's own voice (the microphone stream) on
+    /// or off; the other people keep being transcribed. Audio while it is off
+    /// is discarded, never sent. Returns whether the session has a microphone
+    /// stream to switch.
+    pub fn set_mic(&self, on: bool) -> bool {
+        self.mic_off.store(!on, Ordering::SeqCst);
+        let Some(mic) = self.streams.iter().find(|s| s.kind == StreamKind::Mic) else {
+            return false;
+        };
+        if !on {
+            mic.capture.pause();
+        } else if !self.paused.load(Ordering::SeqCst) {
+            mic.capture.resume();
+        }
+        true
+    }
+
+    /// Whether the user's own voice is being transcribed.
+    #[must_use]
+    pub fn mic_on(&self) -> bool {
+        self.streams.iter().any(|s| s.kind == StreamKind::Mic)
+            && !self.mic_off.load(Ordering::SeqCst)
     }
 
     /// Stops capture, lets STT flush its last results (up to 5 s), then ends.

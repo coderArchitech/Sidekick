@@ -48,6 +48,9 @@ pub enum ConsentOption {
     ParticipantsAgreed,
     /// "Transcribe me only": the microphone only, never other participants.
     MeOnly,
+    /// "Transcribe the other people only": system audio only, never the
+    /// microphone. The other participants agree to transcription.
+    OthersOnly,
 }
 
 impl ConsentOption {
@@ -56,6 +59,7 @@ impl ConsentOption {
         match self {
             Self::ParticipantsAgreed => "participants_agreed",
             Self::MeOnly => "me_only",
+            Self::OthersOnly => "others_only",
         }
     }
 
@@ -63,6 +67,7 @@ impl ConsentOption {
         match s {
             "participants_agreed" => Ok(Self::ParticipantsAgreed),
             "me_only" => Ok(Self::MeOnly),
+            "others_only" => Ok(Self::OthersOnly),
             _ => Err(SidekickError::new(
                 ErrorCode::DbError,
                 "Unknown consent option.",
@@ -143,9 +148,10 @@ pub fn streams_for(consent: Option<ConsentOption>) -> SidekickResult<Vec<StreamK
     match consent {
         Some(ConsentOption::ParticipantsAgreed) => Ok(vec![StreamKind::Mic, StreamKind::System]),
         Some(ConsentOption::MeOnly) => Ok(vec![StreamKind::Mic]),
+        Some(ConsentOption::OthersOnly) => Ok(vec![StreamKind::System]),
         None => Err(SidekickError::new(
             ErrorCode::ConsentRequired,
-            "Confirm that participants agree to transcription, or choose \"Transcribe me only\".",
+            "Choose who Sidekick transcribes: the other people, the other people and you, or only you.",
         )),
     }
 }
@@ -193,6 +199,10 @@ mod tests {
             [StreamKind::Mic]
         );
         assert_eq!(
+            streams_for(Some(ConsentOption::OthersOnly)).unwrap(),
+            [StreamKind::System]
+        );
+        assert_eq!(
             streams_for(None).unwrap_err().code,
             ErrorCode::ConsentRequired
         );
@@ -203,7 +213,11 @@ mod tests {
         for s in [Draft, Live, Paused, Ended] {
             assert_eq!(SessionStatus::parse(s.as_str()).unwrap(), s);
         }
-        for c in [ConsentOption::ParticipantsAgreed, ConsentOption::MeOnly] {
+        for c in [
+            ConsentOption::ParticipantsAgreed,
+            ConsentOption::MeOnly,
+            ConsentOption::OthersOnly,
+        ] {
             assert_eq!(ConsentOption::parse(c.as_str()).unwrap(), c);
         }
     }
