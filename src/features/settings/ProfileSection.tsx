@@ -30,7 +30,7 @@ export function ProfileSection({ profile, onSave }: Props) {
 
   return (
     <section aria-labelledby="profile-heading" className="card p-4">
-      <h2 id="profile-heading" className="text-base font-semibold">
+      <h2 id="profile-heading" className="heading text-xl">
         Profile
       </h2>
       <p className="mb-3 text-sm text-fg-muted">

@@ -26,7 +26,7 @@ export function ShortcutsSection({ shortcuts, onSave }: Props) {
 
   return (
     <section aria-labelledby="shortcuts-heading" className="card p-4">
-      <h2 id="shortcuts-heading" className="text-base font-semibold">
+      <h2 id="shortcuts-heading" className="heading text-xl">
         Shortcuts
       </h2>
       <p className="mb-3 text-sm text-fg-muted">

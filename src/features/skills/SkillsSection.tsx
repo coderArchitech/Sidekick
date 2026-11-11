@@ -85,7 +85,7 @@ export function SkillsSection() {
 
   return (
     <section aria-labelledby={headingId} className="card p-4">
-      <h2 id={headingId} className="text-base font-semibold">
+      <h2 id={headingId} className="heading text-xl">
         Skills
       </h2>
       <p className="mb-3 text-sm text-fg-muted">

@@ -103,14 +103,14 @@ export function RecoveryScreen({ problem }: { problem: StartupProblem }) {
       <div className="flex items-center gap-2">
         <span
           aria-hidden="true"
-          className="grid h-5 w-5 shrink-0 place-items-center rounded-md bg-gradient-to-br from-accent-text to-accent text-[11px] font-bold text-white"
+          className="grid h-5 w-5 shrink-0 place-items-center bg-accent font-display text-sm leading-none text-accent-ink"
         >
           S
         </span>
-        <span className="text-sm font-semibold tracking-tight">Sidekick</span>
+        <span className="wordmark">Sidekick</span>
       </div>
 
-      <h1 id={titleId} className="text-lg font-semibold text-balance">
+      <h1 id={titleId} className="heading text-2xl text-balance">
         {copy.title}
       </h1>
       <p className="text-fg-2">{copy.body(problem)}</p>

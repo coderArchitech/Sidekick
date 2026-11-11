@@ -66,7 +66,7 @@ export function MissedRecap({ sessionId }: { sessionId: string }) {
       {state.kind === "done" && (
         <section aria-label="What you missed" className="card relative p-2.5 text-sm text-fg-2">
           <div className="mb-1 flex items-center">
-            <h2 className="text-xs font-semibold text-fg">Last {state.minutes} minutes</h2>
+            <h2 className="heading text-base text-fg">Last {state.minutes} minutes</h2>
             <button
               type="button"
               className="btn btn-ghost btn-sm ml-auto"

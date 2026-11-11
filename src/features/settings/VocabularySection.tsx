@@ -38,7 +38,7 @@ export function VocabularySection({ vocabulary, onSave }: Props) {
 
   return (
     <section aria-labelledby="vocabulary-heading" className="card p-4">
-      <h2 id="vocabulary-heading" className="text-base font-semibold">
+      <h2 id="vocabulary-heading" className="heading text-xl">
         Custom vocabulary
       </h2>
       <p className="mb-3 text-sm text-fg-muted">

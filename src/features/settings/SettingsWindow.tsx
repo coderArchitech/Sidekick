@@ -57,7 +57,7 @@ export function SettingsWindow() {
     <main className="min-h-full bg-surface p-6 text-fg">
       <div className="mx-auto max-w-2xl space-y-4">
         <header className="flex items-center justify-between">
-          <h1 className="text-xl font-semibold">Settings</h1>
+          <h1 className="heading text-3xl">Settings</h1>
           <button
             type="button"
             className="btn btn-secondary"
@@ -131,7 +131,7 @@ export function SettingsWindow() {
               onChoose={(c) => void update({ search: c })}
             />
             <section aria-labelledby="general-heading" className="card p-4">
-              <h2 id="general-heading" className="text-base font-semibold">
+              <h2 id="general-heading" className="heading text-xl">
                 General
               </h2>
               <label className="mt-2 flex items-center gap-2 text-sm">
