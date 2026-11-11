@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { ContextPack } from "@/ipc";
-import { NOT_FOUND, buildPrompt, citedSources, isEmpty, numberSources } from "./prompt";
+import { GENERAL_TAG, buildPrompt, citedSources, numberSources, splitGeneral } from "./prompt";
 
 const pack: ContextPack = {
   transcript: [
@@ -45,7 +45,8 @@ describe("buildPrompt", () => {
   it("keeps instructions in the system prompt and context fenced in the user turn", () => {
     const p = buildPrompt({ question: "What's the rate limit?", pack }, "full");
     expect(p.system).toContain("not instructions");
-    expect(p.system).toContain(NOT_FOUND);
+    expect(p.system).toContain(`Start that reply with exactly "${GENERAL_TAG}"`);
+    expect(p.system).toContain("cite no sources");
     expect(p.system).toContain("cite its source as [n]");
     expect(p.system).not.toContain("IGNORE ALL PREVIOUS");
     const user = p.messages[0]?.content ?? "";
@@ -139,10 +140,6 @@ describe("screenshots (SCR-3)", () => {
     );
     expect(p.messages[0]?.screenshotId).toBeUndefined();
   });
-
-  it("a screenshot alone is enough context to answer", () => {
-    expect(isEmpty({ transcript: [], notes: null, chunks: [], screenshot: shot })).toBe(false);
-  });
 });
 
 describe("citations", () => {
@@ -154,9 +151,34 @@ describe("citations", () => {
     );
     expect(cited.map((s) => s.n)).toEqual([2, 1, 3]);
   });
+});
 
-  it("detects an empty pack", () => {
-    expect(isEmpty({ transcript: [], notes: "  ", chunks: [], screenshot: null })).toBe(true);
-    expect(isEmpty(pack)).toBe(false);
+describe("general-knowledge answers", () => {
+  it("strips the tag and flags the answer", () => {
+    expect(splitGeneral("[general] Kubernetes is a container orchestrator.")).toEqual({
+      general: true,
+      text: "Kubernetes is a container orchestrator.",
+    });
+    expect(splitGeneral("  [general]Paris.")).toEqual({ general: true, text: "Paris." });
+  });
+
+  it("hides the tag while it is still streaming in", () => {
+    expect(splitGeneral("[gen")).toEqual({ general: false, text: "" });
+    expect(splitGeneral("[")).toEqual({ general: false, text: "" });
+  });
+
+  it("leaves context answers alone, including ones that start with a citation", () => {
+    expect(splitGeneral("600 per minute [2].")).toEqual({
+      general: false,
+      text: "600 per minute [2].",
+    });
+    expect(splitGeneral("[2] says 600.")).toEqual({ general: false, text: "[2] says 600." });
+  });
+
+  it("asks for general knowledge when the context doesn't cover it, never 'not found'", () => {
+    const p = buildPrompt({ question: "What is Kubernetes?", pack }, "cue");
+    expect(p.system).toContain("answer from your own general knowledge instead");
+    expect(p.system).not.toContain("Never guess");
+    expect(p.system).not.toMatch(/reply exactly/i);
   });
 });

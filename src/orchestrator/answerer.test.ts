@@ -10,7 +10,7 @@ import type {
 } from "@/ipc";
 import { mockAnswerBus, resetMocks } from "@/ipc/testing";
 import { AnswerRouter, type AnswerDeps, type AnswerView, type AskInput } from "./answerer";
-import { NOT_FOUND } from "./prompt";
+import { GENERAL_LABEL } from "./prompt";
 
 const PACK: ContextPack = {
   transcript: [
@@ -174,11 +174,43 @@ describe("AnswerRouter", () => {
     });
   });
 
-  it("answers 'not found' without calling a model when there is no context", async () => {
+  it("still asks the model when there is no context, so it can answer from general knowledge", async () => {
     const h = harness({ transcript: [], notes: null, chunks: [], screenshot: null });
+    const v = await h.router.ask(input("What is Kubernetes?"));
+    expect(h.streams.map((s) => s.id.split(":")[1])).toEqual(["cue", "full"]);
+    expect(v.status).toBe("streaming");
+  });
+
+  it("labels a general-knowledge answer, strips the tag, and saves it with the label", async () => {
+    const h = harness();
+    const v = await h.router.ask(input("What is Kubernetes?"));
+    token(`${v.id}:cue`, "[gen");
+    expect(h.views.get(v.id)?.cue).toBe("");
+    token(`${v.id}:cue`, "eral] A container orchestrator");
+    token(`${v.id}:full`, "[general] Kubernetes runs and scales containers.");
+    done(`${v.id}:cue`);
+    done(`${v.id}:full`);
+    await tick();
+    const final = h.views.get(v.id);
+    expect(final).toMatchObject({
+      status: "done",
+      general: true,
+      cue: "A container orchestrator",
+      body: "Kubernetes runs and scales containers.",
+      sources: [],
+    });
+    expect(h.saved[0]?.bodyMd).toBe(`_${GENERAL_LABEL}_\n\nKubernetes runs and scales containers.`);
+  });
+
+  it("an answer from the context is not labelled general", async () => {
+    const h = harness();
     const v = await h.router.ask(input());
-    expect(h.streams).toHaveLength(0);
-    expect(v).toMatchObject({ status: "done", body: NOT_FOUND, cue: NOT_FOUND });
+    token(`${v.id}:full`, "The Pro tier allows 600 requests/min [2].");
+    done(`${v.id}:cue`);
+    done(`${v.id}:full`);
+    await tick();
+    expect(h.views.get(v.id)?.general).toBeFalsy();
+    expect(h.saved[0]?.bodyMd).toBe("The Pro tier allows 600 requests/min [2].");
   });
 
   it("a third question cancels the oldest; its tokens are then ignored", async () => {

@@ -52,6 +52,10 @@ pub enum SttStatus {
     Live,
     Reconnecting,
     Failed,
+    /// Audio arrives but it is digital silence (every sample zero). On macOS
+    /// and Windows that usually means the app isn't allowed to use the
+    /// microphone, so the user is told instead of seeing nothing happen.
+    Silent,
 }
 
 /// Where transcription output goes. The app shell turns these into events.

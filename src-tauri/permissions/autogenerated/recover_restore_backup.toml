@@ -1,0 +1,11 @@
+# Automatically generated - DO NOT EDIT!
+
+[[permission]]
+identifier = "allow-recover-restore-backup"
+description = "Enables the recover_restore_backup command without any pre-configured scope."
+commands.allow = ["recover_restore_backup"]
+
+[[permission]]
+identifier = "deny-recover-restore-backup"
+description = "Denies the recover_restore_backup command without any pre-configured scope."
+commands.deny = ["recover_restore_backup"]

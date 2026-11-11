@@ -13,6 +13,7 @@ mod ipc;
 mod logging;
 mod placement;
 mod protection;
+mod recovery;
 mod shortcuts;
 mod state;
 mod topmost;
@@ -39,13 +40,23 @@ pub fn run() {
             logging::init(logging::log_dir(app.path().app_log_dir()?));
             tracing::info!(target: "app", version = env!("CARGO_PKG_VERSION"), os = std::env::consts::OS, "starting");
             builder.mount_events(app);
-            let default_dir = app.path().app_data_dir()?;
-            // A startup failure here should show the recovery screen (tech doc 4.5);
-            // until that exists, fail with the error code in the log.
-            let state = state::AppState::init(state::data_dir(default_dir)).map_err(|e| {
-                tracing::error!(code = ?e.code, "startup failed");
-                Box::new(e) as Box<dyn std::error::Error>
-            })?;
+            let data_dir = state::data_dir(app.path().app_data_dir()?);
+            let state = match state::AppState::init(data_dir.clone()) {
+                Ok(state) => state,
+                Err(failure) => {
+                    // Show the recovery screen instead of quitting (tech doc 4.5).
+                    // Nothing else starts: no shortcuts, no housekeeping.
+                    tracing::error!(code = ?failure.error.code, kind = ?failure.kind, "startup failed; showing the recovery screen");
+                    app.manage(recovery::Startup::failed(data_dir, &failure));
+                    app.manage(protection::apply(app.handle()));
+                    if let Some(w) = app.get_webview_window("overlay") {
+                        let _ = w.show();
+                        let _ = w.set_focus();
+                    }
+                    return Ok(());
+                }
+            };
+            app.manage(recovery::Startup::ok(data_dir));
             let bindings = sidekick_settings::load(&state.db())
                 .map(|s| s.shortcuts)
                 .unwrap_or_default();

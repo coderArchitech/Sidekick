@@ -299,7 +299,7 @@ Proposed minimum (to be confirmed with legal counsel before launch):
 | Risk | Impact | Mitigation |
 | --- | --- | --- |
 | Answers are slow, so the moment passes | High | Two-tier answers (fast cue model, then full answer); streaming; pre-computed likely Q&A from docs |
-| Hallucinated or wrong answers | High | Retrieval-first prompting, mandatory citations, "not found in your docs" fallback, confidence indicator |
+| Hallucinated or wrong answers | High | Retrieval-first prompting, mandatory citations for answers from the meeting and documents; questions they don't cover are answered from general knowledge with a visible "General knowledge · not from your meeting or documents" label and no citations; confidence indicator |
 | Screen-share exclusion doesn't work on some OS versions or capture methods | High | Use native OS APIs (Windows display affinity, macOS window sharing settings), test per OS and meeting app, show live protection status, fall back to second-device mode |
 | Consent and privacy violations | High | Consent prompts, mic-only mode, local storage, admin policies (section 8) |
 | Misuse for cheating in real interviews or exams | Medium | Clear terms of use, practice-focused positioning, no "undetectable" marketing |

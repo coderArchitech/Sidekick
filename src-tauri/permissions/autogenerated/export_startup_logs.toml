@@ -1,0 +1,11 @@
+# Automatically generated - DO NOT EDIT!
+
+[[permission]]
+identifier = "allow-export-startup-logs"
+description = "Enables the export_startup_logs command without any pre-configured scope."
+commands.allow = ["export_startup_logs"]
+
+[[permission]]
+identifier = "deny-export-startup-logs"
+description = "Denies the export_startup_logs command without any pre-configured scope."
+commands.deny = ["export_startup_logs"]

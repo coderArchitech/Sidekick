@@ -6,8 +6,10 @@ use std::sync::{Arc, Mutex, MutexGuard, PoisonError};
 use sidekick_core::{SidekickError, SidekickResult};
 use sidekick_diagnostics::Recorder;
 use sidekick_gateway::Gateway;
-use sidekick_secrets::{KeyStore, KeychainStore, MemoryStore};
+use sidekick_secrets::{CachedStore, KeyStore, KeychainStore, MemoryStore};
 use sidekick_store::{DB_FILE_NAME, Database, database_key};
+
+use crate::recovery::{ProblemKind, StartupFailure};
 
 /// Everything commands need. Crates receive only the parts they use.
 pub struct AppState {
@@ -50,25 +52,40 @@ impl AppState {
     /// never touch the real keychain (tech doc 6.4). Its database key is a
     /// fixed test value, so a mock data folder can be reopened after a restart
     /// (restart and E2E tests); mock data is never real meeting data.
-    pub fn init(data_dir: PathBuf) -> SidekickResult<Self> {
+    pub fn init(data_dir: PathBuf) -> Result<Self, StartupFailure> {
         let keys: Arc<dyn KeyStore> = if mock_providers() {
-            mock_keys()?
+            mock_keys().map_err(|e| StartupFailure::new(ProblemKind::Other, e))?
         } else {
-            Arc::new(KeychainStore::default())
+            // Each keychain read can prompt on macOS: read each key once per run.
+            Arc::new(CachedStore::new(KeychainStore::default()))
         };
         Self::init_with(keys, data_dir, mock_providers())
     }
 
-    /// Opens the database in `data_dir` using the given key store.
+    /// Opens the database in `data_dir` using the given key store. A failure
+    /// says which step failed, so the recovery screen can say what to do.
     pub fn init_with(
         keys: Arc<dyn KeyStore>,
         data_dir: PathBuf,
         mock: bool,
-    ) -> SidekickResult<Self> {
-        std::fs::create_dir_all(&data_dir)
-            .map_err(|_| SidekickError::internal("Couldn't create the app data folder."))?;
-        let key = database_key(keys.as_ref())?;
-        let db = Database::open(&data_dir.join(DB_FILE_NAME), &key)?;
+    ) -> Result<Self, StartupFailure> {
+        std::fs::create_dir_all(&data_dir).map_err(|_| {
+            StartupFailure::new(
+                ProblemKind::Other,
+                SidekickError::internal("Couldn't create the app data folder."),
+            )
+        })?;
+        let db_path = data_dir.join(DB_FILE_NAME);
+        let key = database_key(keys.as_ref(), db_path.exists()).map_err(|e| {
+            let kind = if e.code == sidekick_core::ErrorCode::KeyMissing {
+                ProblemKind::KeyMissing
+            } else {
+                ProblemKind::KeychainUnavailable
+            };
+            StartupFailure::new(kind, e)
+        })?;
+        let db = Database::open(&db_path, &key)
+            .map_err(|e| StartupFailure::new(ProblemKind::DatabaseUnreadable, e))?;
         // First run: copy the built-in Skill templates into the Skills folder (tech doc 4.5).
         if let Err(e) = sidekick_skills::repo::seed(&db, &data_dir.join("skills")) {
             tracing::warn!(target: "skills", code = ?e.code, "couldn't seed Skill templates");
@@ -216,6 +233,66 @@ mod tests {
             .query_row("SELECT count(*) FROM sessions", [], |r| r.get(0))
             .unwrap();
         assert_eq!(n, 1);
+    }
+
+    fn failure(r: Result<AppState, StartupFailure>) -> StartupFailure {
+        match r {
+            Ok(_) => panic!("startup should have failed"),
+            Err(f) => f,
+        }
+    }
+
+    #[test]
+    fn a_missing_key_never_replaces_an_existing_database() {
+        let dir = tempfile::tempdir().unwrap();
+        let first: Arc<dyn KeyStore> = Arc::new(MemoryStore::default());
+        drop(AppState::init_with(first, dir.path().to_path_buf(), true).unwrap());
+
+        // The keychain entry is gone (deleted, or the keychain was reset).
+        let emptied: Arc<dyn KeyStore> = Arc::new(MemoryStore::default());
+        let f = failure(AppState::init_with(
+            emptied.clone(),
+            dir.path().to_path_buf(),
+            true,
+        ));
+        assert_eq!(f.kind, ProblemKind::KeyMissing);
+        assert!(!emptied.status(DB_KEY_ACCOUNT).unwrap().saved);
+        assert!(dir.path().join(DB_FILE_NAME).exists());
+    }
+
+    #[test]
+    fn a_wrong_key_reports_an_unreadable_database() {
+        let dir = tempfile::tempdir().unwrap();
+        let first: Arc<dyn KeyStore> = Arc::new(MemoryStore::default());
+        drop(AppState::init_with(first, dir.path().to_path_buf(), true).unwrap());
+
+        let other: Arc<dyn KeyStore> = Arc::new(MemoryStore::default());
+        other
+            .set(
+                DB_KEY_ACCOUNT,
+                &sidekick_secrets::SecretString::from("ab".repeat(32)),
+            )
+            .unwrap();
+        let f = failure(AppState::init_with(other, dir.path().to_path_buf(), true));
+        assert_eq!(f.kind, ProblemKind::DatabaseUnreadable);
+    }
+
+    #[test]
+    fn after_setting_the_database_aside_a_fresh_start_works() {
+        let dir = tempfile::tempdir().unwrap();
+        let first: Arc<dyn KeyStore> = Arc::new(MemoryStore::default());
+        drop(AppState::init_with(first, dir.path().to_path_buf(), true).unwrap());
+        let emptied: Arc<dyn KeyStore> = Arc::new(MemoryStore::default());
+        failure(AppState::init_with(
+            emptied.clone(),
+            dir.path().to_path_buf(),
+            true,
+        ));
+
+        crate::recovery::set_aside(dir.path(), 7).unwrap();
+        let state = AppState::init_with(emptied, dir.path().to_path_buf(), true).unwrap();
+        assert!(sidekick_settings::load(&state.db()).unwrap().auto_answer);
+        assert!(dir.path().join("sidekick.db.unreadable-7").exists());
     }
 
     #[test]

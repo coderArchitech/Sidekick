@@ -11,6 +11,7 @@ pub mod llm;
 pub mod notes;
 pub mod overlay;
 pub mod packs;
+pub mod recovery;
 pub mod retrieval;
 pub mod search;
 pub mod session;

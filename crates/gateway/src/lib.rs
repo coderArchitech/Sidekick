@@ -154,10 +154,16 @@ impl Gateway {
                 {
                     info.implemented = true;
                 }
-                Ok(ProviderEntry {
-                    key: self.keys.status(info.id)?,
-                    info,
-                })
+                // One unreadable key (a denied keychain prompt) mustn't hide
+                // every provider: show it as not saved and keep the list.
+                let key = self.keys.status(info.id).unwrap_or_else(|e| {
+                    tracing::warn!(target: "gateway", provider = info.id, code = ?e.code, "couldn't read a saved key");
+                    KeyStatus {
+                        saved: false,
+                        last4: None,
+                    }
+                });
+                Ok(ProviderEntry { key, info })
             })
             .collect()
     }

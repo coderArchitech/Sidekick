@@ -2,6 +2,7 @@ import { useState } from "react";
 import { commands } from "@/ipc";
 import { activeRouter, type AnswerView } from "@/orchestrator";
 import { FollowUpChips } from "./FollowUpChips";
+import { GeneralNote } from "./GeneralNote";
 import { Markdown } from "./Markdown";
 import { ToolSteps } from "./ToolSteps";
 
@@ -43,6 +44,7 @@ export function AnswerCard({ view }: { view: AnswerView }) {
         {view.cue ||
           (view.status === "thinking" ? "Thinking…" : view.status === "streaming" ? "…" : "")}
       </p>
+      {view.general && <GeneralNote />}
 
       <ToolSteps view={view} />
 

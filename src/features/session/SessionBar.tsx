@@ -10,6 +10,7 @@ import { Select } from "@/lib/Select";
 import { useSkillsStore } from "@/orchestrator";
 import { ConsentDialog } from "./ConsentDialog";
 import { useSessionStore } from "./store";
+import { SttNotices } from "./SttNotices";
 
 const button = "btn btn-secondary btn-sm";
 
@@ -18,6 +19,8 @@ export function SessionBar() {
   const {
     session,
     warnings,
+    stt,
+    applyStt,
     error,
     busy,
     create,
@@ -39,10 +42,17 @@ export function SessionBar() {
   const inputId = useId();
 
   useEffect(() => {
-    let unlisten: (() => void) | undefined;
-    void sessionEvents.onSessionChanged((e) => applyChange(e.session)).then((u) => (unlisten = u));
-    return () => unlisten?.();
-  }, [applyChange]);
+    const unlisten: (() => void)[] = [];
+    let disposed = false;
+    const keep = (u: () => void) => (disposed ? u() : unlisten.push(u));
+    void sessionEvents.onSessionChanged((e) => applyChange(e.session)).then(keep);
+    // Without this, a failed or silent stream looks exactly like a quiet meeting.
+    void sessionEvents.onSttStatus(applyStt).then(keep);
+    return () => {
+      disposed = true;
+      unlisten.forEach((u) => u());
+    };
+  }, [applyChange, applyStt]);
 
   return (
     <div className="space-y-1.5 border-b border-line px-3 py-2 text-xs">
@@ -149,6 +159,7 @@ export function SessionBar() {
         </div>
       )}
       {session?.status === "ended" && <EndedSessionData />}
+      {(session?.status === "live" || session?.status === "paused") && <SttNotices stt={stt} />}
       {warnings.map((w) => (
         <p key={w} role="status" className="text-warning">
           {w}

@@ -12,7 +12,9 @@ use crate::state::AppState;
 
 #[tauri::command]
 #[specta::specta]
-pub fn list_providers(
+// Async (here and in other commands that read keys) so a keychain prompt
+// never freezes the window: sync commands run on the main thread.
+pub async fn list_providers(
     state: State<'_, AppState>,
     kind: ProviderKind,
 ) -> SidekickResult<Vec<ProviderEntry>> {
@@ -43,7 +45,7 @@ pub async fn test_api_key(
 
 #[tauri::command]
 #[specta::specta]
-pub fn delete_api_key(state: State<'_, AppState>, provider: String) -> SidekickResult<()> {
+pub async fn delete_api_key(state: State<'_, AppState>, provider: String) -> SidekickResult<()> {
     state.gateway.delete_key(&provider)
 }
 

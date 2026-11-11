@@ -37,6 +37,7 @@
     "allow-export-logs",
     "dialog:allow-open",
     "dialog:allow-save",
-    "allow-get-diagnostics"
+    "allow-get-diagnostics",
+    "allow-startup-problem"
   ]
 }

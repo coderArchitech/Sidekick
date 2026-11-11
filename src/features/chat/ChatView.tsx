@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState, type FormEvent, type KeyboardEvent } from "react";
-import { FollowUpChips, Markdown, ToolSteps } from "@/features/answers";
+import { FollowUpChips, GeneralNote, Markdown, ToolSteps } from "@/features/answers";
 import { useSessionStore } from "@/features/session";
 import { activeRouter, askChat, useChatStore, type AnswerView } from "@/orchestrator";
 import { CaptureMenu, PendingScreenshot } from "./CaptureMenu";
@@ -101,6 +101,7 @@ function ChatTurn({ turn }: { turn: AnswerView }) {
       </p>
       <div className="mr-4 text-sm leading-relaxed text-fg-2" aria-live="polite">
         <ToolSteps view={turn} />
+        {turn.general && <GeneralNote />}
         {text ? <Markdown text={text} /> : streaming && <p className="text-fg-muted">Thinking…</p>}
         {turn.status === "error" && (
           <p role="alert" className="text-danger">

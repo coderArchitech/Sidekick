@@ -6,7 +6,7 @@ export { useQuestionDetection } from "./useQuestionDetection";
 export { AnswerRouter, type AnswerView, type AnswerStatus } from "./answerer";
 export { useAnswersStore } from "./answersStore";
 export { modelPlan, sessionPlan, type ModelPlan } from "./models";
-export { NOT_FOUND, buildPrompt, citedSources, type SourceRef } from "./prompt";
+export { GENERAL_LABEL, buildPrompt, citedSources, splitGeneral, type SourceRef } from "./prompt";
 export {
   activeRouter,
   askChat,
