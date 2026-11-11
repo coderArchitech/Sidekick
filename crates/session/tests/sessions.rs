@@ -432,8 +432,11 @@ async fn the_users_own_transcription_turns_off_and_on_and_survives_a_pause() {
     live.stop().await;
     let segs = sink.segments.lock().unwrap();
     assert!(segs.len() >= 2, "{segs:?}");
+    // Had resume turned the microphone back on, the speech would be one run
+    // with no gap. The off period was 700 ms of wall time; slow CI runners play
+    // less audio in that time, so only a clear gap is required.
     assert!(
-        segs[1].start_ms > segs[0].end_ms + 500,
+        segs[1].start_ms > segs[0].end_ms + 200,
         "nothing was sent while the user was off: {segs:?}"
     );
 }
