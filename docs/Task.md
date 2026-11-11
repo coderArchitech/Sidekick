@@ -84,6 +84,11 @@ All Phase 0 code and automated tests are done and green on Linux, Windows and ma
 | T-037 | Release pipeline: signing and auto-update | ⬜ To do | Needs signing certificates |
 | T-038 | Performance soak and baselines | ⬜ To do | Also carries the T-012 baselines on the 8 GB reference laptops |
 | T-039 | Answer quality eval | ⬜ To do | Needs real provider keys. Also carries the live-key and real-model checks of T-010, T-017, T-021, T-027, T-041 to T-047 (moved here when those tasks closed after macOS testing) |
+| T-069 | Startup recovery: keep the database key, recovery screen | ✅ Done | A missing keychain key no longer silently replaces the database key (which crashed every start); startup failures show a recovery screen instead of quitting. Rust, Vitest, Playwright and a real-app check |
+| T-070 | Answers from general knowledge, labelled | ✅ Done | Replaces the "Not found in your documents" reply: context first with citations, otherwise general knowledge with a label. Checked against live Claude |
+| T-071 | Speech-to-text status in the session bar; silent microphone warning | 🟡 In progress: testing | `stt.status` was emitted but never shown. Adds `silent` for a microphone of digital zeros (missing permission). Deepgram path checked with a live key. Waiting on: the manual check in the installed app (Microphone permission off, then on) |
+| T-072 | Red quit button in the overlay header | ✅ Done | Quits; a live session is ended first, after asking, so notes and summary are saved |
+| T-073 | Keychain prompts after every rebuild; provider dropdowns missing | 🟡 In progress: testing | Each key read once per run; one unreadable key no longer hides the provider dropdowns; keychain reads off the main thread; stable local signing (`pnpm build:mac-local`) keeps Always Allow and Microphone across rebuilds. Waiting on: your check in the signed build |
 | T-040 | Release checklist and first beta | ⬜ To do | 🖥️ |
 
 ### Phase 3: P1 features (ship if time allows)
@@ -643,6 +648,75 @@ Reported after using the app on macOS (2026-11-09). Each fix has unit, component
 **Refs:** TECHNICAL.md 9.5
 **Tests**
 - [ ] Every item in the release checklist (TECHNICAL.md 9.5) passes on Windows 10, Windows 11, macOS Apple Silicon and Intel.
+
+### T-069 Startup recovery: keep the database key, recovery screen
+
+**Refs:** TECHNICAL.md 4, 4.5, 5.1
+**Why:** on a Mac whose keychain entry `sidekick/db-key` was lost, Sidekick generated a new key, couldn't open the existing `sidekick.db`, and crashed on every start with no message (`DbError`, then an abort).
+**Scope**
+- [x] `database_key` creates a key only when no database exists; otherwise `KEY_MISSING`, and nothing is saved to the keychain.
+- [x] Startup reports which step failed (`key_missing`, `keychain_unavailable`, `database_unreadable`, `other`) and shows the recovery screen in the overlay instead of quitting.
+- [x] Recovery actions: Start fresh (asks first; the database is moved aside, never deleted), Restore backup (newest pre-migration backup), Try again, Export logs. All refuse after a normal start.
+
+**Tests**
+- [x] Rust: no key is created for an existing database; missing key, wrong key and fresh start after setting aside; set-aside moves `-wal`/`-shm` with the file; restore keeps the broken file and the backup; backups offered only when the key still works; actions refuse after a normal start.
+- [x] Component: copy and actions per kind, confirm before Start fresh, Restore backup first when there is one, export logs, errors shown.
+- [x] Playwright (`tests/ui/recovery.spec.ts`): recovery screen instead of the overlay, confirm flow, backup, locked keychain, normal start unaffected; axe on each state.
+- [x] Real app (macOS 26.7, mock mode, damaged database): logs `startup failed; showing the recovery screen` (`DatabaseUnreadable`), stays running, no crash report.
+
+### T-070 Answers from general knowledge, labelled
+
+**Refs:** PRD risks (hallucination); TECHNICAL.md 3.2 `orchestrator`
+**Why:** every question the meeting and documents didn't cover got "Not found in your documents or the meeting so far", and a question with no context got it without calling the model, so Sidekick looked broken whenever speech-to-text heard nothing.
+**Scope**
+- [x] Rules: context first with citations; otherwise answer from general knowledge, start with `[general]`, cite nothing, never present it as from the meeting or documents.
+- [x] `splitGeneral` strips the tag (and hides it while streaming); `AnswerView.general` drives the label in Live Answers and Chat; saved with the label as its first line.
+- [x] The model is always called, even with an empty context.
+
+**Tests**
+- [x] Unit: tag stripping, partial tag, citations left alone; rules no longer say "reply exactly … never guess"; empty context still streams; a general answer is labelled, has no sources and is saved with the label; a context answer isn't labelled.
+- [x] Component: the label shows only on general answers.
+- [x] Live: real Claude (Opus full, Haiku cue) with the exact prompts: "What is Kubernetes?" with no context → `[general]`; a question the transcript answers → cited `[1]`, not general.
+
+### T-071 Speech-to-text status in the session bar; silent microphone warning
+
+**Refs:** TECHNICAL.md 5.2 `stt.status`
+**Why:** with the installed app, sessions started and Deepgram connected, but nothing was transcribed and nothing said why. Each new unsigned build needs the Microphone and System Audio Recording permissions again; without them macOS delivers zeros. Deepgram itself was fine: the same key transcribed a test sentence through Sidekick's streaming code.
+**Scope**
+- [x] `SttStatus::Silent` / `silent`: `sidekick_session::silence` watches the microphone stream and reports 3 s of digital zeros once, and `live` when sound returns. System audio isn't watched (it's quiet whenever others are).
+- [x] The session bar listens to `stt.status`: silent (with the System Settings or Windows Settings path), failed (which stream, check the key) and reconnecting.
+
+**Tests**
+- [x] Rust: zeros reported once after 3 s, not before; a quiet room's noise isn't silence; sound after silence reports live; the watcher forwards every frame.
+- [x] Component and Playwright: notices per state, cleared on live, other sessions ignored; axe.
+- [x] Live: Deepgram nova-3 with the provided key, through `DeepgramProvider` with fixture audio → final segment.
+- [ ] Manual: installed app with Microphone permission off shows the silent notice; with it on, transcripts appear.
+
+### T-072 Red quit button in the overlay header
+
+**Refs:** TECHNICAL.md 5.1 `quit_app`
+**Scope**
+- [x] Red ✕ ("Quit Sidekick") after Settings in the header; quits at once when nothing is listening.
+- [x] During a live or paused session: asks, ends the session, waits for the summary (up to 60 s; "Quit now" skips), then quits. Escape and Cancel keep listening.
+
+**Tests**
+- [x] Component: quits at once with no session; asks during a session; Cancel keeps listening; waits for the summary; Quit now; summary wait gives up on time.
+- [x] Playwright: red, passes axe, ask → Escape → End session and quit ends the session.
+
+### T-073 Keychain prompts after every rebuild; provider dropdowns missing
+
+**Refs:** TECHNICAL.md 9.3 (local macOS builds), ADR-008
+**Why:** every rebuilt app asked for the login keychain password again, once per saved key, because "Always Allow" is tied to the app's signature and unsigned builds get a new one each time. `list_providers` read every provider's key on each open, ran on the main thread (freezing the window while a prompt waited) and failed outright if any one read failed, so the provider and model dropdowns didn't appear. The same per-build identity also reset the Microphone permission (see T-071).
+**Scope**
+- [x] `CachedStore`: each key is read from the keychain at most once per run; saving and removing keep it current; failed reads are retried.
+- [x] `Gateway::providers`: an unreadable key shows as not saved; the list always comes back.
+- [x] `list_providers`, `session_provider_options`, `create_session`, `delete_api_key` are async, so keychain reads never run on the main thread.
+- [x] Stable local signing: `scripts/macos-local-signing.sh`, `pnpm build:mac-local`, `Entitlements.plist` with `audio-input`, hardened runtime.
+
+**Tests**
+- [x] Rust: one read per key across repeated status checks; set and delete keep the cache current; a failed read is retried; one unreadable key keeps the provider list.
+- [x] Local signing: a copy of the app signed with the certificate has the designated requirement `identifier "com.sidekick.app" and certificate root = H"…"`.
+- [ ] Manual: install the signed build, allow the keychain once ("Always Allow") and the Microphone; rebuild and reinstall; no keychain prompt and the microphone still works.
 
 ## Phase 3 details
 

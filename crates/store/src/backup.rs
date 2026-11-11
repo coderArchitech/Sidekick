@@ -25,7 +25,8 @@ pub(crate) fn backup_before_migration(
     Ok(backup)
 }
 
-pub(crate) fn list(db_path: &Path) -> Vec<PathBuf> {
+/// Pre-migration backups of the database at `db_path`, oldest first.
+pub fn list(db_path: &Path) -> Vec<PathBuf> {
     let Some(file_name) = db_path.file_name().and_then(|n| n.to_str()) else {
         return Vec::new();
     };

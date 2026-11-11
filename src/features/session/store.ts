@@ -6,11 +6,16 @@ import {
   type Session,
   type SessionOverrides,
   type SidekickError,
+  type Stream,
+  type SttState,
+  type SttStatusChanged,
 } from "@/ipc";
 
 interface SessionState {
   session: Session | null;
   warnings: string[];
+  /** Speech-to-text state per stream of the current session (`stt.status`). */
+  stt: Partial<Record<Stream, SttState>>;
   error: string | null;
   busy: boolean;
   /** Creates a draft session; `overrides` picks other providers for it (PRD KEY-9). */
@@ -34,6 +39,8 @@ interface SessionState {
   reset: () => void;
   /** Applies a `session-changed` event for the current session. */
   applyChange: (session: Session) => void;
+  /** Applies an `stt.status` event for the current session. */
+  applyStt: (e: SttStatusChanged) => void;
 }
 
 const message = (e: SidekickError) => e.message;
@@ -55,12 +62,13 @@ export const useSessionStore = create<SessionState>((set, get) => {
   return {
     session: null,
     warnings: [],
+    stt: {},
     error: null,
     busy: false,
 
     create: async (title, overrides) => {
       const session = await run(() => commands.createSession(title, overrides ?? null));
-      if (session) set({ session, warnings: [] });
+      if (session) set({ session, warnings: [], stt: {} });
     },
 
     confirmAndStart: async (option) => {
@@ -91,7 +99,7 @@ export const useSessionStore = create<SessionState>((set, get) => {
       const id = get().session?.id;
       if (!id) return;
       const s = await run(() => commands.endSession(id));
-      if (s) set({ session: s, warnings: [] });
+      if (s) set({ session: s, warnings: [], stt: {} });
     },
 
     setSkill: async (skillId) => {
@@ -130,10 +138,15 @@ export const useSessionStore = create<SessionState>((set, get) => {
       if (r.status === "error") set({ error: message(r.error) });
       else get().reset();
     },
-    reset: () => set({ session: null, warnings: [], error: null }),
+    reset: () => set({ session: null, warnings: [], stt: {}, error: null }),
 
     applyChange: (session) => {
       if (get().session?.id === session.id) set({ session });
+    },
+    applyStt: (e) => {
+      const s = get().session;
+      if (s?.id !== e.sessionId || s.status === "ended") return;
+      set({ stt: { ...get().stt, [e.stream]: e.state } });
     },
   };
 });

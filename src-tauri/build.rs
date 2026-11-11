@@ -81,6 +81,12 @@ const COMMANDS: &[&str] = &[
     "get_brief",
     "save_brief",
     "retrieve_context",
+    "startup_problem",
+    "recover_start_fresh",
+    "recover_restore_backup",
+    "recover_retry",
+    "export_startup_logs",
+    "quit_app",
 ];
 
 fn main() {

@@ -7,3 +7,4 @@ src-tauri/gen/schemas
 .env.local
 *.log
 .DS_Store
+.env

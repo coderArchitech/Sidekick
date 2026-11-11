@@ -23,6 +23,7 @@
     "verify": "pnpm lint && pnpm typecheck && pnpm test && cargo fmt --all --check && cargo clippy --workspace --all-targets -- -D warnings && cargo test --workspace",
     "test:ui": "playwright test",
     "build:e2e": "tauri build --debug --no-bundle --features e2e --config src-tauri/tauri.e2e.conf.json",
+    "build:mac-local": "node scripts/build-mac-local.mjs",
     "test:e2e": "node scripts/e2e.mjs"
   },
   "dependencies": {

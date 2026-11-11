@@ -68,7 +68,7 @@ pub struct SessionProviderOptions {
 /// Speech-to-text and answer providers the overlay can offer when creating a session.
 #[tauri::command]
 #[specta::specta]
-pub fn session_provider_options(
+pub async fn session_provider_options(
     state: State<'_, AppState>,
 ) -> SidekickResult<SessionProviderOptions> {
     let settings = sidekick_settings::load(&state.db())?;
@@ -126,7 +126,7 @@ fn check_override(
 
 #[tauri::command]
 #[specta::specta]
-pub fn create_session(
+pub async fn create_session(
     app: AppHandle,
     state: State<'_, AppState>,
     title: String,

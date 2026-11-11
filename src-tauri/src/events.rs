@@ -114,6 +114,8 @@ pub enum SttState {
     Live,
     Reconnecting,
     Failed,
+    /// The stream is pure digital silence: usually a missing OS permission.
+    Silent,
 }
 
 /// STT connection changes (`stt.status`).
@@ -174,6 +176,7 @@ impl SttSink for TauriSttSink {
             SttStatus::Live => SttState::Live,
             SttStatus::Reconnecting => SttState::Reconnecting,
             SttStatus::Failed => SttState::Failed,
+            SttStatus::Silent => SttState::Silent,
         };
         let _ = SttStatusChanged {
             session_id: self.session_id.clone(),

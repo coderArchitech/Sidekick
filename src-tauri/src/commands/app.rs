@@ -47,6 +47,15 @@ pub fn open_settings(app: AppHandle) -> SidekickResult<()> {
         .map_err(|_| SidekickError::internal("Couldn't open Settings."))
 }
 
+/// Quits Sidekick (the red close button in the overlay header). The overlay
+/// ends a live session first, so its notes and summary are saved.
+#[tauri::command]
+#[specta::specta]
+pub fn quit_app(app: AppHandle) {
+    tracing::info!(target: "app", "quit from the overlay");
+    app.exit(0);
+}
+
 #[cfg(test)]
 mod tests {
     #[test]

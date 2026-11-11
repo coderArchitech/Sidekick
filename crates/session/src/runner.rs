@@ -107,6 +107,13 @@ impl LiveSession {
             let (tx, rx) = frame_channel();
             match audio.start(kind, tx) {
                 Ok(capture) => {
+                    // System audio is often quiet for good reason (nobody else
+                    // talking); a microphone of pure zeros means no permission.
+                    let rx = if kind == StreamKind::Mic {
+                        crate::silence::watch(kind, rx, Arc::clone(&sink))
+                    } else {
+                        rx
+                    };
                     let mut cfg = SttConfig::new(kind);
                     cfg.language.clone_from(&stt.language);
                     cfg.keyterms.clone_from(&stt.keyterms);

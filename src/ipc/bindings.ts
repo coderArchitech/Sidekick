@@ -26,6 +26,13 @@ export const commands = {
     }
   },
   /**
+   * Quits Sidekick (the red close button in the overlay header). The overlay
+   * ends a live session first, so its notes and summary are saved.
+   */
+  async quitApp(): Promise<void> {
+    await TAURI_INVOKE("quit_app");
+  },
+  /**
    * Whether the overlay is hidden from screen sharing (PRD UI-4a).
    */
   async getCaptureProtection(): Promise<ProtectionStatus> {
@@ -874,6 +881,58 @@ export const commands = {
       else return { status: "error", error: e as any };
     }
   },
+  /**
+   * Why startup failed, or `null` when Sidekick started normally.
+   */
+  async startupProblem(): Promise<StartupProblem | null> {
+    return await TAURI_INVOKE("startup_problem");
+  },
+  /**
+   * Moves the unreadable database aside (it isn't deleted) and restarts with
+   * empty data and, if the key was missing, a new key.
+   */
+  async recoverStartFresh(): Promise<Result<null, SidekickError>> {
+    try {
+      return { status: "ok", data: await TAURI_INVOKE("recover_start_fresh") };
+    } catch (e) {
+      if (e instanceof Error) throw e;
+      else return { status: "error", error: e as any };
+    }
+  },
+  /**
+   * Puts back the newest pre-migration backup, keeping the current file aside.
+   */
+  async recoverRestoreBackup(): Promise<Result<null, SidekickError>> {
+    try {
+      return { status: "ok", data: await TAURI_INVOKE("recover_restore_backup") };
+    } catch (e) {
+      if (e instanceof Error) throw e;
+      else return { status: "error", error: e as any };
+    }
+  },
+  /**
+   * Starts Sidekick again, for example after unlocking the keychain.
+   */
+  async recoverRetry(): Promise<Result<null, SidekickError>> {
+    try {
+      return { status: "ok", data: await TAURI_INVOKE("recover_retry") };
+    } catch (e) {
+      if (e instanceof Error) throw e;
+      else return { status: "error", error: e as any };
+    }
+  },
+  /**
+   * Saves the logs plus the startup problem as a zip, for a bug report.
+   * Returns how many log files were included.
+   */
+  async exportStartupLogs(filePath: string): Promise<Result<number, SidekickError>> {
+    try {
+      return { status: "ok", data: await TAURI_INVOKE("export_startup_logs", { filePath }) };
+    } catch (e) {
+      if (e instanceof Error) throw e;
+      else return { status: "error", error: e as any };
+    }
+  },
 };
 
 /** user-defined events **/
@@ -1289,6 +1348,24 @@ export type PackInfo = {
   ready: number;
 };
 /**
+ * Which startup step failed. Each kind gets its own advice and actions.
+ */
+export type ProblemKind =
+  /**
+   * The database exists but its key is gone from the keychain.
+   */
+  | "key_missing"
+  /**
+   * The keychain couldn't be read or written (locked, or access denied).
+   */
+  | "keychain_unavailable"
+  /**
+   * The key was read but the database didn't open: wrong key, a damaged
+   * file, or a failed upgrade.
+   */
+  | "database_unreadable"
+  | "other";
+/**
  * Who the user is, for directed questions and STT boosts (PRD QA-2, LIS-5a).
  */
 export type Profile = { name: string; nicknames: string[] };
@@ -1624,10 +1701,40 @@ export type StageStats = {
   healthy: boolean | null;
 };
 /**
+ * What the recovery screen shows. No keys or meeting content.
+ */
+export type StartupProblem = {
+  kind: ProblemKind;
+  /**
+   * The underlying error, for the details line and bug reports.
+   */
+  message: string;
+  /**
+   * Where the database lives, so people can find the set-aside file.
+   */
+  dataDir: string;
+  /**
+   * A pre-migration backup exists that "Restore backup" can put back.
+   */
+  hasBackup: boolean;
+  /**
+   * What this OS calls its keychain, for the advice text.
+   */
+  keychainName: string;
+};
+/**
  * Which audio stream a transcript event belongs to.
  */
 export type Stream = "mic" | "system";
-export type SttState = "connecting" | "live" | "reconnecting" | "failed";
+export type SttState =
+  | "connecting"
+  | "live"
+  | "reconnecting"
+  | "failed"
+  /**
+   * The stream is pure digital silence: usually a missing OS permission.
+   */
+  | "silent";
 /**
  * STT connection changes (`stt.status`).
  */

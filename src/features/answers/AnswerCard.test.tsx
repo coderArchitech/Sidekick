@@ -213,4 +213,15 @@ describe("AnswerCard tools (PRD SKL-4)", () => {
     render(<AnswerCard view={view({ status: "thinking", cue: "", body: "", tools: [] })} />);
     expect(screen.getByText("Checking whether tools help…")).toBeInTheDocument();
   });
+
+  it("labels a general-knowledge answer, and only that kind", () => {
+    const { rerender } = render(
+      <AnswerCard view={view({ general: true, status: "done", sources: [] })} />,
+    );
+    expect(
+      screen.getByText("General knowledge · not from your meeting or documents"),
+    ).toBeInTheDocument();
+    rerender(<AnswerCard view={view({ general: false, status: "done" })} />);
+    expect(screen.queryByText(/General knowledge/)).not.toBeInTheDocument();
+  });
 });

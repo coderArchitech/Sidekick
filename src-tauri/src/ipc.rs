@@ -13,6 +13,7 @@ pub fn builder() -> Builder<tauri::Wry> {
         .commands(collect_commands![
             commands::app::app_info,
             commands::app::open_settings,
+            commands::app::quit_app,
             commands::app::get_capture_protection,
             commands::settings::get_settings,
             commands::settings::update_settings,
@@ -90,6 +91,11 @@ pub fn builder() -> Builder<tauri::Wry> {
             commands::packs::get_brief,
             commands::packs::save_brief,
             commands::retrieval::retrieve_context,
+            commands::recovery::startup_problem,
+            commands::recovery::recover_start_fresh,
+            commands::recovery::recover_restore_backup,
+            commands::recovery::recover_retry,
+            commands::recovery::export_startup_logs,
         ])
         .events(collect_events![
             events::AnswerToken,

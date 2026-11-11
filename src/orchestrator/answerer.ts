@@ -13,10 +13,10 @@ import { log } from "@/lib/log";
 import { runAgent, type AgentDeps, type ToolResult } from "./agent";
 import type { ModelPlan } from "./models";
 import {
-  NOT_FOUND,
+  GENERAL_LABEL,
   buildPrompt,
   citedSources,
-  isEmpty,
+  splitGeneral,
   type SkillPrompt,
   type SourceRef,
 } from "./prompt";
@@ -60,6 +60,11 @@ export interface AnswerView {
   tools?: ToolResult[];
   /** Shown in Live Answers (detected questions, or a screenshot taken there). */
   live?: boolean;
+  /**
+   * Answered from the model's general knowledge because the meeting and
+   * documents didn't cover it; shown with a label and no sources.
+   */
+  general?: boolean;
 }
 
 export interface AskInput {
@@ -207,13 +212,6 @@ export class AnswerRouter {
       flight.view = { ...flight.view, tools: toolResults };
       this.onUpdate({ ...flight.view });
     }
-    if (isEmpty(ctx.data) && !toolResults.some((r) => r.ok)) {
-      // Nothing to answer from: say so, never guess (QA-6).
-      flight.view = { ...flight.view, cue: NOT_FOUND, body: NOT_FOUND, status: "done" };
-      this.inFlight.delete(id);
-      this.onUpdate({ ...flight.view });
-      return flight.view;
-    }
     const full = buildPrompt(
       {
         question: input.text,
@@ -299,15 +297,20 @@ export class AnswerRouter {
         void this.deps.recordLatency("question_to_cue", Math.max(0, this.now() - f.endedAt));
       }
       f.cueTokens += delta;
-      f.view = { ...f.view, cue: f.cueTokens.trim() };
+      f.view = { ...f.view, cue: splitGeneral(f.cueTokens).text.trim() };
     } else {
       if (!f.sawBody) {
         f.sawBody = true;
         void this.deps.recordLatency("question_to_answer", Math.max(0, this.now() - f.endedAt));
       }
       f.bodyTokens += delta;
-      f.view = { ...f.view, body: f.bodyTokens };
+      f.view = { ...f.view, body: splitGeneral(f.bodyTokens).text };
     }
+    // The full answer decides; until it starts, the cue does.
+    const general = f.bodyTokens.trim()
+      ? splitGeneral(f.bodyTokens).general
+      : splitGeneral(f.cueTokens).general;
+    if (general !== Boolean(f.view.general)) f.view = { ...f.view, general };
     this.onUpdate({ ...f.view });
   }
 
@@ -361,7 +364,8 @@ export class AnswerRouter {
       directed: f.input.directed,
       segmentId: f.input.segmentId ?? null,
       cue: f.view.cue || null,
-      bodyMd: f.bodyTokens,
+      // Saved without the tag; a general answer keeps its label in the text.
+      bodyMd: f.view.general ? `_${GENERAL_LABEL}_\n\n${f.view.body}` : f.view.body,
       sources: cited.map((s) => ({ type: s.type, ref: s.ref, label: s.label })),
       provider: f.input.models.provider,
       model: f.input.models.full,

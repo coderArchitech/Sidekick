@@ -22,6 +22,7 @@ import type {
   SettingsPatch,
   Notes,
   Screenshot,
+  StartupProblem,
 } from "./bindings";
 
 type Commands = typeof tauriCommands;
@@ -328,6 +329,35 @@ function stageStats(): StageStats[] {
   });
 }
 
+/**
+ * Startup state the mock reports (tech doc 4.5). Tests set `problem`; a
+ * Playwright test can set `window.__sidekickStartupProblem` before the page
+ * loads. `actions` records the recovery buttons pressed: each one restarts the
+ * real app, so the mock only records it.
+ */
+export const mockStartup: { problem: StartupProblem | null; actions: string[] } = {
+  problem: null,
+  actions: [],
+};
+
+function currentStartupProblem(): StartupProblem | null {
+  const injected =
+    typeof window !== "undefined"
+      ? (window as unknown as { __sidekickStartupProblem?: StartupProblem })
+          .__sidekickStartupProblem
+      : undefined;
+  return injected ?? mockStartup.problem;
+}
+
+function recoveryAction(name: string) {
+  if (!currentStartupProblem())
+    return Promise.resolve(
+      err("INTERNAL", "Sidekick started normally, so there's nothing to recover."),
+    );
+  mockStartup.actions.push(name);
+  return Promise.resolve({ status: "ok" as const, data: null });
+}
+
 /** Protection status the mock reports; tests may replace it. */
 export const mockProtection: { status: ProtectionStatus } = {
   status: { state: "unavailable", reason: "Running in a browser: no screen-share protection." },
@@ -342,7 +372,7 @@ export const mockOptions = { demoTranscript: false, ingestStepMs: 5 };
 /** What the mocks were asked to do, for assertions. */
 export const mockCalls: { streams: ("mic" | "system")[] } = { streams: [] };
 /** Counts window actions so tests can assert them. */
-export const mockWindowCalls = { openSettings: 0, hide: 0 };
+export const mockWindowCalls = { openSettings: 0, hide: 0, quit: 0 };
 
 /** Applies a patch the way the Rust side does: absent fields are unchanged. */
 export function applyPatch(current: Settings, patch: SettingsPatch): Settings {
@@ -409,7 +439,10 @@ export function resetMocks(): void {
   nextId = 1;
   mockCalls.streams = [];
   mockWindowCalls.openSettings = 0;
+  mockStartup.problem = null;
+  mockStartup.actions = [];
   mockWindowCalls.hide = 0;
+  mockWindowCalls.quit = 0;
   mockProtection.status = {
     state: "unavailable",
     reason: "Running in a browser: no screen-share protection.",
@@ -430,6 +463,10 @@ export const mockCommands: Commands = {
   openSettings: () => {
     mockWindowCalls.openSettings += 1;
     return Promise.resolve({ status: "ok", data: null });
+  },
+  quitApp: () => {
+    mockWindowCalls.quit += 1;
+    return Promise.resolve();
   },
   getCaptureProtection: () => Promise.resolve(structuredClone(mockProtection.status)),
   getSettings: () => Promise.resolve({ status: "ok", data: structuredClone(settings) }),
@@ -929,6 +966,14 @@ export const mockCommands: Commands = {
   log: (level, message, requestId) => {
     mockLogs.push({ level, message, requestId });
     return Promise.resolve();
+  },
+  startupProblem: () => Promise.resolve(structuredClone(currentStartupProblem())),
+  recoverStartFresh: () => recoveryAction("startFresh"),
+  recoverRestoreBackup: () => recoveryAction("restoreBackup"),
+  recoverRetry: () => recoveryAction("retry"),
+  exportStartupLogs: (path) => {
+    mockSkills.files.set(path, "zip: diagnostics.json (startup problem), logs/");
+    return Promise.resolve({ status: "ok", data: 1 });
   },
   exportLogs: (path) => {
     mockSkills.files.set(path, "zip: diagnostics.json, logs/");

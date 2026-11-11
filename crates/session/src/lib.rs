@@ -11,6 +11,7 @@ pub mod notes;
 pub mod repo;
 pub mod retention;
 pub mod runner;
+pub mod silence;
 pub mod sinks;
 
 pub use model::{ConsentOption, Session, SessionStatus, streams_for};

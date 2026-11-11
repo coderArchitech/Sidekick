@@ -14,7 +14,7 @@ mod migrations;
 pub mod settings;
 pub mod vectors;
 
-pub use backup::MAX_BACKUPS;
+pub use backup::{MAX_BACKUPS, list as list_backups};
 pub use db::{DB_FILE_NAME, Database};
 pub use key::database_key;
 pub use migrations::LATEST_VERSION;

@@ -8,6 +8,7 @@ import { TranscriptView } from "@/features/transcript";
 import { commands, sessionEvents, type AppInfo } from "@/ipc";
 import { useAnswering, useChatStore, useNotes, useQuestionDetection } from "@/orchestrator";
 import { ProtectionShield } from "./ProtectionShield";
+import { QuitButton } from "./QuitButton";
 import { ViewMenu } from "./ViewMenu";
 import { useHotkeyActions } from "./useHotkeyActions";
 import { TABS, useOverlayStore, type Tab } from "./store";
@@ -107,6 +108,7 @@ export function Overlay() {
           >
             Settings
           </button>
+          <QuitButton />
         </div>
       </header>
 

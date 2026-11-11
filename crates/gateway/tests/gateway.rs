@@ -480,3 +480,45 @@ mod openai_embeddings {
         assert_eq!((mock.id(), key.is_none()), ("mock", true));
     }
 }
+
+/// A keychain where one key can't be read (a denied macOS prompt).
+struct OneUnreadable {
+    inner: MemoryStore,
+    broken: &'static str,
+}
+
+impl KeyStore for OneUnreadable {
+    fn set(&self, a: &str, s: &SecretString) -> SidekickResult<()> {
+        self.inner.set(a, s)
+    }
+    fn get(&self, a: &str) -> SidekickResult<Option<SecretString>> {
+        if a == self.broken {
+            return Err(SidekickError::new(ErrorCode::PermissionDenied, "denied"));
+        }
+        self.inner.get(a)
+    }
+    fn delete(&self, a: &str) -> SidekickResult<()> {
+        self.inner.delete(a)
+    }
+}
+
+#[test]
+fn one_unreadable_key_does_not_hide_the_provider_list() {
+    let inner = MemoryStore::default();
+    inner
+        .set(
+            "anthropic",
+            &SecretString::from("sk-ant-OK-9999".to_owned()),
+        )
+        .unwrap();
+    let keys: Arc<dyn KeyStore> = Arc::new(OneUnreadable {
+        inner,
+        broken: "openai",
+    });
+    let gw = Gateway::new(keys, false);
+    let llm = gw.providers(ProviderKind::Llm).unwrap();
+    assert!(llm.len() > 2, "every provider is still listed");
+    let by_id = |id: &str| llm.iter().find(|p| p.info.id == id).unwrap();
+    assert!(!by_id("openai").key.saved);
+    assert!(by_id("anthropic").key.saved);
+}

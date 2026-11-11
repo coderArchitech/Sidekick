@@ -9,9 +9,11 @@
 //! [`KeyStore`] is the seam: production uses [`KeychainStore`], tests and the
 //! mock-provider mode use [`MemoryStore`].
 
+mod cached;
 mod keychain;
 mod memory;
 
+pub use cached::CachedStore;
 pub use keychain::KeychainStore;
 pub use memory::MemoryStore;
 pub use secrecy::{ExposeSecret, SecretString};

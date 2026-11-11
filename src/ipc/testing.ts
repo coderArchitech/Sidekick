@@ -9,6 +9,7 @@ export {
   mockFiles,
   mockOptions,
   mockProtection,
+  mockStartup,
   mockWindowCalls,
   resetMocks,
   savedAnswers,
