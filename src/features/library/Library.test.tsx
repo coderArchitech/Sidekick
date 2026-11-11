@@ -1,4 +1,4 @@
-import { act, render, screen, within } from "@testing-library/react";
+import { act, render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it } from "vitest";
 import { useSessionStore } from "@/features/session";
@@ -46,8 +46,9 @@ describe("Library", () => {
     await user.click(screen.getByRole("button", { name: "Add files" }));
     const list = await screen.findByRole("list", { name: "Documents" });
     expect(within(list).getAllByRole("listitem")).toHaveLength(2);
-    await wait(80);
-    expect(within(list).getAllByText(/Ready/)).toHaveLength(2);
+    // Wait for both mocked imports to finish, not a fixed time: a busy CI
+    // runner can be slower than the mock's few timer steps.
+    await waitFor(() => expect(within(list).getAllByText(/Ready/)).toHaveLength(2));
     expect(screen.getByRole("button", { name: /Documents \(2\/2 ready\)/ })).toBeInTheDocument();
   });
 
