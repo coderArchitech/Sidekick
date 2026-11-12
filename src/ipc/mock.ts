@@ -368,7 +368,16 @@ export const mockLogs: { level: string; message: string; requestId: string | nul
 
 export const mockFiles: { picked: string[]; saveAs: string[] } = { picked: [], saveAs: [] };
 /** Browser-demo switches; tests leave them off. */
-export const mockOptions = { demoTranscript: false, ingestStepMs: 5 };
+export const mockOptions: {
+  demoTranscript: boolean;
+  ingestStepMs: number;
+  /** Canned model replies for the README screenshots (scripts/screenshots):
+   * the first whose `match` appears in the prompt replaces the mock answer. */
+  /** `long` limits a reply to full answers (true) or one-line cues (false). */
+  replies: { match: string; reply: string; long?: boolean }[];
+  /** The version the mock reports (the screenshots show the real one). */
+  version: string;
+} = { demoTranscript: false, ingestStepMs: 5, replies: [], version: "0.0.0-mock" };
 /** What the mocks were asked to do, for assertions. */
 export const mockCalls: { streams: ("mic" | "system")[]; micOn: boolean } = {
   streams: [],
@@ -462,7 +471,7 @@ export const mockCommands: Commands = {
   appInfo: () =>
     Promise.resolve({
       status: "ok",
-      data: { name: "Sidekick", version: "0.0.0-mock", os: "web" },
+      data: { name: "Sidekick", version: mockOptions.version, os: "web" },
     }),
   openSettings: () => {
     mockWindowCalls.openSettings += 1;
@@ -575,8 +584,16 @@ export const mockCommands: Commands = {
     // Like the Rust mock: full answers (answer-sized budgets) cite source [1].
     const cite = request.maxTokens > 100 ? " [1]" : "";
     const agent = request.system?.startsWith("You decide whether tools are needed");
+    const canned = agent
+      ? undefined
+      : mockOptions.replies.find(
+          (r) =>
+            (r.long === undefined || r.long === request.maxTokens > 100) &&
+            (question.includes(r.match) || (request.system ?? "").includes(r.match)),
+        )?.reply;
     const words = (
-      agent ? mockAgentReply(request.system ?? "", question) : `${prefix} ${question}${cite}`
+      canned ??
+      (agent ? mockAgentReply(request.system ?? "", question) : `${prefix} ${question}${cite}`)
     ).split(/(?<= )/);
     const handle = { cancelled: false };
     activeStreams.set(requestId, handle);
@@ -597,7 +614,7 @@ export const mockCommands: Commands = {
   },
   getDiagnostics: () =>
     Promise.resolve({
-      appVersion: "0.0.0-mock",
+      appVersion: mockOptions.version,
       os: "web",
       protection: structuredClone(mockProtection.status),
       stages: stageStats(),

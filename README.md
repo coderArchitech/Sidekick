@@ -2,10 +2,11 @@
 
 🦸 Your private, real-time AI meeting copilot. Sidekick listens to a live conversation in any meeting app (Teams, Zoom, Google Meet, Webex and others), keeps running notes, detects questions as they're asked (especially ones addressed to you by name), and suggests answers with sources from your documents, the meeting so far and your screen. Answers appear in a translucent overlay that is hidden from screen sharing, so only you see it.
 
-> **Status:** Phase 1 (MVP) is feature-complete and tested on Windows, macOS and Linux in CI. The remaining Phase 1 work is hands-on checks on real hardware and live meetings, then the MVP acceptance pass. Progress is tracked task by task in [docs/Task.md](docs/Task.md).
+> **Status:** Phase 1 (MVP) and the Phase 3 features are built and tested on Windows, macOS and Linux in CI, and macOS was verified on a real machine (T-051). Still to do: the Windows hardware checks (Phase 5), a few fixes from real use that need a live call (Phase 6), the MVP acceptance pass and the release pipeline. Progress is tracked task by task in [docs/Task.md](docs/Task.md).
 
 ## Contents
 
+- [Screenshots](#screenshots)
 - [What it does](#what-it-does)
 - [Documentation](#documentation)
 - [Tech stack](#tech-stack)
@@ -17,18 +18,80 @@
 - [Contributing](#contributing)
 - [Responsible use](#responsible-use)
 
+## Screenshots
+
+The overlay sits beside your meeting window at 420 × 640 by default; Settings is a separate window. These are the real UI with the mocked backend and canned answers; `pnpm docs:screenshots` takes them again (see [Running the tests](#running-the-tests)).
+
+<table>
+  <tr>
+    <td width="33%"><img src="docs/screenshots/app/live-answers.png" alt="Live Answers: a question that used your name, a one-line cue, then a full answer with a cited source, follow-up chips and feedback buttons"></td>
+    <td width="33%"><img src="docs/screenshots/app/transcript.png" alt="Transcript: timestamped lines with speaker labels and a Bookmark button"></td>
+    <td width="33%"><img src="docs/screenshots/app/chat-screenshot.png" alt="Chat: a screenshot of the screen attached, the question 'What does this error mean?' and an answer with a code fix"></td>
+  </tr>
+  <tr>
+    <td><b>Live Answers.</b> A question that uses your name is marked "For you": a one-line cue first, then the full answer with numbered sources, follow-up chips and feedback.</td>
+    <td><b>Transcript.</b> The other people and you, as separate streams, with timestamps, speaker labels and bookmarks.</td>
+    <td><b>Chat about your screen.</b> Capture a window, an area or the whole screen and ask about it; code comes highlighted with a Copy button.</td>
+  </tr>
+  <tr>
+    <td><img src="docs/screenshots/app/notes.png" alt="Notes: a 'What did I miss?' recap of the last five minutes, the pre-meeting brief and an agenda with covered, in progress and not yet items"></td>
+    <td><img src="docs/screenshots/app/summary.png" alt="After the meeting: summary, decisions and action items with owners and due dates, one ticked off"></td>
+    <td><img src="docs/screenshots/app/consent.png" alt="Consent dialog: The other people only, The other people and me, or Only me"></td>
+  </tr>
+  <tr>
+    <td><b>Notes.</b> "What did I miss?" recaps the last minutes; the agenda tracks itself as topics come up; rolling notes every 45 seconds.</td>
+    <td><b>After the meeting.</b> Summary, decisions and action items with owners and due dates, ready to tick off.</td>
+    <td><b>Consent first.</b> Choose who is transcribed before Sidekick listens: the other people, the other people and you, or only you.</td>
+  </tr>
+  <tr>
+    <td><img src="docs/screenshots/app/documents.png" alt="Documents: three files indexed and ready, a link field, and the Sales kit Knowledge Pack turned on"></td>
+    <td><img src="docs/screenshots/app/screenshot-actions.png" alt="Screenshot quick actions: Explain, Summarise, Extract table, Answer question on screen, Debug this code"></td>
+    <td><img src="docs/screenshots/app/skills-picker.png" alt="Skills: Technical Architect as the main Skill with Teacher added from the 'Also use' list"></td>
+  </tr>
+  <tr>
+    <td><b>Your documents.</b> Add files or links to a session, or turn on a Knowledge Pack; answers cite them.</td>
+    <td><b>Screenshot quick actions.</b> One click to explain, summarise, extract a table, answer the question on screen or debug code.</td>
+    <td><b>Skills.</b> One main Skill per session, plus up to two more at once.</td>
+  </tr>
+  <tr>
+    <td><img src="docs/screenshots/app/glass.png" alt="Glass overlay at 60% background opacity over a colourful video call, text still crisp"></td>
+    <td><img src="docs/screenshots/app/theme-light.png" alt="The overlay in the light theme"></td>
+    <td><img src="docs/screenshots/app/settings.png" alt="Settings: profile name and nickname, custom vocabulary and the speech-to-text provider"></td>
+  </tr>
+  <tr>
+    <td><b>Glass.</b> A translucent panel over the call (20–100% background); only the tint changes, text stays crisp.</td>
+    <td><b>Themes.</b> Dark (Darkroom), light and high contrast, all WCAG AA.</td>
+    <td><b>Settings.</b> Your name and nicknames, custom vocabulary, providers and keys (kept in the OS keychain).</td>
+  </tr>
+</table>
+
+<table>
+  <tr>
+    <td width="50%"><img src="docs/screenshots/app/settings-skills.png" alt="Settings, Skills: the built-in Skills with On, Edit, Export and Delete, plus New Skill, From template and Import"></td>
+    <td width="50%"><img src="docs/screenshots/app/diagnostics.png" alt="Diagnostics: p50 and p95 latency for transcript lag, question to cue, question to full answer, LLM first token and context retrieval against their targets"></td>
+  </tr>
+  <tr>
+    <td><b>Skill builder.</b> Turn built-in Skills on or off, edit them, write your own from a template, and import or export them as files.</td>
+    <td><b>Diagnostics.</b> Latency for every stage against its target, the screen-share protection status, and a log bundle for bug reports (no keys or meeting content).</td>
+  </tr>
+</table>
+
 ## What it does
 
-| Area      | Features                                                                                                                                                                                                                             |
-| --------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| Listening | Microphone and system audio as separate streams, live transcript with speaker labels, pause and resume, bookmarks. Speech-to-text with Deepgram, AssemblyAI, Soniox, or local Whisper (audio never leaves the computer)              |
-| Answers   | Detects questions, especially ones that use your name; a one-line cue first, then a full answer with numbered sources; code blocks with highlighting and copy; thumbs up/down                                                        |
-| Context   | Your documents (PDF, Word, PowerPoint, spreadsheets, text, web pages) searched with hybrid vector + keyword search; the meeting so far; screenshots of a window, an area or the whole screen                                         |
-| Chat      | Ask your own questions with the whole session as context, with follow-ups and capture-and-ask ("What does this error mean?")                                                                                                         |
-| Notes     | Rolling notes every 45 seconds; a summary, decisions and action items when the meeting ends                                                                                                                                          |
-| Skills    | Tell Sidekick how to behave for a kind of meeting (Interview Coach, Staff Engineer Interview (JS), Sales Discovery, Technical Architect, Teacher, Negotiation Coach, or your own)                                                    |
-| Models    | Anthropic (Claude), OpenAI, Google Gemini, or local Ollama, with your own keys in the OS keychain                                                                                                                                    |
-| Privacy   | Overlay excluded from screen sharing where the OS supports it, with a visible status; everything stored encrypted on your computer; retention per session; delete everything at any time; consent before listening to anyone but you |
+| Area             | Capabilities                                                                                                                                                                                                                                                                                                                                                                                                                                                                    |
+| ---------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Listening        | Microphone and system audio as separate streams. Live transcript with speaker labels, timestamps, bookmarks, pause and resume. Choose who is transcribed: the other people only, the other people and you, or only you, with a **Me** switch to turn your own voice off and on during a call. Room mode when system audio isn't available. Echo of the other side picked up by your microphone is dropped                                                                       |
+| Speech-to-text   | Deepgram, AssemblyAI, Soniox, or local Whisper (audio never leaves the computer). Each pause is finalised at once, so a line never waits for the next speaker. Custom vocabulary (product names, acronyms, people) boosts recognition. A silent-microphone warning when permission is missing                                                                                                                                                                                   |
+| Answers          | Detects questions, especially ones that use your name or nicknames, including interview tasks ("design a…", "walk me through…"). **Auto** answers every question; off, only the ones for you. A one-line cue first, then a full answer with numbered sources; from general knowledge, clearly labelled, when your context doesn't cover it. Code blocks with highlighting and Copy; follow-up chips (Shorter, More detail, Give an example, Explain simply); thumbs up and down |
+| Context          | Your documents (PDF, Word, PowerPoint, spreadsheets, text, Markdown, web pages) by picker, drag and drop or link, searched with hybrid vector and keyword search. Knowledge Packs: named document sets you reuse across sessions. The meeting so far. Optional web search (Tavily or Brave)                                                                                                                                                                                     |
+| Screenshots      | A window, an area or the whole screen. Ask about it, or use a quick action: Explain, Summarise, Extract table, Answer question on screen, Debug this code. The screenshot button on Live Answers answers the question on screen. Every capture kept in a strip, with re-ask and delete                                                                                                                                                                                          |
+| Chat             | Ask your own questions with the whole session as context, follow-ups, Shift+Enter for new lines, and capture-and-ask                                                                                                                                                                                                                                                                                                                                                            |
+| Meeting memory   | Pre-meeting brief from your documents and packs. Agenda that tracks itself (covered, in progress, not yet). "What did I miss?" recap of the last 2, 5 or 10 minutes. Rolling notes every 45 seconds. When the meeting ends: summary, decisions and action items with owners and due dates                                                                                                                                                                                       |
+| Skills           | Tell Sidekick how to answer for a kind of meeting: Interview Coach, Staff Engineer Interview (JS), Sales Discovery, Technical Architect, Teacher, Negotiation Coach, or your own. Up to three at once. Agent Skills can use tools (document search, web search, calculator) before answering. Build, edit, import and export Skills in Settings                                                                                                                                 |
+| Models           | Anthropic (Claude), OpenAI, Google Gemini, or local Ollama, with your own keys in the OS keychain. Per-session overrides for the speech-to-text and answer providers                                                                                                                                                                                                                                                                                                            |
+| Overlay          | Always on top, hidden from screen sharing where the OS supports it, with a visible protection status. Glass background (20–100%), compact mode, click-through so clicks reach the meeting below, dark, light and high-contrast themes. Global shortcuts for show and hide, Ask, screenshot, Auto, pause and resume, switch Skill, bookmark and click-through; dropdowns drawn inside the window so they never show in a screen share                                            |
+| Privacy and data | Everything stored encrypted on your computer (SQLCipher). Retention per session; delete a session or everything at any time. Consent before listening to anyone but you. Logs never contain keys or meeting content. No hosted backend: the app talks only to the providers you choose                                                                                                                                                                                          |
+| Reliability      | Startup recovery screen instead of a crash if the keychain or database has a problem. Speech-to-text status in the session bar. Diagnostics with per-stage latency targets and a log bundle for bug reports                                                                                                                                                                                                                                                                     |
 
 ## Documentation
 
@@ -261,6 +324,14 @@ pnpm exec playwright show-report test-results/ui-report
 
 Failures keep a trace, a screenshot and an error context in `test-results/ui/`.
 
+### README screenshots
+
+The pictures in [Screenshots](#screenshots) come from `tests/screenshots/readme.spec.ts`: the same mocked frontend, with canned model replies so answers read like real ones, saved at 2× to `docs/screenshots/app/`. Take them again after a UI change:
+
+```bash
+pnpm docs:screenshots
+```
+
 ### End-to-end tests (WebdriverIO)
 
 The suite in `tests/e2e/` drives the real desktop app through a WebDriver server built into a special debug build, so it works on Windows, macOS and Linux. The app runs with mock providers, a generated audio fixture and a scripted mock transcript. The specs cover consent to a cited answer, screenshot capture and ask, adding, testing and removing a key, and an LLM outage that leaves the transcript running. After each run, every log line is scanned for keys and meeting content.
@@ -318,7 +389,7 @@ Every pull request runs `.github/workflows/ci.yml`:
 ```text
 src/              React frontend
   app/            App shell (picks the overlay or the Settings window)
-  features/       One folder per feature: overlay, session, transcript, answers, chat, notes, library, settings, skills
+  features/       One folder per feature: overlay, session, transcript, answers, chat, notes, library, packs, recovery, settings, skills
   orchestrator/   Question detection, prompts, answering, chat, notes jobs
   ipc/            The only route to Rust: generated bindings, browser mocks, events
   lib/            Small shared helpers (batching, logging)
@@ -328,6 +399,7 @@ crates/           Rust domain crates, one per module (core, store, audio, stt, g
 schemas/          skill.schema.json
 skills/           Built-in Skill templates and their golden-answer cases
 tests/ui/         Playwright UI tests
+tests/screenshots/ README screenshots (pnpm docs:screenshots)
 tests/e2e/        WebdriverIO end-to-end tests
 scripts/          IPC generation, E2E runner, log scanner
 docs/             PRD, technical documentation, tasks, manual checks, ADRs

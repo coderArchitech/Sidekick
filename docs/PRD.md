@@ -86,6 +86,10 @@ Priority: P0 = must ship in MVP, P1 = ship if time allows, P2 = later.
 | LIS-5 | Custom vocabulary (product names, acronyms, people) to boost accuracy | P1 |
 | LIS-5a | The user's own name and nicknames (from QA-2) are always sent as vocabulary boosts, so directed questions are detected even when STT would misspell the name | P0 |
 | LIS-6 | Pause / resume listening with one hotkey; clear visual "listening" indicator | P0 |
+| LIS-7 | Choose who is transcribed at session start: the other people only (system audio, never the microphone), the other people and me, or only me; when both are transcribed, a **Me** switch turns the user's own voice off and on during the session, and pausing keeps that choice | P0 |
+| LIS-8 | Each line appears as soon as the speaker pauses: the app asks the provider to finalise right after a pause instead of waiting for the next speech, and the transcript lag is shown in Diagnostics against the under-1-second target (LIS-2) | P0 |
+| LIS-9 | Room mode: when system audio can't be captured, the microphone is the only way to hear the other person, so its lines are marked as the room (not the user) and their questions are detected and answered. With both streams, the other side's voice picked up again by the microphone (echo) is dropped so it isn't transcribed twice as "Me" | P0 |
+| LIS-10 | Speech-to-text status in the session bar (connecting, live, reconnecting, failed) and a warning when the microphone delivers only silence (usually a missing OS permission) | P0 |
 
 ### 4.3 Live meeting memory
 
@@ -100,12 +104,12 @@ Priority: P0 = must ship in MVP, P1 = ship if time allows, P2 = later.
 
 | ID | Requirement | Priority |
 | --- | --- | --- |
-| QA-1 | Detect questions in the transcript (interrogatives and implicit asks like "walk us through...") | P0 |
+| QA-1 | Detect questions in the transcript (interrogatives and implicit asks like "walk us through...", including interview tasks such as "design a rate limiter" or "write a function that...") | P0 |
 | QA-2 | Name trigger: questions that address the user by name (plus configured nicknames) are prioritised and auto-answered | P0 |
 | QA-3 | Modes: Auto (answer every detected question) or Directed only (name trigger), with Auto on by default, switched with a one-click Auto-answer button in the overlay header (and a hotkey); manual asks work in both modes | P0 |
 | QA-4 | Retrieval order: meeting transcript and notes, then session documents, then web search (if enabled) | P0 |
 | QA-5 | Answer format: a 1-line cue first, expandable to a full answer, then sources | P0 |
-| QA-6 | Every answer cites its source (doc name and page, transcript timestamp, or URL); if nothing is found, Sidekick says so instead of guessing | P0 |
+| QA-6 | Every answer from the meeting, documents or web cites its source (doc name and page, transcript timestamp, or URL). A question they don't cover is answered from general knowledge with a visible "General knowledge · not from your meeting or documents" label and no citations, instead of a bare "not found" | P0 |
 | QA-7 | Code snippets rendered with syntax highlighting and a one-click copy button | P0 |
 | QA-8 | Chat section: a dedicated Chat tab where the user types or speaks their own questions at any time, with full session context (transcript, notes, documents, screenshots); supports code snippets and follow-ups, and keeps history per session | P0 |
 | QA-9 | Follow-up chips: "Shorter", "More detail", "Give an example", "Explain simply" | P1 |
@@ -137,7 +141,7 @@ Priority: P0 = must ship in MVP, P1 = ship if time allows, P2 = later.
 | --- | --- | --- |
 | SKL-1 | A Skill = name, instructions (persona, tone, answer format), attached knowledge, and trigger rules | P0 |
 | SKL-2 | No-code Skill builder plus import/export as a file (Markdown with metadata) | P0 |
-| SKL-3 | Built-in templates: Interview Coach, Sales Discovery, Technical Architect, Teacher, Negotiation Coach | P1 |
+| SKL-3 | Built-in templates: Interview Coach, Staff Engineer Interview (JS), Sales Discovery, Technical Architect, Teacher, Negotiation Coach | P1 |
 | SKL-4 | Agents = Skills that can use tools (web search, doc search, calculator, code runner, calendar) | P1 |
 | SKL-5 | Multiple Skills can be active; user switches with a hotkey or dropdown | P1 |
 | SKL-6 | Community Skill gallery to share and install Skills | P2 |
@@ -157,6 +161,9 @@ Priority: P0 = must ship in MVP, P1 = ship if time allows, P2 = later.
 | UI-6 | Global hotkeys: show/hide, ask, screenshot, pause listening, switch Skill, Auto-answer on/off | P0 |
 | UI-7 | Tabs: Live Answers, Transcript, Notes, Chat | P0 |
 | UI-8 | Light, dark and high-contrast themes | P1 |
+| UI-9 | A Quit button in the overlay header; quitting during a live session asks first and ends the session so its notes and summary are saved | P0 |
+| UI-10 | Startup recovery: if the keychain or database can't be opened, a recovery screen explains the problem and offers safe next steps instead of crashing; the database key is never silently replaced | P0 |
+| UI-11 | Every dropdown and menu is drawn inside the overlay window (no native OS popups), so it stays hidden from screen sharing along with the panel (UI-4) | P0 |
 
 ### 4.9 Settings: providers and API keys
 
