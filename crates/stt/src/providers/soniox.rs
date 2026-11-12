@@ -32,6 +32,8 @@ pub const DEFAULT_API_URL: &str = "https://api.soniox.com";
 pub const MODEL: &str = "stt-rt-v3";
 const NAME: &str = "Soniox";
 const END: &str = "<end>";
+/// Marks the end of the text a `finalize` request asked for.
+const FIN: &str = "<fin>";
 
 #[derive(Debug, Clone)]
 pub struct SonioxProvider {
@@ -167,7 +169,7 @@ impl MessageParser for SonioxParser {
         let mut out = Vec::new();
         let mut pending = String::new();
         for t in msg.tokens {
-            if t.text == END {
+            if t.text == END || t.text == FIN {
                 out.extend(self.flush());
             } else if t.is_final {
                 self.finals.push(t);
@@ -217,6 +219,11 @@ impl Dialect for SonioxProvider {
 
     fn finish(&self) -> Option<Message> {
         Some(Message::Text(String::new().into()))
+    }
+
+    /// Returns the final text for what was said so far, without waiting for more audio.
+    fn finalize(&self) -> Option<Message> {
+        Some(Message::Text(r#"{"type":"finalize"}"#.into()))
     }
 }
 
@@ -324,6 +331,19 @@ mod tests {
                 .unwrap();
         assert_eq!(c["enable_speaker_diarization"], false);
         assert_eq!(c["language_hints"], json!(["en"]));
+    }
+
+    #[test]
+    fn a_finalize_marker_ends_the_result_like_an_endpoint() {
+        let mut p = SonioxParser::default();
+        let out = p
+            .parse(r#"{"tokens":[{"text":"Ready?","start_ms":0,"end_ms":400,"confidence":0.9,"is_final":true,"speaker":"1"},{"text":"<fin>","is_final":true}]}"#)
+            .unwrap();
+        assert!(
+            out.iter()
+                .any(|p| matches!(p, Parsed::Final { words, .. } if words[0].text == "Ready?")),
+            "{out:?}"
+        );
     }
 
     #[test]

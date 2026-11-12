@@ -4,7 +4,7 @@ import { createAndStart, openTab, waitForLine } from "../helpers";
 // The app runs with SIDEKICK_MOCK_LLM_FAIL=1 for this spec (wdio.conf.ts).
 describe("LLM outage (NFR-5)", () => {
   it("shows the error on the answer and keeps the transcript running", async () => {
-    await createAndStart("Outage", "Participants know and agree to transcription");
+    await createAndStart("Outage", "The other people and me");
     await waitForLine("What's the rate limit for the Pro tier?");
 
     await openTab("Live Answers");

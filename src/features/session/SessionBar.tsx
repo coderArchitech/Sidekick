@@ -2,6 +2,7 @@ import { useEffect, useId, useRef, useState } from "react";
 import {
   commands,
   sessionEvents,
+  type ConsentOption,
   type Retention,
   type SessionOverrides,
   type SessionProviderOptions,
@@ -13,6 +14,13 @@ import { useSessionStore } from "./store";
 import { SttNotices } from "./SttNotices";
 
 const button = "btn btn-secondary btn-sm";
+
+/** Who is being transcribed, for the live status. */
+function listeningLabel(consent: ConsentOption | null, meOn: boolean | null) {
+  if (consent === "me_only") return "Listening (you only)";
+  if (consent === "others_only" || meOn === false) return "Listening (others only)";
+  return "Listening";
+}
 
 /** Session controls in the overlay: create, start (with consent), pause, resume, end (PRD CTX-1, LIS-6). */
 export function SessionBar() {
@@ -31,6 +39,8 @@ export function SessionBar() {
     reset,
     applyChange,
     toggleAuto,
+    meOn,
+    toggleMe,
   } = useSessionStore();
   const [title, setTitle] = useState("");
   const [asking, setAsking] = useState(false);
@@ -119,7 +129,7 @@ export function SessionBar() {
                   aria-hidden="true"
                   className="inline-block h-2 w-2 animate-pulse rounded-full bg-danger"
                 />
-                {session.consent === "me_only" ? "Listening (you only)" : "Listening"}
+                {listeningLabel(session.consent, meOn)}
               </span>
               <button type="button" className={button} disabled={busy} onClick={() => void pause()}>
                 Pause
@@ -140,6 +150,18 @@ export function SessionBar() {
                 Resume
               </button>
             </>
+          )}
+          {meOn !== null && (session.status === "live" || session.status === "paused") && (
+            <button
+              type="button"
+              className={`${button} ${meOn ? "border-success text-success" : ""}`}
+              aria-pressed={meOn}
+              title="Me: on transcribes your voice too; off transcribes only the other people"
+              disabled={busy}
+              onClick={() => void toggleMe()}
+            >
+              Me
+            </button>
           )}
           <button
             type="button"

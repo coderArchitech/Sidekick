@@ -370,7 +370,10 @@ export const mockFiles: { picked: string[]; saveAs: string[] } = { picked: [], s
 /** Browser-demo switches; tests leave them off. */
 export const mockOptions = { demoTranscript: false, ingestStepMs: 5 };
 /** What the mocks were asked to do, for assertions. */
-export const mockCalls: { streams: ("mic" | "system")[] } = { streams: [] };
+export const mockCalls: { streams: ("mic" | "system")[]; micOn: boolean } = {
+  streams: [],
+  micOn: false,
+};
 /** Counts window actions so tests can assert them. */
 export const mockWindowCalls = { openSettings: 0, hide: 0, quit: 0 };
 
@@ -438,6 +441,7 @@ export function resetMocks(): void {
   liveSessionId = null;
   nextId = 1;
   mockCalls.streams = [];
+  mockCalls.micOn = false;
   mockWindowCalls.openSettings = 0;
   mockStartup.problem = null;
   mockStartup.actions = [];
@@ -646,14 +650,20 @@ export const mockCommands: Commands = {
       return Promise.resolve(
         err(
           "CONSENT_REQUIRED",
-          'Confirm that participants agree to transcription, or choose "Transcribe me only".',
+          "Choose who Sidekick transcribes: the other people, the other people and you, or only you.",
         ),
       );
     }
     const result = move(sessionId, "start");
     if (result.status === "error") return Promise.resolve(result);
     liveSessionId = sessionId;
-    mockCalls.streams = s.consent === "me_only" ? ["mic"] : ["mic", "system"];
+    mockCalls.streams =
+      s.consent === "me_only"
+        ? ["mic"]
+        : s.consent === "others_only"
+          ? ["system"]
+          : ["mic", "system"];
+    mockCalls.micOn = mockCalls.streams.includes("mic");
     if (mockOptions.demoTranscript) {
       // Browser demo (pnpm dev:web): a partial, then a final line.
       setTimeout(
@@ -698,6 +708,19 @@ export const mockCommands: Commands = {
     liveSessionId = null;
     for (const id of [...sessions.keys()]) forgetSession(id);
     return Promise.resolve({ status: "ok", data: n });
+  },
+  setMyTranscription: (sessionId, on) => {
+    if (liveSessionId !== sessionId)
+      return Promise.resolve(err("INTERNAL", "This session isn't running."));
+    if (!mockCalls.streams.includes("mic"))
+      return Promise.resolve(
+        err(
+          "INTERNAL",
+          'This session doesn\'t transcribe your microphone. Start a new one with "The other people and me".',
+        ),
+      );
+    mockCalls.micOn = on;
+    return Promise.resolve({ status: "ok", data: on });
   },
   setAutoAnswer: (sessionId, on) => {
     const s = sessions.get(sessionId);

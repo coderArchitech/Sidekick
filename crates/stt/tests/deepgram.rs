@@ -26,6 +26,7 @@ const KEY: &str = "dg-test-key";
 struct Sink {
     log: Mutex<Vec<String>>,
     segments: Mutex<Vec<Segment>>,
+    latencies: Mutex<Vec<u64>>,
 }
 
 impl SttSink for Sink {
@@ -38,6 +39,9 @@ impl SttSink for Sink {
     }
     fn status(&self, _: StreamKind, s: SttStatus) {
         self.log.lock().unwrap().push(format!("status:{s:?}"));
+    }
+    fn latency(&self, _: StreamKind, ms: u64) {
+        self.latencies.lock().unwrap().push(ms);
     }
 }
 
@@ -209,8 +213,14 @@ async fn transcribes_with_auth_and_meeting_timestamps() {
     let segs = sink.segments.lock().unwrap();
     assert_eq!(segs[0].text, "hello from connection 0");
     assert_eq!(segs[0].speaker_label, "speaker_1");
-    // Provider time 0.1 s maps to meeting time 2.0 s + 0.1 s (the skipped silence is added back).
-    assert_eq!((segs[0].start_ms, segs[0].end_ms), (2_100, 2_600));
+    // The 300 ms of silence before speech is sent as pre-roll, so provider
+    // time 0 is meeting time 1.7 s: 0.1 s maps to 1.8 s (the skipped
+    // silence is added back).
+    assert_eq!((segs[0].start_ms, segs[0].end_ms), (1_800, 2_300));
+    // How long the final took is reported as transcript lag.
+    let lags = sink.latencies.lock().unwrap();
+    assert_eq!(lags.len(), 1);
+    assert!(lags[0] < 2_000, "lag {} ms", lags[0]);
     assert!(
         seen.texts
             .lock()
@@ -231,6 +241,39 @@ async fn silence_is_not_sent_apart_from_a_short_tail() {
     let (_, result) = run(&url, config(), frames, Duration::from_millis(100)).await;
     result.unwrap();
     assert_eq!(seen.binary_frames.load(Ordering::SeqCst), 20);
+}
+
+#[tokio::test]
+async fn asks_for_the_final_text_as_soon_as_the_tail_is_sent() {
+    let (url, seen) = server(|_| None, usize::MAX, None).await;
+    // Two phrases with a long pause between them: one Finalize after each tail.
+    let frames: Vec<_> = (0..10)
+        .map(|i| frame(i, true))
+        .chain((10..40).map(|i| frame(i, false)))
+        .chain((40..50).map(|i| frame(i, true)))
+        .chain((50..70).map(|i| frame(i, false)))
+        .collect();
+    let (_, result) = run(&url, config(), frames, Duration::from_millis(100)).await;
+    result.unwrap();
+    let texts = seen.texts.lock().unwrap();
+    let finalizes = texts.iter().filter(|t| t.contains("Finalize")).count();
+    assert_eq!(finalizes, 2, "{texts:?}");
+}
+
+#[tokio::test]
+async fn sends_a_short_pre_roll_before_speech() {
+    let (url, seen) = server(|_| None, usize::MAX, None).await;
+    // 1 s of silence, then 10 speech frames: the last 300 ms of silence go first.
+    let frames: Vec<_> = (0..20)
+        .map(|i| frame(i, false))
+        .chain((20..30).map(|i| frame(i, true)))
+        .collect();
+    let (_, result) = run(&url, config(), frames, Duration::from_millis(100)).await;
+    result.unwrap();
+    assert_eq!(
+        seen.binary_frames.load(Ordering::SeqCst),
+        sidekick_stt::providers::ws::PRE_ROLL_FRAMES + 10
+    );
 }
 
 #[tokio::test]

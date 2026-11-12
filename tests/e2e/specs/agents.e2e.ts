@@ -7,7 +7,7 @@ import { createAndStart, openTab, selectValue, waitForText } from "../helpers";
  */
 describe("agent Skills and several Skills (PRD SKL-4, SKL-5)", () => {
   it("calculator step, then extra Skills", async () => {
-    await createAndStart("Deal review", "Transcribe me only");
+    await createAndStart("Deal review", "Only me");
     // The Skills list loads after the session starts; selectValue waits for it.
     await selectValue("Skill", "negotiation-coach");
 

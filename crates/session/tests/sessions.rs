@@ -289,6 +289,51 @@ async fn participants_agreed_starts_both_streams() {
 }
 
 #[tokio::test]
+async fn others_only_starts_system_audio_only() {
+    let dir = tempfile::tempdir().unwrap();
+    let audio = recording(dir.path(), false);
+    let sink = Arc::new(Sink::default());
+    let kinds = streams_for(Some(ConsentOption::OthersOnly)).unwrap();
+    let live = LiveSession::start(&kinds, &audio, &plan(), sink.clone()).unwrap();
+    assert_eq!(live.kinds(), [StreamKind::System]);
+    assert!(!live.mic_on());
+    assert!(
+        !live.set_mic(true),
+        "there is no microphone stream to turn on"
+    );
+    tokio::time::sleep(Duration::from_millis(300)).await; // Let the fixture play.
+    live.stop().await;
+    assert_eq!(
+        *audio.started.lock().unwrap(),
+        [StreamKind::System],
+        "the microphone never started"
+    );
+    let segs = sink.segments.lock().unwrap();
+    assert_eq!(segs.len(), 2, "two speech bursts in the fixture");
+    assert!(segs.iter().all(|s| !s.is_user));
+}
+
+#[tokio::test]
+async fn others_only_without_system_audio_fails_and_says_what_to_choose() {
+    let dir = tempfile::tempdir().unwrap();
+    let audio = recording(dir.path(), true);
+    let kinds = streams_for(Some(ConsentOption::OthersOnly)).unwrap();
+    let err = LiveSession::start(&kinds, &audio, &plan(), Arc::new(Sink::default()))
+        .err()
+        .unwrap();
+    assert_eq!(err.code, ErrorCode::PermissionDenied);
+    assert!(
+        err.message.contains("The other people and me"),
+        "{}",
+        err.message
+    );
+    assert!(
+        audio.started.lock().unwrap().is_empty(),
+        "the microphone never started"
+    );
+}
+
+#[tokio::test]
 async fn missing_system_audio_falls_back_to_the_microphone_with_a_warning() {
     let dir = tempfile::tempdir().unwrap();
     let audio = recording(dir.path(), true);
@@ -360,6 +405,39 @@ async fn pause_and_resume_reach_the_capture() {
     assert!(
         segs[1].start_ms > segs[0].end_ms + 100,
         "gap where the pause was: {segs:?}"
+    );
+}
+
+#[tokio::test]
+async fn the_users_own_transcription_turns_off_and_on_and_survives_a_pause() {
+    let dir = tempfile::tempdir().unwrap();
+    let wav = dir.path().join("long.wav");
+    write_wav(&wav, &[(true, 3.0)]);
+    let audio = FixtureAudio {
+        path: wav,
+        pacing: Pacing::RealTime,
+    };
+    let sink = Arc::new(Sink::default());
+    let live = LiveSession::start(&[StreamKind::Mic], &audio, &plan(), sink.clone()).unwrap();
+    assert!(live.mic_on());
+    tokio::time::sleep(Duration::from_millis(300)).await;
+    assert!(live.set_mic(false));
+    assert!(!live.mic_on());
+    // Pausing and resuming the session keeps the user's choice: still off.
+    live.pause();
+    live.resume();
+    tokio::time::sleep(Duration::from_millis(700)).await;
+    assert!(live.set_mic(true));
+    tokio::time::sleep(Duration::from_millis(300)).await;
+    live.stop().await;
+    let segs = sink.segments.lock().unwrap();
+    assert!(segs.len() >= 2, "{segs:?}");
+    // Had resume turned the microphone back on, the speech would be one run
+    // with no gap. The off period was 700 ms of wall time; slow CI runners play
+    // less audio in that time, so only a clear gap is required.
+    assert!(
+        segs[1].start_ms > segs[0].end_ms + 200,
+        "nothing was sent while the user was off: {segs:?}"
     );
 }
 

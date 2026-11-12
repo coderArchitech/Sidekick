@@ -267,8 +267,15 @@ fn upgrading_from_0001_keeps_consent_rows_with_their_title() {
         )
         .unwrap();
     assert_eq!(title, "Old meeting");
+    // Migration 0007 allows the "other people only" choice.
+    db.conn()
+        .execute(
+            "INSERT INTO consent_log (id, session_id, option, confirmed_at) VALUES ('c2', 's1', 'others_only', 6)",
+            [],
+        )
+        .unwrap();
     db.conn()
         .execute("DELETE FROM sessions WHERE id = 's1'", [])
         .unwrap();
-    assert_eq!(count(&db, "consent_log"), 1);
+    assert_eq!(count(&db, "consent_log"), 2);
 }

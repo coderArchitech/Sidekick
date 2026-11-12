@@ -149,6 +149,15 @@ impl SttSink for TauriSttSink {
         .emit(&self.app);
     }
 
+    fn latency(&self, _kind: StreamKind, ms: u64) {
+        // Transcript lag (tech doc 13.1): audio sent to final text received.
+        let state = self.app.state::<crate::state::AppState>();
+        state.diagnostics.record(
+            sidekick_diagnostics::Stage::TranscriptLag,
+            std::time::Duration::from_millis(ms),
+        );
+    }
+
     fn segment(&self, s: Segment) {
         let state = self.app.state::<crate::state::AppState>();
         let id = match sidekick_session::repo::insert_segment(&state.db(), &self.session_id, &s) {

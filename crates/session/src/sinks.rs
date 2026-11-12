@@ -113,6 +113,10 @@ impl SttSink for EchoFilter {
     fn status(&self, kind: StreamKind, status: SttStatus) {
         self.inner.status(kind, status);
     }
+
+    fn latency(&self, kind: StreamKind, ms: u64) {
+        self.inner.latency(kind, ms);
+    }
 }
 
 /// Marks microphone lines as the room, for sessions without system audio.
@@ -141,6 +145,10 @@ impl SttSink for RoomSink {
 
     fn status(&self, kind: StreamKind, status: SttStatus) {
         self.inner.status(kind, status);
+    }
+
+    fn latency(&self, kind: StreamKind, ms: u64) {
+        self.inner.latency(kind, ms);
     }
 }
 

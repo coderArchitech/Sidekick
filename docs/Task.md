@@ -89,6 +89,8 @@ All Phase 0 code and automated tests are done and green on Linux, Windows and ma
 | T-071 | Speech-to-text status in the session bar; silent microphone warning | 🟡 In progress: testing | `stt.status` was emitted but never shown. Adds `silent` for a microphone of digital zeros (missing permission). Deepgram path checked with a live key. Waiting on: the manual check in the installed app (Microphone permission off, then on) |
 | T-072 | Red quit button in the overlay header | ✅ Done | Quits; a live session is ended first, after asking, so notes and summary are saved |
 | T-073 | Keychain prompts after every rebuild; provider dropdowns missing | 🟡 In progress: testing | Each key read once per run; one unreadable key no longer hides the provider dropdowns; keychain reads off the main thread; stable local signing (`pnpm build:mac-local`) keeps Always Allow and Microphone across rebuilds. Waiting on: your check in the signed build |
+| T-074 | Choose who is transcribed: the other people, the other people and me, or only me; a Me switch | 🟡 In progress: testing | New consent choice "The other people only" (system audio, never the microphone; migration 0007). With "The other people and me", a **Me** button turns your own transcription off and on during the session. Waiting on: your check in a real call |
+| T-075 | Speech-to-text latency | 🟡 In progress: testing | Deepgram `Finalize` (AssemblyAI `ForceEndpoint`, Soniox `finalize`) right after each pause, so a line never waits for the next speaker; transcript lag recorded in Diagnostics; questions ending in "?" decided after 250 ms, not 600 ms; 300 ms pre-roll so first words aren't cut. Waiting on: your Diagnostics numbers from a real call |
 | T-040 | Release checklist and first beta | ⬜ To do | 🖥️ |
 
 ### Phase 3: P1 features (ship if time allows)
@@ -717,6 +719,35 @@ Reported after using the app on macOS (2026-11-09). Each fix has unit, component
 - [x] Rust: one read per key across repeated status checks; set and delete keep the cache current; a failed read is retried; one unreadable key keeps the provider list.
 - [x] Local signing: a copy of the app signed with the certificate has the designated requirement `identifier "com.sidekick.app" and certificate root = H"…"`.
 - [ ] Manual: install the signed build, allow the keychain once ("Always Allow") and the Microphone; rebuild and reinstall; no keychain prompt and the microphone still works.
+
+### T-074 Choose who is transcribed; the Me switch
+
+**Refs:** PRD 8 (session start confirmation), LIS-6
+**Why:** in interviews and calls the user mostly wants only the other person transcribed, and sometimes their own voice too. The consent dialog only offered "both" or "only me".
+**Scope**
+- [x] `ConsentOption::OthersOnly` (`others_only`): system audio only, never the microphone; migration 0007 allows it in the consent log. If system audio can't start, the session doesn't fall back to the microphone and says to choose "The other people and me".
+- [x] `LiveSession::set_mic` and the `set_my_transcription` command: with "The other people and me", the user's own transcription turns off and on mid-session; audio while off is discarded; pause and resume keep the choice.
+- [x] Consent dialog: "The other people only", "The other people and me", "Only me". Session bar: a **Me** toggle (`aria-pressed`) and "Listening (others only)".
+
+**Tests**
+- [x] Rust: others-only starts system audio only and has no microphone to switch; without system audio it fails and names the other choice; the Me switch survives a pause and nothing is sent while it is off; the migration keeps rows and accepts `others_only`.
+- [x] Unit and UI: the three choices, others-only streams, the Me toggle and its label; axe on the dialog and the bar.
+- [ ] Manual: a real call with each choice.
+
+### T-075 Speech-to-text latency
+
+**Refs:** PRD 7 (transcript lag under 1 s; cue under 2 s), tech doc 5.4, 13.1
+**Why:** the engine stops sending audio 500 ms after speech ends, and Deepgram only finalizes after it hears 300 ms of silence. With background noise in the meeting audio that silence is never recognised, so the last line stayed interim until someone spoke again. Transcript lag was never measured, so Diagnostics couldn't show it.
+**Scope**
+- [x] `Dialect::finalize`: sent once the tail after speech is sent. Deepgram `{"type":"Finalize"}`, AssemblyAI `{"type":"ForceEndpoint"}`, Soniox `{"type":"finalize"}` (its `<fin>` marker ends the result like `<end>`).
+- [x] Transcript lag: from sending the audio of a result's last word to receiving the final text, recorded per result (`SttSink::latency`, Diagnostics "Transcript lag").
+- [x] 300 ms pre-roll: silence just before speech is sent with it, so the first syllable isn't cut by the volume gate.
+- [x] Question detection: 250 ms after a line ending in "?", 600 ms otherwise.
+
+**Tests**
+- [x] Rust: one Finalize per pause; the pre-roll is sent before speech; lag is reported for each final; Soniox `<fin>` ends a result.
+- [x] Unit: the detector's 250 ms and 600 ms waits.
+- [ ] Manual: a real call; Settings → Diagnostics shows transcript lag under 1 s (p50).
 
 ## Phase 3 details
 

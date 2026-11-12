@@ -1,7 +1,10 @@
 //! The streaming engine every WebSocket STT provider shares: connect with
 //! backoff, buffer audio while (re)connecting (up to 10 s), skip silence apart
-//! from a short tail, keep-alives, replay audio a dropped connection may have
-//! lost, and flush at the end. A [`Dialect`] supplies what differs per
+//! from a short tail (and a short pre-roll before speech, so first syllables
+//! aren't cut), ask the provider to finalize as soon as the tail is sent (so a
+//! line never waits for the next speaker), keep-alives, replay audio a dropped
+//! connection may have lost, report how long each final result took, and flush
+//! at the end. A [`Dialect`] supplies what differs per
 //! provider: URL and auth, the first message, keep-alive and finish messages,
 //! and how to read results.
 
@@ -23,6 +26,9 @@ use crate::{Partial, SttConfig, SttSink, SttStatus};
 
 /// Frames kept while reconnecting (10 s, tech doc 5.4).
 pub const MAX_BUFFER_FRAMES: usize = 200;
+/// Silence sent just before speech starts (300 ms): the volume gate opens a
+/// little after a word begins, and without this its first sound is lost.
+pub const PRE_ROLL_FRAMES: usize = 6;
 const BACKOFF: [Duration; 4] = [
     Duration::from_millis(250),
     Duration::from_millis(500),
@@ -64,6 +70,11 @@ pub trait Dialect: Send + Sync {
     fn keepalive(&self) -> Option<Message>;
     /// Sent when the audio ends, so the provider flushes its last results.
     fn finish(&self) -> Option<Message>;
+    /// Sent when speech pauses (after the tail), so the provider returns the
+    /// final text now instead of waiting for more audio, if it supports it.
+    fn finalize(&self) -> Option<Message> {
+        None
+    }
 }
 
 pub(crate) fn auth_header(
@@ -146,23 +157,47 @@ struct Session<'a> {
     sink: &'a Arc<dyn SttSink>,
     parser: Box<dyn MessageParser>,
     timeline: Timeline,
-    /// Frames since the last speech frame (for the tail).
+    /// Frames since the last speech frame (for the tail). Starts past the
+    /// tail: nothing is sent until someone speaks.
     since_speech: u32,
     last_send: Instant,
+    /// Skipped silence just before now, sent ahead of the next speech.
+    pre_roll: VecDeque<AudioFrame>,
     /// Sent frames not yet covered by a final result, with their provider end
-    /// time. A dropped connection may have lost them, so they're replayed.
-    unfinalized: VecDeque<(u64, AudioFrame)>,
+    /// time and when they were sent. A dropped connection may have lost them,
+    /// so they're replayed.
+    unfinalized: VecDeque<(u64, AudioFrame, Instant)>,
 }
 
 impl Session<'_> {
-    fn should_send(&mut self, frame: &AudioFrame) -> bool {
+    /// Sends `frame` if it is speech or part of the tail after speech; keeps
+    /// other silence as pre-roll. When the tail ends, asks for final results.
+    /// On an error, the frame (and any pre-roll) wasn't sent.
+    async fn offer(&mut self, ws: &mut Ws, frame: &AudioFrame) -> Result<(), tungstenite::Error> {
         if frame.speech {
+            if self.since_speech > self.cfg.tail_frames {
+                while let Some(f) = self.pre_roll.pop_front() {
+                    self.send(ws, &f).await?;
+                }
+            }
             self.since_speech = 0;
-            true
-        } else {
-            self.since_speech = self.since_speech.saturating_add(1);
-            self.since_speech <= self.cfg.tail_frames
+            return self.send(ws, frame).await;
         }
+        self.since_speech = self.since_speech.saturating_add(1);
+        if self.since_speech <= self.cfg.tail_frames {
+            self.send(ws, frame).await?;
+            if self.since_speech == self.cfg.tail_frames
+                && let Some(m) = self.dialect.finalize()
+            {
+                ws.send(m).await?;
+            }
+            return Ok(());
+        }
+        if self.pre_roll.len() == PRE_ROLL_FRAMES {
+            self.pre_roll.pop_front();
+        }
+        self.pre_roll.push_back(frame.clone());
+        Ok(())
     }
 
     async fn send(&mut self, ws: &mut Ws, frame: &AudioFrame) -> Result<(), tungstenite::Error> {
@@ -173,7 +208,7 @@ impl Session<'_> {
             self.unfinalized.pop_front();
         }
         self.unfinalized
-            .push_back((self.timeline.sent_ms(), frame.clone()));
+            .push_back((self.timeline.sent_ms(), frame.clone(), self.last_send));
         Ok(())
     }
 
@@ -194,10 +229,20 @@ impl Session<'_> {
                     text: t,
                 }),
                 Parsed::Final { words, confidence } => {
-                    // Audio up to the end of this result is transcribed; stop keeping it.
+                    // Audio up to the end of this result is transcribed; stop
+                    // keeping it. The last word's audio was sent at `sent`, so
+                    // the provider took `sent.elapsed()` to finalize it.
                     if let Some(end) = words.last().map(|w| w.end_ms) {
-                        while self.unfinalized.front().is_some_and(|(e, _)| *e <= end) {
-                            self.unfinalized.pop_front();
+                        let mut sent = None;
+                        while self.unfinalized.front().is_some_and(|(e, _, _)| *e <= end) {
+                            sent = self.unfinalized.pop_front().map(|(_, _, at)| at);
+                        }
+                        if let Some(at) =
+                            sent.or_else(|| self.unfinalized.front().map(|(_, _, at)| *at))
+                        {
+                            #[allow(clippy::cast_possible_truncation)]
+                            self.sink
+                                .latency(self.cfg.kind, at.elapsed().as_millis() as u64);
                         }
                     }
                     for mut seg in speakers::split(self.cfg.kind, &words, confidence) {
@@ -230,7 +275,7 @@ impl Session<'_> {
     ) -> Ended {
         // Replay audio captured while disconnected.
         while let Some(f) = buffered.pop_front() {
-            if self.should_send(&f) && self.send(ws, &f).await.is_err() {
+            if self.offer(ws, &f).await.is_err() {
                 buffered.push_front(f);
                 return Ended::Dropped;
             }
@@ -244,7 +289,7 @@ impl Session<'_> {
                 }
                 frame = frames.recv() => match frame {
                     Some(f) => {
-                        if self.should_send(&f) && self.send(ws, &f).await.is_err() {
+                        if self.offer(ws, &f).await.is_err() {
                             buffered.push_back(f);
                             return Ended::Dropped;
                         }
@@ -366,6 +411,7 @@ pub async fn run(
             timeline: Timeline::default(),
             since_speech: u32::MAX,
             last_send: Instant::now(),
+            pre_roll: VecDeque::new(),
             unfinalized: VecDeque::new(),
         };
         match session
@@ -380,7 +426,7 @@ pub async fn run(
             Ended::Dropped => {
                 tracing::warn!(target: "stt", provider = dialect.name(), ?kind, replay = session.unfinalized.len(), "connection dropped; reconnecting");
                 // Replay audio the provider may not have transcribed, before newer buffered audio.
-                for (_, f) in session.unfinalized.drain(..).rev() {
+                for (_, f, _) in session.unfinalized.drain(..).rev() {
                     buffered.push_front(f);
                 }
                 while buffered.len() > MAX_BUFFER_FRAMES {

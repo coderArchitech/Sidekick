@@ -12,8 +12,7 @@ export async function startSession(
   page: Page,
   title = "Design review",
   consent:
-    | "Participants know and agree to transcription"
-    | "Transcribe me only" = "Participants know and agree to transcription",
+    "The other people only" | "The other people and me" | "Only me" = "The other people and me",
 ) {
   await page.getByLabel("Session name").fill(title);
   await page.getByRole("button", { name: "New session" }).click();

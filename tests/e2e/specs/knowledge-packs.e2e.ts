@@ -37,7 +37,7 @@ describe("Knowledge Packs and brief (PRD CTX-4, CTX-5)", () => {
     await waitForText(packs, "1/1 ready", 30_000);
     await browser.tauri.switchWindow("overlay");
 
-    await createAndStart("Pack review", "Transcribe me only");
+    await createAndStart("Pack review", "Only me");
     await $("button*=Documents (").click();
     const box = await $('input[aria-label="Use E2E pack in this session"]');
     await box.waitForExist();

@@ -272,7 +272,7 @@ Sidekick records and processes other people's voices, so consent and transparenc
 **Recording consent.** Laws differ by country and state. Many US states, parts of the EU (under GDPR), and company policies require all participants to consent to recording or transcription. India's DPDP Act 2023 also governs processing of personal data, including voice.
 
 - Before each session starts, the user confirms that participants are aware of and agree to transcription. Sidekick does not send or post any notice on the user's behalf.
-- Offer a "Transcribe me only" mode (microphone only) for situations where others have not agreed.
+- Offer an "Only me" mode (microphone only) for situations where others have not agreed, and a "The other people only" mode (meeting audio only, never the microphone).
 
 **Minimum disclosure before a session (proposed).** Sidekick should not start transcribing other people until the user has confirmed consent for that session.
 
@@ -280,7 +280,7 @@ Why this is needed: in "one-party consent" places (US federal law and most US st
 
 Proposed minimum (to be confirmed with legal counsel before launch):
 
-1. **Session start confirmation (required):** before listening begins, the user confirms "Participants are aware of and agree to transcription", or picks "Transcribe me only". Listening to others does not start without this confirmation.
+1. **Session start confirmation (required):** before listening begins, the user picks who is transcribed: "The other people only" or "The other people and me" (both confirm that participants are aware of and agree to transcription), or "Only me". Listening to others does not start without this confirmation.
 2. **No automatic notice:** informing participants is the user's responsibility; Sidekick does not post or send messages into the meeting.
 3. **Local consent log:** Sidekick records the confirmation for each session (date, option chosen) on the device, so the user can show it later if asked.
 

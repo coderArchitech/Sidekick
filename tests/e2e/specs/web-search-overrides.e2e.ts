@@ -47,7 +47,7 @@ describe("web search and per-session providers (PRD KEY-8, KEY-9)", () => {
     await $('input[placeholder="New session name"]').setValue("Market call");
     await $("button=New session").click();
     await $("button=Start").click();
-    await $("aria/Transcribe me only").click();
+    await $("aria/Only me").click();
     await $("button=Start listening").click();
     await $("button=Pause").waitForDisplayed();
 

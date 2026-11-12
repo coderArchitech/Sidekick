@@ -28,7 +28,7 @@ test("a session with its own providers; an agent searches the web", async ({ pag
   await page.getByRole("button", { name: "New session" }).click();
   await page.getByRole("button", { name: "Start", exact: true }).click();
   const dialog = page.getByRole("dialog", { name: "Before Sidekick listens" });
-  await dialog.getByLabel("Transcribe me only").check();
+  await dialog.getByLabel("Only me").check();
   await dialog.getByRole("button", { name: "Start listening" }).click();
 
   const stored = await page.evaluate(async () => {

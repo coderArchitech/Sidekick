@@ -21,13 +21,19 @@ describe("QuestionDetector", () => {
   });
   afterEach(() => vi.useRealTimers());
 
-  it("waits 600 ms after a segment ends before deciding", () => {
+  it("decides 250 ms after a line ending in '?', and 600 ms after any other line", () => {
     d.push(seg("What's the rate limit for the Pro tier?"));
-    vi.advanceTimersByTime(599);
+    vi.advanceTimersByTime(249);
     expect(found).toHaveLength(0);
     vi.advanceTimersByTime(1);
     expect(found).toHaveLength(1);
     expect(found[0]?.directed).toBe(false);
+
+    d.push(seg("Walk me through how you would design a URL shortener"));
+    vi.advanceTimersByTime(599);
+    expect(found).toHaveLength(1);
+    vi.advanceTimersByTime(1);
+    expect(found).toHaveLength(2);
   });
 
   it("merges a question split across segments of the same speaker", () => {
