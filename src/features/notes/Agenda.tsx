@@ -45,7 +45,7 @@ export function Agenda({ sessionId, notes }: { sessionId: string; notes: Notes |
   return (
     <section aria-label="Agenda" className="card space-y-2 p-2.5">
       <div className="flex items-center gap-2">
-        <h2 className="text-sm font-semibold text-fg">Agenda</h2>
+        <h2 className="heading text-lg text-fg">Agenda</h2>
         {agenda.length > 0 && (
           <span className="text-xs text-fg-muted tabular">
             {covered}/{agenda.length} covered

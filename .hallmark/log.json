@@ -1,0 +1,28 @@
+[
+ {
+  "mode": "redesign",
+  "depth": "restyle",
+  "scope": "app",
+  "shape": "app screen",
+  "theme": "darkroom",
+  "axes": "dark/display-condensed/chromatic-amber",
+  "hero": "none (app)",
+  "nav": "kept",
+  "footer": "none (app)",
+  "imagery": "none",
+  "photos": [],
+  "entry": "kept",
+  "fingerprint": "darkroom-amber-app-restyle",
+  "sections": [
+   "overlay",
+   "settings",
+   "recovery"
+  ],
+  "signature": "condensed SIDEKICK wordmark over warm print-black glass, one amber safelight",
+  "waived": [
+   "39b"
+  ],
+  "prompt": "a desktop meeting copilot overlay: live transcript, detected questions and answers, notes, settings",
+  "date": "2026-11-11"
+ }
+]

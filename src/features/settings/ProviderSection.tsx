@@ -73,7 +73,7 @@ export function ProviderSection({ kind, title, description, choice, allowOff, on
 
   return (
     <section aria-labelledby={`${providerSelectId}-heading`} className="card p-4">
-      <h2 id={`${providerSelectId}-heading`} className="text-base font-semibold">
+      <h2 id={`${providerSelectId}-heading`} className="heading text-xl">
         {title}
       </h2>
       <p className="mb-3 text-sm text-fg-muted">{description}</p>

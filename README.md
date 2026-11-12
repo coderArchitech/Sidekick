@@ -51,7 +51,7 @@ The technical doc is the single source of truth for engineering: when code and d
 
 - **Desktop app:** Tauri 2 for Windows and macOS (Linux builds and runs for development and CI).
 - **Core:** Rust, as a Cargo workspace with one crate per module (`crates/`): audio, speech-to-text, gateway (LLM providers), ingest, retrieval, store (SQLCipher + sqlite-vec), sessions, skills, capture, settings, diagnostics and more.
-- **UI:** React 19 + TypeScript, Tailwind CSS 4 with design tokens, Zustand, Inter.
+- **UI:** React 19 + TypeScript, Tailwind CSS 4 with design tokens, Zustand, Barlow and Sofia Sans Extra Condensed.
 - **IPC:** typed commands and events generated from Rust with tauri-specta (`src/ipc/bindings.ts`).
 - **No hosted backend:** the app calls the providers you choose directly, with your own keys.
 - **Tests:** `cargo test`, Vitest + React Testing Library, Playwright with axe, WebdriverIO.
@@ -338,7 +338,7 @@ The full tree is in [section 7.1](docs/TECHNICAL.md#71-repository-structure).
 
 ## Design system
 
-The UI uses a dark graphite theme with an indigo accent and the [Inter](https://rsms.me/inter/) typeface (bundled, so it works offline). Colours, fonts and shared component styles are defined once, as semantic tokens in [`src/styles.css`](src/styles.css): `surface`, `line`, `fg`, `accent`, `success` and so on, plus `btn`, `field`, `card` and `badge` classes. Components use only these, so the theme changes in one place. Every text colour meets WCAG AA contrast, and the UI test suite checks it. The overlay is glass: a dark translucent panel, so the call or slides behind it stay visible, with the background opacity (20–100%, default 80%) under **View**; only the tint changes, text stays crisp. Details are in [technical doc section 7.2](docs/TECHNICAL.md#72-coding-standards).
+The UI uses the Hallmark **Darkroom** theme: a warm print-black ground, fibre-white text, one amber accent for the main action and the current selection, square corners, [Barlow](https://fonts.google.com/specimen/Barlow) for text and [Sofia Sans Extra Condensed](https://fonts.google.com/specimen/Sofia+Sans+Extra+Condensed) capitals for headings (both bundled, so they work offline). Light and high-contrast variants are under Settings → Appearance. Colours, fonts and shared component styles are defined once, as semantic tokens in [`src/styles.css`](src/styles.css): `surface`, `line`, `fg`, `accent`, `success` and so on, plus `btn`, `field`, `card` and `badge` classes. Components use only these, so the theme changes in one place. Every text colour meets WCAG AA contrast, and the UI test suite checks it. The overlay is glass: a translucent panel, so the call or slides behind it stay visible, with the background opacity (20–100%, default 80%) under **View**; only the tint changes, text stays crisp. Details are in [technical doc section 7.2](docs/TECHNICAL.md#72-coding-standards).
 
 ## Contributing
 

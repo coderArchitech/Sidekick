@@ -45,14 +45,14 @@ export function ConsentDialog({ onConfirm, onCancel }: Props) {
   }, [onCancel]);
 
   return (
-    <div className="fixed inset-0 z-10 flex items-center justify-center bg-black/60 p-3">
+    <div className="fixed inset-0 z-10 flex items-center justify-center bg-scrim p-3">
       <div
         role="dialog"
         aria-modal="true"
         aria-labelledby={titleId}
         className="w-full max-w-sm rounded-lg border border-line bg-popover p-4 text-sm"
       >
-        <h2 id={titleId} className="text-base font-semibold">
+        <h2 id={titleId} className="heading text-xl">
           Before Sidekick listens
         </h2>
         <p className="mt-1 text-fg-muted">

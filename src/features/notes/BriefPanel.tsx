@@ -56,7 +56,7 @@ export function BriefPanel({ sessionId }: { sessionId: string }) {
             {open ? "▾" : "▸"} Pre-meeting brief
           </button>
         ) : (
-          <h2 className="text-sm font-semibold text-fg">Pre-meeting brief</h2>
+          <h2 className="heading text-lg text-fg">Pre-meeting brief</h2>
         )}
         <button
           type="button"

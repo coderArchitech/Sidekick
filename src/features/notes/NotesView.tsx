@@ -47,7 +47,7 @@ export function NotesView() {
 
       {notes?.summaryMd && (
         <section aria-label="Summary" className="rounded-lg border border-line p-2">
-          <h2 className="text-sm font-semibold text-fg">Summary</h2>
+          <h2 className="heading text-lg text-fg">Summary</h2>
           <div className="text-sm text-fg-2">
             <Markdown text={notes.summaryMd} />
           </div>

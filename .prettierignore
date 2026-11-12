@@ -7,3 +7,6 @@ docs/PRD.md
 docs/TECHNICAL.md
 docs/Task.md
 docs/phase-0-manual-checks.md
+# Third-party Claude Code skills, kept as published
+.claude/skills
+.hallmark

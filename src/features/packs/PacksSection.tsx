@@ -72,7 +72,7 @@ export function PacksSection() {
   return (
     <section aria-labelledby={headingId} className="space-y-3">
       <div>
-        <h2 id={headingId} className="text-base font-semibold text-fg">
+        <h2 id={headingId} className="heading text-xl text-fg">
           Knowledge Packs
         </h2>
         <p className="text-sm text-fg-muted">

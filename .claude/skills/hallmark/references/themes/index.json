@@ -1,0 +1,55 @@
+{
+ "themes": [
+  {
+   "name": "Darkroom",
+   "slug": "darkroom",
+   "genre": "atmospheric",
+   "posture": "restrained",
+   "paper": {
+    "band": "dark",
+    "L": 12.5,
+    "hue": 55
+   },
+   "display": {
+    "class": "display-condensed",
+    "face": "Sofia Sans Extra Condensed"
+   },
+   "accent": {
+    "band": "chromatic-amber",
+    "hue": 58
+   },
+   "keywords": [
+    "photographer",
+    "photography",
+    "film",
+    "analogue",
+    "darkroom",
+    "prints",
+    "portfolio",
+    "exhibition",
+    "gallery",
+    "edition",
+    "commission",
+    "cinematographer",
+    "negative",
+    "archive",
+    "monochrome",
+    "lab",
+    "moody",
+    "black and white",
+    "night",
+    "print shop",
+    "travel",
+    "places",
+    "landscape",
+    "portrait",
+    "photo studio"
+   ],
+   "material": "warm print-black ground, a fine light grain, fibre-white ink, hairline Sofia Sans Extra Condensed capitals over Barlow, zero radius, black-and-white photographs printed deeper than the ground, one amber safelight",
+   "file": "references/themes/darkroom.md",
+   "photo": "mono high=-20 shad=-12",
+   "pictured": "Photographic, Poster hero",
+   "picture": "references/themes/darkroom.jpg"
+  }
+ ]
+}

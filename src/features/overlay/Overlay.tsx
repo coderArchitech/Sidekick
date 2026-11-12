@@ -89,11 +89,11 @@ export function Overlay() {
         <span data-tauri-drag-region className="flex min-w-0 items-center gap-2">
           <span
             aria-hidden="true"
-            className="grid h-5 w-5 shrink-0 place-items-center rounded-md bg-gradient-to-br from-accent-text to-accent text-[11px] font-bold text-white"
+            className="grid h-5 w-5 shrink-0 place-items-center bg-accent font-display text-sm leading-none text-accent-ink"
           >
             S
           </span>
-          <span className="text-sm font-semibold tracking-tight">Sidekick</span>
+          <span className="wordmark">Sidekick</span>
           {!compact && info && (
             <span className="text-[11px] whitespace-nowrap text-fg-muted">v{info.version}</span>
           )}

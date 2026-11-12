@@ -29,7 +29,17 @@ const boundaries = {
 };
 
 export default tseslint.config(
-  { ignores: ["dist", "target", "src-tauri", "crates", "src/ipc/bindings.ts", "coverage"] },
+  {
+    ignores: [
+      "dist",
+      "target",
+      "src-tauri",
+      "crates",
+      "src/ipc/bindings.ts",
+      "coverage",
+      ".claude/skills",
+    ],
+  },
   js.configs.recommended,
   ...tseslint.configs.strict,
   jsxA11y.flatConfigs.recommended,
