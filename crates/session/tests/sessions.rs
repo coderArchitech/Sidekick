@@ -426,17 +426,23 @@ async fn the_users_own_transcription_turns_off_and_on_and_survives_a_pause() {
     // Pausing and resuming the session keeps the user's choice: still off.
     live.pause();
     live.resume();
+    assert!(
+        !live.mic_on(),
+        "resume must not turn the user's voice back on"
+    );
     tokio::time::sleep(Duration::from_millis(700)).await;
     assert!(live.set_mic(true));
     tokio::time::sleep(Duration::from_millis(300)).await;
     live.stop().await;
     let segs = sink.segments.lock().unwrap();
     assert!(segs.len() >= 2, "{segs:?}");
-    // Had resume turned the microphone back on, the speech would be one run
-    // with no gap. The off period was 700 ms of wall time; slow CI runners play
-    // less audio in that time, so only a clear gap is required.
+    // The mock starts a new segment wherever frames are missing. Had resume
+    // turned the microphone back on, pause and resume (back to back) would drop
+    // at most one 50 ms frame. The off period is 700 ms of wall time, but slow
+    // CI runners play much less audio in it (macOS has shown 200 ms), so the
+    // bar sits between the two: more than two frames missing.
     assert!(
-        segs[1].start_ms > segs[0].end_ms + 200,
+        segs[1].start_ms >= segs[0].end_ms + 100,
         "nothing was sent while the user was off: {segs:?}"
     );
 }
