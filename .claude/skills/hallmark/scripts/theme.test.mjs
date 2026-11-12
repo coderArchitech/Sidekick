@@ -7,7 +7,7 @@ import { fileURLToPath } from 'node:url';
 import test from 'node:test';
 
 test('validate accepts a theme with either LF or CRLF line endings', () => {
-  const source = readFileSync(new URL('../references/themes/hum.md', import.meta.url), 'utf8').replace(/\r\n/g, '\n');
+  const source = readFileSync(new URL('../references/themes/darkroom.md', import.meta.url), 'utf8').replace(/\r\n/g, '\n');
   const cli = fileURLToPath(new URL('./theme.mjs', import.meta.url));
   const dir = mkdtempSync(join(tmpdir(), 'hallmark-theme-'));
   try {
@@ -17,7 +17,7 @@ test('validate accepts a theme with either LF or CRLF line endings', () => {
       writeFileSync(file, text);
       const result = spawnSync(process.execPath, [cli, 'validate', file], { encoding: 'utf8' });
       assert.equal(result.status, 0, `${name}: ${result.stdout}${result.stderr}`);
-      assert.match(result.stdout, /: ok \(Hum,/);
+      assert.match(result.stdout, /: ok \(Darkroom,/);
     }
   } finally {
     rmSync(dir, { recursive: true, force: true });
@@ -25,7 +25,7 @@ test('validate accepts a theme with either LF or CRLF line endings', () => {
 });
 
 test('validate rejects an invalid Build hint in a CRLF file, like it does in LF', () => {
-  const source = readFileSync(new URL('../references/themes/hum.md', import.meta.url), 'utf8').replace(/\r\n/g, '\n');
+  const source = readFileSync(new URL('../references/themes/darkroom.md', import.meta.url), 'utf8').replace(/\r\n/g, '\n');
   const at = source.indexOf('```css', source.indexOf('## Build hint')) + '```css\n'.length;
   const bad = `${source.slice(0, at)}  color: black;\n${source.slice(at)}`;
   const cli = fileURLToPath(new URL('./theme.mjs', import.meta.url));

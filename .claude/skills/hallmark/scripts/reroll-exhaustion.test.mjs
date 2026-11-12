@@ -28,7 +28,8 @@ for (const n of [1, 3]) {
   }));
 }
 
-test('normal first and next hands retain three different themes', () => fixture(run => {
+// Skipped: this repo keeps only the Darkroom theme, so there are not six themes to deal.
+test('normal first and next hands retain three different themes', { skip: 'only one theme is kept' }, () => fixture(run => {
   const first = run(0), next = run(1);
   assert.ifError(first.error); assert.ifError(next.error);
   assert.equal(first.status, 0, first.stderr);
