@@ -7,6 +7,14 @@ import negotiationCoach from "../../skills/templates/negotiation-coach.md?raw";
 import salesDiscovery from "../../skills/templates/sales-discovery.md?raw";
 import staffEngineerInterview from "../../skills/templates/staff-engineer-interview.md?raw";
 import teacher from "../../skills/templates/teacher.md?raw";
+import dsaInterview from "../../skills/templates/dsa-interview.md?raw";
+import systemDesignBackend from "../../skills/templates/system-design-backend.md?raw";
+import systemDesignFrontend from "../../skills/templates/system-design-frontend.md?raw";
+import aiInterview from "../../skills/templates/ai-interview.md?raw";
+import behaviouralInterview from "../../skills/templates/behavioural-interview.md?raw";
+import managerialInterview from "../../skills/templates/managerial-interview.md?raw";
+import marketingMeeting from "../../skills/templates/marketing-meeting.md?raw";
+import designDiscussion from "../../skills/templates/design-discussion.md?raw";
 import technicalArchitect from "../../skills/templates/technical-architect.md?raw";
 import type {
   AnswerFormat,
@@ -25,6 +33,14 @@ const TEMPLATE_TEXT = [
   teacher,
   negotiationCoach,
   staffEngineerInterview,
+  dsaInterview,
+  systemDesignBackend,
+  systemDesignFrontend,
+  aiInterview,
+  behaviouralInterview,
+  managerialInterview,
+  marketingMeeting,
+  designDiscussion,
 ];
 export const TOOLS: Tool[] = ["doc_search", "web_search", "calculator"];
 export const TRIGGERS: Trigger[] = ["question_detected", "chat", "screenshot"];

@@ -143,16 +143,24 @@ describe("auto-answer shortcut", () => {
     render(<Harness />);
     await tick();
     const ids: (string | null)[] = [];
-    for (let i = 0; i < 7; i++) {
+    for (let i = 0; i < 15; i++) {
       mockSessionBus.emit("hotkey", { action: "switch_skill" });
       await tick(40);
       ids.push(useSessionStore.getState().session?.skillId ?? null);
     }
     expect(ids).toEqual([
+      "ai-interview",
+      "behavioural-interview",
+      "design-discussion",
+      "dsa-interview",
       "interview-coach",
+      "managerial-interview",
+      "marketing-meeting",
       "negotiation-coach",
       "sales-discovery",
       "staff-engineer-interview",
+      "system-design-backend",
+      "system-design-frontend",
       "teacher",
       "technical-architect",
       null,

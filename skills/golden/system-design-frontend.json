@@ -1,0 +1,12 @@
+{
+  "skill": "system-design-frontend",
+  "question": "Design the frontend for an autocomplete search box.",
+  "documents": [
+    {
+      "name": "interview-notes.md",
+      "text": "Frontend system design round: the interviewer cares about performance, accessibility, state management and the component API."
+    }
+  ],
+  "mustMention": ["debounce", "aria", "cache"],
+  "mustNotMention": []
+}

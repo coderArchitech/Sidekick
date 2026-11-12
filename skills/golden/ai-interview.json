@@ -1,0 +1,12 @@
+{
+  "skill": "ai-interview",
+  "question": "How would you design a retrieval-augmented generation system over our internal documents?",
+  "documents": [
+    {
+      "name": "interview-notes.md",
+      "text": "AI engineering round: questions on RAG, embeddings, chunking, evaluation, cost and latency."
+    }
+  ],
+  "mustMention": ["chunk", "embedding", "evaluat"],
+  "mustNotMention": []
+}

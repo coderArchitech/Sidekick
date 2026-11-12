@@ -1,0 +1,12 @@
+{
+  "skill": "design-discussion",
+  "question": "Should the notification service call the email provider directly or go through a queue?",
+  "documents": [
+    {
+      "name": "rfc-notifications.md",
+      "text": "RFC: notifications for 2 million users a day; the email provider has occasional outages and rate limits of 100 requests per second."
+    }
+  ],
+  "mustMention": ["queue", "retr"],
+  "mustNotMention": []
+}

@@ -91,6 +91,7 @@ All Phase 0 code and automated tests are done and green on Linux, Windows and ma
 | T-073 | Keychain prompts after every rebuild; provider dropdowns missing | 🟡 In progress: testing | Each key read once per run; one unreadable key no longer hides the provider dropdowns; keychain reads off the main thread; stable local signing (`pnpm build:mac-local`) keeps Always Allow and Microphone across rebuilds. Waiting on: your check in the signed build |
 | T-074 | Choose who is transcribed: the other people, the other people and me, or only me; a Me switch | 🟡 In progress: testing | New consent choice "The other people only" (system audio, never the microphone; migration 0007). With "The other people and me", a **Me** button turns your own transcription off and on during the session. Waiting on: your check in a real call |
 | T-075 | Speech-to-text latency | 🟡 In progress: testing | Deepgram `Finalize` (AssemblyAI `ForceEndpoint`, Soniox `finalize`) right after each pause, so a line never waits for the next speaker; transcript lag recorded in Diagnostics; questions ending in "?" decided after 250 ms, not 600 ms; 300 ms pre-roll so first words aren't cut. Waiting on: your Diagnostics numbers from a real call |
+| T-076 | Interview round and meeting Skills | 🟡 In progress: testing | 8 new built-in Skills, code in JavaScript: DS & Algo (brute force and optimal, each with complexity), System Design Backend and Frontend (FR, NFR, estimates, APIs, data model, simple and scaled design, trade-offs), AI Engineering, Behavioural, Managerial, Marketing Meeting, Design Discussion. Added once to existing installs. Needs a live-model check (T-039) |
 | T-040 | Release checklist and first beta | ⬜ To do | 🖥️ |
 
 ### Phase 3: P1 features (ship if time allows)
@@ -748,6 +749,23 @@ Reported after using the app on macOS (2026-11-09). Each fix has unit, component
 - [x] Rust: one Finalize per pause; the pre-roll is sent before speech; lag is reported for each final; Soniox `<fin>` ends a result.
 - [x] Unit: the detector's 250 ms and 600 ms waits.
 - [ ] Manual: a real call; Settings → Diagnostics shows transcript lag under 1 s (p50).
+
+### T-076 Interview round and meeting Skills
+
+**Refs:** PRD SKL-3, tech doc 4 (`skills`)
+**Why:** the user practises mock interviews round by round and joins marketing and design meetings; one general interview Skill didn't ask for what each round is judged on.
+**Scope**
+- [x] `dsa-interview` (DS & Algo Round (JS)): restate and clarify, then Approach 1 brute force (the most expensive) and Approach 2 optimal (the least expensive), each with complete JavaScript, time and space complexity and why; a comparison table, a dry run, edge cases with `console.assert` tests, follow-ups; DP as recurrence, memoized, tabulated, space-optimised.
+- [x] `system-design-backend` and `system-design-frontend`: clarify, functional and non-functional requirements, back-of-the-envelope estimates with the calculator, API, data model (backend) or component API and state (frontend), architecture, Design A (cheapest) and Design B (scales) with when to switch, deep dives, reliability, security, accessibility (frontend), trade-offs; JavaScript examples.
+- [x] `ai-interview` (AI Engineering Interview (JS)): concepts, RAG and agent design with a simple and a production-grade approach, estimates of tokens and cost, evaluation, prompt injection, operations; JavaScript code.
+- [x] `behavioural-interview` (STAR+L, short and full versions, follow-ups, never invents stories: placeholders when the documents have none), `managerial-interview` (quick answer, framework, STAR example, pitfalls, a question back).
+- [x] `marketing-meeting` (quick win and bigger bet, CAC, LTV, ROAS worked out, plan, measurement, next steps; web search when a provider is set) and `design-discussion` (FR and NFR check, simple vs scalable option with a comparison table, risks as questions, decision and next steps).
+- [x] Added once to existing installs, like T-066 (`skills.seededTemplates`); a deleted built-in stays deleted.
+
+**Tests**
+- [x] Rust: 14 templates validate; one golden case each; an install with the first five gets the nine newer ones once; each round Skill asks for what its round is judged on.
+- [x] Unit: Settings lists the 14 by name; the Skill picker and the Switch Skill shortcut cycle through them.
+- [ ] Live models (T-039): the golden questions answered in the expected shape.
 
 ## Phase 3 details
 
