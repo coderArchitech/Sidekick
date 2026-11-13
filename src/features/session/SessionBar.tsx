@@ -108,8 +108,9 @@ export function SessionBar() {
           {showOptions && <ProviderOverrides value={overrides} onChange={setOverrides} />}
         </form>
       ) : (
-        <div className="flex items-center gap-2">
-          <span className="min-w-0 flex-1 truncate font-medium" title={session.title}>
+        // Wraps rather than overflowing at the overlay's narrow default width.
+        <div className="flex flex-wrap items-center gap-2">
+          <span className="min-w-0 basis-full truncate font-medium" title={session.title}>
             {session.title}
           </span>
           {session.status === "draft" && (

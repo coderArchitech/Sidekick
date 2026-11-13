@@ -36,6 +36,20 @@ if (
   !("__TAURI_INTERNALS__" in window) &&
   import.meta.env.MODE === "uitest"
 ) {
+  // Options set before the app loads (page.addInitScript), e.g. the README
+  // screenshots' canned replies and version.
+  const preset = (
+    window as unknown as {
+      __sidekickMockOptions?: Partial<typeof mockOptions> & {
+        protection?: typeof mockProtection.status;
+      };
+    }
+  ).__sidekickMockOptions;
+  if (preset) {
+    const { protection, ...options } = preset;
+    Object.assign(mockOptions, options);
+    if (protection) mockProtection.status = protection;
+  }
   (window as unknown as { __sidekickTest: unknown }).__sidekickTest = {
     commands: mockCommands,
     sessionBus: mockSessionBus,
@@ -43,6 +57,7 @@ if (
     files: mockFiles,
     skills: mockSkills,
     protection: mockProtection,
+    options: mockOptions,
   };
 }
 import type { SessionEvents } from "./sessionEvents";
