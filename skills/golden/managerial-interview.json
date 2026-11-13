@@ -1,0 +1,12 @@
+{
+  "skill": "managerial-interview",
+  "question": "How do you handle an engineer who keeps missing deadlines?",
+  "documents": [
+    {
+      "name": "resume.md",
+      "text": "Engineering manager for a team of eight; introduced weekly 1:1s and written growth plans; two engineers promoted in 2025."
+    }
+  ],
+  "mustMention": ["expectations", "1:1"],
+  "mustNotMention": []
+}

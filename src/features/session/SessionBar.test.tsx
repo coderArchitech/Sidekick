@@ -227,7 +227,7 @@ describe("Auto-answer toggle", () => {
     render(<SessionBar />);
     await createSession(user);
     const picker = screen.getByRole("combobox", { name: "Skill" });
-    await waitFor(async () => expect(await optionsOf(user, picker)).toHaveLength(6));
+    await waitFor(async () => expect(await optionsOf(user, picker)).toHaveLength(14));
     expect((await optionsOf(user, picker)).map((o) => o.label)).not.toContain("Teacher");
     await choose(user, picker, "sales-discovery");
     await waitFor(() =>

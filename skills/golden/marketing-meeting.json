@@ -1,0 +1,12 @@
+{
+  "skill": "marketing-meeting",
+  "question": "Should we spend the extra 20,000 dollars on paid social or on email for the launch?",
+  "documents": [
+    {
+      "name": "launch-plan.md",
+      "text": "Q3 launch: email list of 50,000 with a 4% click rate; paid social CPC is 2 dollars with a 3% conversion to trial."
+    }
+  ],
+  "mustMention": ["CAC", "email"],
+  "mustNotMention": []
+}

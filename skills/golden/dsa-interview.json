@@ -1,0 +1,12 @@
+{
+  "skill": "dsa-interview",
+  "question": "Given an array of integers and a target, return the indices of the two numbers that add up to the target.",
+  "documents": [
+    {
+      "name": "interview-notes.md",
+      "text": "DSA round: the interviewer expects a brute-force solution first, then an optimal one, in JavaScript, with time and space complexity for both."
+    }
+  ],
+  "mustMention": ["O(n^2)", "O(n)", "Map"],
+  "mustNotMention": []
+}

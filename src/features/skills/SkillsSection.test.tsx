@@ -9,7 +9,7 @@ async function renderSection() {
   const user = userEvent.setup();
   render(<SkillsSection />);
   const list = await screen.findByRole("list", { name: "Your Skills" });
-  await waitFor(() => expect(within(list).getAllByRole("listitem")).toHaveLength(6));
+  await waitFor(() => expect(within(list).getAllByRole("listitem")).toHaveLength(14));
   return { user, list };
 }
 
@@ -24,10 +24,18 @@ describe("Skills in Settings", () => {
   it("lists the built-in templates by name", async () => {
     const { list } = await renderSection();
     expect(names(list)).toEqual([
+      "AI Engineering Interview (JS)",
+      "Behavioural Round",
+      "Design Discussion",
+      "DS & Algo Round (JS)",
       "Interview Coach",
+      "Managerial Round",
+      "Marketing Meeting",
       "Negotiation Coach",
       "Sales Discovery",
       "Staff Engineer Interview (JS)",
+      "System Design Round - Backend (JS)",
+      "System Design Round - Frontend (JS)",
       "Teacher",
       "Technical Architect",
     ]);
@@ -69,7 +77,7 @@ describe("Skills in Settings", () => {
     expect(
       within(form).getByText("Write the instructions below the front matter."),
     ).toBeInTheDocument();
-    expect(mockSkills.list()).toHaveLength(6);
+    expect(mockSkills.list()).toHaveLength(14);
   });
 
   it("edits a Skill in place", async () => {

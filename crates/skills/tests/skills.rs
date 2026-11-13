@@ -13,14 +13,16 @@ fn db() -> Database {
 
 #[test]
 fn every_template_validates_and_matches_its_file_name() {
-    assert_eq!(TEMPLATES.len(), 6);
+    assert_eq!(TEMPLATES.len(), 14);
     for (id, text) in TEMPLATES {
         let s = format::validate(text).unwrap_or_else(|e| panic!("{id}: {e:?}"));
         assert_eq!(s.id, *id);
         assert!(!s.instructions.is_empty());
+        // Web search (T-046) only where answers need outside facts; it stays
+        // off until the user picks a search provider.
         assert!(
-            s.tools.iter().all(|t| *t != Tool::WebSearch),
-            "{id}: no web search until T-046"
+            s.tools.iter().all(|t| *t != Tool::WebSearch) || *id == "marketing-meeting",
+            "{id}: no web search"
         );
     }
 }
@@ -45,7 +47,7 @@ fn every_template_has_one_golden_answer_case() {
 fn seeds_templates_once_then_lists_by_name() {
     let db = db();
     let dir = tempfile::tempdir().unwrap();
-    assert_eq!(repo::seed(&db, dir.path()).unwrap(), 6);
+    assert_eq!(repo::seed(&db, dir.path()).unwrap(), 14);
     assert_eq!(repo::seed(&db, dir.path()).unwrap(), 0, "only on first run");
     let names: Vec<String> = repo::list(&db)
         .unwrap()
@@ -55,10 +57,18 @@ fn seeds_templates_once_then_lists_by_name() {
     assert_eq!(
         names,
         [
+            "AI Engineering Interview (JS)",
+            "Behavioural Round",
+            "Design Discussion",
+            "DS & Algo Round (JS)",
             "Interview Coach",
+            "Managerial Round",
+            "Marketing Meeting",
             "Negotiation Coach",
             "Sales Discovery",
             "Staff Engineer Interview (JS)",
+            "System Design Round - Backend (JS)",
+            "System Design Round - Frontend (JS)",
             "Teacher",
             "Technical Architect"
         ]
@@ -168,12 +178,16 @@ fn export_then_import_is_lossless() {
 fn an_update_adds_new_built_in_skills_once_without_restoring_deleted_ones() {
     let db = db();
     let dir = tempfile::tempdir().unwrap();
-    // An install from before the interview Skill: the first five were seeded,
-    // and the user deleted one of them.
-    for (id, text) in TEMPLATES
-        .iter()
-        .filter(|(id, _)| *id != "staff-engineer-interview")
-    {
+    // An install from before the interview Skills: the first five were
+    // seeded, and the user deleted one of them.
+    const FIRST: [&str; 5] = [
+        "interview-coach",
+        "sales-discovery",
+        "technical-architect",
+        "teacher",
+        "negotiation-coach",
+    ];
+    for (id, text) in TEMPLATES.iter().filter(|(id, _)| FIRST.contains(id)) {
         repo::save(
             &db,
             dir.path(),
@@ -184,8 +198,13 @@ fn an_update_adds_new_built_in_skills_once_without_restoring_deleted_ones() {
     }
     repo::delete(&db, dir.path(), "teacher").unwrap();
 
-    assert_eq!(repo::seed(&db, dir.path()).unwrap(), 1, "only the new one");
+    assert_eq!(
+        repo::seed(&db, dir.path()).unwrap(),
+        TEMPLATES.len() - FIRST.len(),
+        "only the new ones"
+    );
     assert!(repo::get(&db, "staff-engineer-interview").is_ok());
+    assert!(repo::get(&db, "dsa-interview").is_ok());
     assert!(
         repo::get(&db, "teacher").is_err(),
         "a deleted built-in stays deleted"
@@ -217,4 +236,106 @@ fn the_interview_skill_covers_js_coding_and_system_design() {
         assert!(skill.instructions.contains(must), "missing {must}");
     }
     assert!(skill.instructions.chars().count() <= 8_000);
+}
+
+/// The interview and meeting Skills: each one asks for what its round is
+/// judged on, and every technical one writes code in JavaScript.
+#[test]
+fn the_round_skills_ask_for_what_each_round_is_judged_on() {
+    let expect: &[(&str, &[&str])] = &[
+        (
+            "dsa-interview",
+            &[
+                "brute force (the most expensive)",
+                "optimal (the least expensive)",
+                "Time and space complexity",
+                "Dry run",
+                "Edge cases",
+                "JavaScript",
+            ],
+        ),
+        (
+            "system-design-backend",
+            &[
+                "Functional requirements (FR)",
+                "Non-functional requirements (NFR)",
+                "Back-of-the-envelope estimates",
+                "API design",
+                "Data model",
+                "Design A (cheapest",
+                "Design B (scales",
+                "Trade-offs",
+                "JavaScript",
+            ],
+        ),
+        (
+            "system-design-frontend",
+            &[
+                "Functional requirements (FR)",
+                "Non-functional requirements (NFR)",
+                "Estimates",
+                "Component API",
+                "State management",
+                "Accessibility",
+                "Design A (cheapest",
+                "Design B (scales",
+                "JavaScript",
+            ],
+        ),
+        (
+            "ai-interview",
+            &[
+                "Approach 1 (simplest",
+                "Approach 2 (production-grade",
+                "Evaluation",
+                "prompt injection",
+                "JavaScript",
+            ],
+        ),
+        (
+            "behavioural-interview",
+            &["STAR", "Short version", "Full version", "never invent"],
+        ),
+        (
+            "managerial-interview",
+            &["Quick answer", "Structured answer", "STAR", "JavaScript"],
+        ),
+        (
+            "marketing-meeting",
+            &[
+                "Option A, the quick win",
+                "Option B, the bigger bet",
+                "CAC",
+                "Next steps",
+                "JavaScript",
+            ],
+        ),
+        (
+            "design-discussion",
+            &[
+                "Option A, the simplest",
+                "Option B, the more scalable",
+                "Non-functional",
+                "Decision and next steps",
+                "JavaScript",
+            ],
+        ),
+    ];
+    for (id, musts) in expect {
+        let (_, text) = TEMPLATES
+            .iter()
+            .find(|(t, _)| t == id)
+            .unwrap_or_else(|| panic!("{id} is a built-in"));
+        let skill = sidekick_skills::format::parse(text).unwrap();
+        assert!(
+            skill.instructions.contains("first person"),
+            "{id}: answers are what the user says"
+        );
+        for must in *musts {
+            assert!(
+                skill.instructions.contains(must),
+                "{id} should mention {must:?}"
+            );
+        }
+    }
 }

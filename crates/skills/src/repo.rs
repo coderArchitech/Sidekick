@@ -37,6 +37,38 @@ pub const TEMPLATES: &[(&str, &str)] = &[
         "staff-engineer-interview",
         include_str!("../../../skills/templates/staff-engineer-interview.md"),
     ),
+    (
+        "dsa-interview",
+        include_str!("../../../skills/templates/dsa-interview.md"),
+    ),
+    (
+        "system-design-backend",
+        include_str!("../../../skills/templates/system-design-backend.md"),
+    ),
+    (
+        "system-design-frontend",
+        include_str!("../../../skills/templates/system-design-frontend.md"),
+    ),
+    (
+        "ai-interview",
+        include_str!("../../../skills/templates/ai-interview.md"),
+    ),
+    (
+        "behavioural-interview",
+        include_str!("../../../skills/templates/behavioural-interview.md"),
+    ),
+    (
+        "managerial-interview",
+        include_str!("../../../skills/templates/managerial-interview.md"),
+    ),
+    (
+        "marketing-meeting",
+        include_str!("../../../skills/templates/marketing-meeting.md"),
+    ),
+    (
+        "design-discussion",
+        include_str!("../../../skills/templates/design-discussion.md"),
+    ),
 ];
 
 /// The templates of the first release, seeded before `SEEDED_KEY` existed.

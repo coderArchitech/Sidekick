@@ -1,0 +1,12 @@
+{
+  "skill": "behavioural-interview",
+  "question": "Tell me about a time you disagreed with your manager.",
+  "documents": [
+    {
+      "name": "resume.md",
+      "text": "Led the payments migration at Acme in 2025: aligned three teams on a phased rollout instead of a big-bang cutover; failed payments dropped 40%."
+    }
+  ],
+  "mustMention": ["Situation", "Result"],
+  "mustNotMention": []
+}

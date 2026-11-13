@@ -1,0 +1,12 @@
+{
+  "skill": "system-design-backend",
+  "question": "Design a URL shortener like bit.ly.",
+  "documents": [
+    {
+      "name": "interview-notes.md",
+      "text": "System design round: cover functional and non-functional requirements, back-of-the-envelope estimates, APIs, data model and scaling."
+    }
+  ],
+  "mustMention": ["functional", "non-functional", "per second"],
+  "mustNotMention": []
+}

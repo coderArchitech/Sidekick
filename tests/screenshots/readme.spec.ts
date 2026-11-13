@@ -15,6 +15,17 @@ const SETTINGS = { width: 720, height: 900 };
 /** Canned model replies: the first whose `match` is in the prompt is used. */
 const REPLIES = [
   {
+    match: "two numbers that add up",
+    long: false,
+    reply: "One pass with a Map of value to index: O(n) time, O(n) space.",
+  },
+  {
+    match: "two numbers that add up",
+    long: true,
+    reply:
+      "**Approach 1: brute force (most expensive).** Try every pair.\n\n```js\nfunction twoSumBrute(nums, target) {\n  for (let i = 0; i < nums.length; i++)\n    for (let j = i + 1; j < nums.length; j++)\n      if (nums[i] + nums[j] === target) return [i, j];\n  return [];\n}\n```\n\nTime **O(n²)**: every pair is checked. Space **O(1)**. At n = 10⁵ that is about 5 × 10⁹ checks: too slow.\n\n**Approach 2: optimal (least expensive).** Remember each value's index; for each number, look up its complement.\n\n```js\nfunction twoSum(nums, target) {\n  const seen = new Map();\n  for (let i = 0; i < nums.length; i++) {\n    const j = seen.get(target - nums[i]);\n    if (j !== undefined) return [j, i];\n    seen.set(nums[i], i);\n  }\n  return [];\n}\n```\n\nTime **O(n)**: one pass with O(1) lookups. Space **O(n)** for the map.",
+  },
+  {
     match: "running notes for a live meeting",
     reply:
       "- The partner moved every team to the **Pro plan** last week.\n- Pro stays at 600 requests a minute.\n- Billing data migration: plan due next.\n- Rollout timeline wanted by Friday.",
@@ -113,6 +124,20 @@ test("chat about a screenshot", async ({ page }) => {
   await shot(page, "chat-screenshot");
 });
 
+test("DS & Algo answer", async ({ page }) => {
+  await setup(page);
+  await startSession(page, "Coding round");
+  await choose(page.getByRole("combobox", { name: "Skill" }), "dsa-interview");
+  await line(
+    page,
+    "Alex, given an array of integers and a target, return the indices of the two numbers that add up to the target.",
+  );
+  await page.getByRole("tab", { name: "Live Answers" }).click();
+  await expect(page.getByRole("article").first()).toContainText("Approach 2");
+  await page.setViewportSize({ width: 420, height: 1100 });
+  await shot(page, "dsa-answer");
+});
+
 test("screenshot quick actions", async ({ page }) => {
   await setup(page);
   await startSession(page, "Bug triage");
@@ -201,11 +226,11 @@ test("documents and knowledge packs", async ({ page }) => {
 test("skills", async ({ page }) => {
   await setup(page);
   await startSession(page, "System design interview");
-  await choose(page.getByRole("combobox", { name: "Skill" }), "technical-architect");
+  await choose(page.getByRole("combobox", { name: "Skill" }), "system-design-backend");
   await page.getByRole("button", { name: /More Skills/ }).click();
   await page
     .getByRole("dialog", { name: "Also use" })
-    .getByRole("checkbox", { name: "Teacher" })
+    .getByRole("checkbox", { name: "System Design Round - Frontend (JS)" })
     .check();
   await shot(page, "skills-picker");
 });

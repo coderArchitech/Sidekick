@@ -141,7 +141,7 @@ Priority: P0 = must ship in MVP, P1 = ship if time allows, P2 = later.
 | --- | --- | --- |
 | SKL-1 | A Skill = name, instructions (persona, tone, answer format), attached knowledge, and trigger rules | P0 |
 | SKL-2 | No-code Skill builder plus import/export as a file (Markdown with metadata) | P0 |
-| SKL-3 | Built-in templates: Interview Coach, Staff Engineer Interview (JS), Sales Discovery, Technical Architect, Teacher, Negotiation Coach | P1 |
+| SKL-3 | Built-in templates: Interview Coach, Staff Engineer Interview (JS), DS & Algo Round (JS), System Design Round - Backend (JS), System Design Round - Frontend (JS), AI Engineering Interview (JS), Behavioural Round, Managerial Round, Marketing Meeting, Design Discussion, Sales Discovery, Technical Architect, Teacher, Negotiation Coach. Interview Skills answer in the first person with code in JavaScript, and give a simple option and a better one with their costs (DS & Algo: brute force and optimal with time and space complexity; system design: FR, NFR, estimates, APIs, data model, a simple and a scaled design, trade-offs) | P1 |
 | SKL-4 | Agents = Skills that can use tools (web search, doc search, calculator, code runner, calendar) | P1 |
 | SKL-5 | Multiple Skills can be active; user switches with a hotkey or dropdown | P1 |
 | SKL-6 | Community Skill gallery to share and install Skills | P2 |
